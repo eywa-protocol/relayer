@@ -8,8 +8,6 @@ ADD . .
 
 ADD ./env_p2p_bridge.env .
 
-RUN ls -la external/wrappers
-
 RUN make
 
 FROM golang:alpine

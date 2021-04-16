@@ -18,5 +18,11 @@ keys:
 clean:
 	rm ./bridge keys/*.key
 
-all: keys build
+all: deps keys build
 
+update-modules:
+	git submodule update --init --recursive
+	touch $@
+
+clean-modules:
+	rm ./external/wrappers/*.go

@@ -2,7 +2,7 @@ package test_utils
 
 import (
 	"fmt"
-	"github.com/sivo4kin/ea-starter/libp2p/pub_sub_bls/model"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
 	"sync"
 	"testing"
 )

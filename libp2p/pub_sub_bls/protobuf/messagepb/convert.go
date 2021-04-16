@@ -2,8 +2,8 @@ package messagepb
 
 import (
 	"fmt"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
 	"github.com/golang/protobuf/proto"
-	"github.com/sivo4kin/ea-starter/libp2p/pub_sub_bls/model"
 )
 
 type Convert struct{}

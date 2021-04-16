@@ -3,9 +3,9 @@ package tls
 import (
 	"context"
 	"fmt"
+	"github.com/digiu-ai/p2p-bridge/keys"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
-	"github.com/sivo4kin/ea-starter/keys"
 	"io/ioutil"
 	"net"
 	"time"

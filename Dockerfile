@@ -4,11 +4,11 @@ RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 
 WORKDIR /p2p-bridge
 
-ADD ./adapter/p2p-bridge .
+ADD . .
 
 ADD ./env_p2p_bridge.env .
 
-RUN make keys
+RUN ls -la external/wrappers
 
 RUN make
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/sivo4kin/ea-starter/keys"
+	"github.com/digiu-ai/p2p-bridge/keys"
 	"net"
 	"time"
 

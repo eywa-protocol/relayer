@@ -1,0 +1,18 @@
+syntax = "proto2";
+package messageSigpb;
+
+enum Msg_type {
+    Raw = 0;
+    Ack = 1;
+    Wit = 2;
+    Catchup = 3;
+}
+
+message PbMessageSig{
+    required Msg_type Msg_type = 1;
+    required int64 source = 2;
+    required int64 step = 3;
+    repeated PbMessageSig history = 4;
+    optional bytes signature = 5;
+    optional bytes mask = 6;
+}

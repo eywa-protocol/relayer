@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
+	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/model"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	mrand "math/rand"

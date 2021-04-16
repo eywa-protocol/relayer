@@ -1,11 +1,11 @@
-module github.com/digiu-ai/p2p-bridge
+module github.com/DigiU-Lab/p2p-bridge
 
 go 1.16
 
-replace github.com/digiu-ai/p2p-bridge => ./
+replace github.com/DigiU-Lab/p2p-bridge => ./
 
 require (
-	github.com/DigiU-Lab/p2p-bridge v0.0.0-20210416120024-8802ad3cedf0
+	github.com/DigiU-Lab/eth-contracts-go-wrappers v0.0.0-20210416113817-ee86a8dca2e7
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/ethereum/go-ethereum v1.10.2
 	github.com/golang/protobuf v1.4.3

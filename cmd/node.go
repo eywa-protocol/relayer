@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/libp2p/dht"
+	common2 "github.com/DigiU-Lab/p2p-bridge/common"
+	"github.com/DigiU-Lab/p2p-bridge/config"
+	"github.com/DigiU-Lab/p2p-bridge/libp2p/dht"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"

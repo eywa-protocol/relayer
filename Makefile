@@ -3,7 +3,7 @@
 .PHONY: update-modules build keys
 
 
-deps: update-modules
+deps:
 	go mod tidy
 	go mod download
 link:
@@ -20,9 +20,3 @@ clean:
 
 all: deps keys build
 
-update-modules:
-	git submodule update --init --recursive
-	touch $@
-
-clean-modules:
-	rm ./external/wrappers/*.go

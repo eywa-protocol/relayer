@@ -45,10 +45,15 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	return
 }
 
-func ListenOracleRequest(client ethclient.Client) (oracleRequest OracleRequest, err error) {
+func ListenOracleRequest(client ethclient.Client, contractAddress common.Address) (oracleRequest OracleRequest, err error) {
+	bridgeFilterer, err := wrappers.NewBridge(contractAddress, &client)
+	if err != nil {
+		return
+	}
 	channel := make(chan *wrappers.BridgeOracleRequest)
 	opt := &bind.WatchOpts{}
-	sub, err := wrappers.BridgeFilterer.WatchOracleRequest(opt, opt, channel)
+
+	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
 		return
 	}

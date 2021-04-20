@@ -105,13 +105,13 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 		return
 	}
 
-	ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequest)
-	if err != nil {
-		logrus.Fatal(err)
-		return
-	}
+	// ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequest)
+	// if err != nil {
+	// 	logrus.Fatal(err)
+	// 	return
+	// }
 
-	ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
+	// ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
 
 	if err != nil {
 		logrus.Fatal(err)
@@ -120,8 +120,8 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 	bridgesList = append(bridgesList, ad)
 	bridgesList = append(bridgesList, ad2)
-	bridgesList = append(bridgesList, ad3)
-	bridgesList = append(bridgesList, ad4)
+	// bridgesList = append(bridgesList, ad3)
+	// bridgesList = append(bridgesList, ad4)
 	srv = bridges.NewServer(bridgesList...)
 	return
 }

@@ -1,0 +1,6 @@
+FROM golang:alpine
+WORKDIR /app
+ADD ./p2p-bridge .
+RUN go get -v github.com/gofiber/fiber
+RUN go get -v github.com/cosmtrek/air
+ENTRYPOINT ["air"]

@@ -5,7 +5,7 @@ RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 ADD ./eth-contracts/wrappers /eth-contracts/wrappers
 
 WORKDIR /p2p-bridge-b
-
+RUN env
 ADD ./p2p-bridge .
 
 ADD ./p2p-bridge/env_p2p_bridge.env .

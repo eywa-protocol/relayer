@@ -4,54 +4,57 @@ services:
 
   adapter_1:
     build:
-      context: ./
-      dockerfile: ./Dockerfile
+      context: ../
+      dockerfile: ./p2p-bridge/Dockerfile
     depends_on:
       - ganache_net1
       - ganache_net2
     env_file:
-      - ./env_p2p_bridge.env
+      - ../eth-contracts/truffle/env_connect_to_network_1.env
+      - ../eth-contracts/truffle/env_connect_to_network_2.env
     networks:
       static-network:
-        ipv4_address: 172.20.128.55
+        ipv4_address: 173.20.128.55
     ports:
       - "8081:8081" # for debug
-
-
   adapter_2:
     build:
-      context: ./
-      dockerfile: ./Dockerfile
+      context: ../
+      dockerfile: ./p2p-bridge/Dockerfile
     depends_on:
       - ganache_net1
       - ganache_net2
     env_file:
-      - ./env_p2p_bridge_2.env
+      - ../eth-contracts/truffle/env_connect_to_network_1.env
+      - ../eth-contracts/truffle/env_connect_to_network_2.env
     networks:
       static-network:
-        ipv4_address: 172.20.128.58
+        ipv4_address: 173.20.128.58
+  ganache_net1:
+    build:
+      context: ../
+      dockerfile: ./eth-contracts/truffle/docker/network1/ganache/Dockerfile
+    networks:
+      static-network:
+        ipv4_address: 173.20.128.11
+    ports:
+     - "7545:7545"
 
-  # ganache_net1:
-  #   build: ./docker/network1/ganache
-  #   networks:
-  #     static-network:
-  #       ipv4_address: 172.20.128.11
-  #   ports:
-  #    - "7545:7545"
-
-  # ganache_net2:
-  #   build: ./docker/network2/ganache
-  #   networks:
-  #     static-network:
-  #       ipv4_address: 172.20.128.12
-  #   ports:
-  #    - "8545:8545"
+  ganache_net2:
+    build:
+      context: ../
+      dockerfile: ./eth-contracts/truffle/docker/network2/ganache/Dockerfile
+    networks:
+      static-network:
+        ipv4_address: 173.20.128.12
+    ports:
+     - "8545:8545"
 
 networks:
   static-network:
     name: dev_net
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 173.20.0.0/16
 
 

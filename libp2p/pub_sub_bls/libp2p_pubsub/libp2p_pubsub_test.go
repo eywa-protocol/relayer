@@ -298,10 +298,10 @@ func TestWithThreeGroups(t *testing.T) {
 }
 
 func TestBLS(t *testing.T) {
-	logFile, _ := os.OpenFile("../../../logs/logBLS.log", os.O_RDWR|os.O_CREATE, 0666)
+	logFile, _ := os.OpenFile("../../../logBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
 	Delayed = false
-	simpleTestBLS(t, 8, 9900, 3)
+	simpleTestBLS(t, 5, 9900, 2)
 }
 
 func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {

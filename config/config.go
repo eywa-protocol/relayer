@@ -3,9 +3,9 @@ package config
 import (
 	"flag"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/viper"
-	"time"
 )
 
 // Config is global object that holds all application level variables.
@@ -31,6 +31,7 @@ type AppConfig struct {
 	NETWORK_RPC_2             string
 	NETWORK_RPC_1             string
 	KEY_FILE                  string
+	BOOTSTRAP_PEER            string
 }
 
 // LoadConfig loads config from files
@@ -57,7 +58,7 @@ func LoadConfigAndArgs() (cfg *AppConfig, err error) {
 func NewConfig() *AppConfig {
 	c := AppConfig{}
 	var path string
-	flag.StringVar(&path, "config", ".", "config file absolute path")
+	flag.StringVar(&path, "cnf", ".", "config file absolute path")
 	flag.Parse()
 	c.CONFIG_PATH = filepath.Dir(path)
 	c.CONFIG_NAME = filepath.Base(path)

@@ -3,8 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"flag"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
-	"log"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 )
@@ -14,7 +14,7 @@ func main() {
 	flag.Parse()
 
 	if err := exportKeys(*prefix); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
 
@@ -53,9 +53,9 @@ func exportKeys(prefix string) error {
 func writeKey(priv crypto.PrivKey, name string) error {
 	privBytes, err := crypto.MarshalPrivateKey(priv)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	filename := name + ".key"
-	log.Println("Exporting key to", filename)
+	logrus.Println("Exporting key to", filename)
 	return ioutil.WriteFile("keys/"+filename, privBytes, 0644)
 }

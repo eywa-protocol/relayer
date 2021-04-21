@@ -22,24 +22,34 @@ import (
 )
 
 func main() {
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var bootstrapPeers addrList
-	//room := flag.String("room", "", "")
-	//joinRoom := flag.String("joinRoom", "", "")
+	var DigiUDefaultBootstrapPeers []multiaddr.Multiaddr
+
+	for _, s := range []string{
+		"/ip4/172.20.128.55/tcp/6666/p2p/QmYszwAKLoe1WjWutrc1tCCCKyHKBpr1a26LuESLqgcjHi",
+		"/ip4/127.0.0.1/tcp/6666/p2p/QmdDKbtGuRwh5LmPGjRhjhMb7ivEi9autzpCeazYQnzZnw",
+	} {
+		ma, err := multiaddr.NewMultiaddr(s)
+		if err != nil {
+			panic(err)
+		}
+		DigiUDefaultBootstrapPeers = append(DigiUDefaultBootstrapPeers, ma)
+	}
+
+	//firstMultiAddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/6666/p2p/QmdDKbtGuRwh5LmPGjRhjhMb7ivEi9autzpCeazYQnzZnw")
+
+	//DigiUDefaultBootstrapPeers = append(DigiUDefaultBootstrapPeers, firstMultiAddr)
 	flag.Var(&bootstrapPeers, "b", "")
 	flag.Parse()
-	//if *room == "" && *joinRoom == "" {
-	//	logrus.Printf("Пожалуйста, решите присоединиться room(-room [roomName]) Или создать room(-joinRoom [roomName])\n")
-	//	return
-	//}
 	if len(bootstrapPeers) == 0 {
-		bootstrapPeers = dht.DefaultBootstrapPeers
+		bootstrapPeers = DigiUDefaultBootstrapPeers
 	}
-	//h ost option
 
-	//устанавливать routingDiscovery
+	// устанавка routingDiscovery
 	var dualDHT *ddht.DHT
 	var routingDiscovery *discovery.RoutingDiscovery
 	routing := libp2p.Routing(func(host host.Host) (routing.PeerRouting, error) {
@@ -93,7 +103,7 @@ func main() {
 		peerInfo, _ := peer.AddrInfoFromP2pAddr(maddr)
 		go func() {
 			defer wg.Done()
-			logrus.Printf("Попробуйте подключиться к :%s\n", peerInfo.ID.Pretty())
+			logrus.Printf("Пробую подключиться к :%s\n", peerInfo.ID.Pretty())
 			if err := host.Connect(ctx, *peerInfo); err != nil {
 				logrus.Printf("Сбой соединения :%s\n", peerInfo.ID.Pretty())
 			} else {

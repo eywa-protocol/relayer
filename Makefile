@@ -14,12 +14,12 @@ key:
 	go run key/keygen.go --prefix $(name)
 
 clean:
-	rm -f ./bridge keys/*.key
+	rm -f ./bridge keys/*.key ./eth-contracts -r
 
 all: deps keys build
 
 .PHONY: docker
-develop:
+develop: clean
 	go run key/keygen.go --prefix $(keyname);
 	@docker-compose up -d $(servicename);
 	@docker-compose logs -f $(servicename)

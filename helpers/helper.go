@@ -10,12 +10,12 @@ import (
 )
 
 type OracleRequest struct {
-	requestType    string
-	bridge         common.Address
-	requestId      [32]byte
-	selector       []byte
-	receiveSide    common.Address
-	oppositeBridge common.Address
+	RequestType    string
+	Bridge         common.Address
+	RequestId      [32]byte
+	Selector       []byte
+	ReceiveSide    common.Address
+	OppositeBridge common.Address
 }
 
 func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAddress common.Address) (oracleRequest OracleRequest, err error) {
@@ -33,12 +33,12 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 		logrus.Print("OracleRequest Event", it.Event.Raw)
 		if it.Event != nil {
 			oracleRequest = OracleRequest{
-				requestType:    it.Event.RequestType,
-				bridge:         it.Event.Bridge,
-				requestId:      it.Event.RequestId,
-				selector:       it.Event.Selector,
-				receiveSide:    it.Event.ReceiveSide,
-				oppositeBridge: it.Event.OppositeBridge,
+				RequestType:    it.Event.RequestType,
+				Bridge:         it.Event.Bridge,
+				RequestId:      it.Event.RequestId,
+				Selector:       it.Event.Selector,
+				ReceiveSide:    it.Event.ReceiveSide,
+				OppositeBridge: it.Event.OppositeBridge,
 			}
 		}
 	}
@@ -66,12 +66,12 @@ func ListenOracleRequest(client ethclient.Client, contractAddress common.Address
 			case event := <-channel:
 				logrus.Printf("OracleRequest id: %d type: %d\n", event.RequestId, event.RequestType)
 				oracleRequest = OracleRequest{
-					requestType:    event.RequestType,
-					bridge:         event.Bridge,
-					requestId:      event.RequestId,
-					selector:       event.Selector,
-					receiveSide:    event.ReceiveSide,
-					oppositeBridge: event.OppositeBridge,
+					RequestType:    event.RequestType,
+					Bridge:         event.Bridge,
+					RequestId:      event.RequestId,
+					Selector:       event.Selector,
+					ReceiveSide:    event.ReceiveSide,
+					OppositeBridge: event.OppositeBridge,
 				}
 			}
 		}

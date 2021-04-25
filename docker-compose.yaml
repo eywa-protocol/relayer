@@ -2,34 +2,51 @@ version: '3.6'
 
 services:
 
-  adapter_1:
+  bootstrap_node:
     build:
       context: ../
       dockerfile: ./p2p-bridge/Dockerfile
+      args:
+        - NAMEFILE_KEY=boot
     depends_on:
       - ganache_net1
       - ganache_net2
     env_file:
       - ../eth-contracts/truffle/env_connect_to_network_1.env
       - ../eth-contracts/truffle/env_connect_to_network_2.env
+    environment:
+        - TYPE_ADAPTER_ENV=./bootstrap.env
     networks:
       static-network:
         ipv4_address: 173.20.128.55
-    ports:
-      - "8081:8081" # for debug
-  adapter_2:
+  dev-adapter:
     build:
       context: ../
-      dockerfile: ./p2p-bridge/Dockerfile
+      dockerfile: ./p2p-bridge/dev.Dockerfile
     depends_on:
       - ganache_net1
       - ganache_net2
-    env_file:
-      - ../eth-contracts/truffle/env_connect_to_network_1.env
-      - ../eth-contracts/truffle/env_connect_to_network_2.env
+    environment:
+      - TYPE_ADAPTER_ENV=${TYPE_ADAPTER_ENV}
+    volumes:
+      - ./:/p2p-bridge      
+      - ../eth-contracts/wrappers:/eth-contracts/wrappers
     networks:
       static-network:
-        ipv4_address: 173.20.128.58
+        ipv4_address: 173.20.128.56
+  # adapter_2:
+  #   build:
+  #     context: ../
+  #     dockerfile: ./p2p-bridge/Dockerfile
+  #   depends_on:
+  #     - ganache_net1
+  #     - ganache_net2
+  #   env_file:
+  #     - ../eth-contracts/truffle/env_connect_to_network_1.env
+  #     - ../eth-contracts/truffle/env_connect_to_network_2.env
+  #   networks:
+  #     static-network:
+  #       ipv4_address: 173.20.128.58
   ganache_net1:
     build:
       context: ../
@@ -56,5 +73,3 @@ networks:
     ipam:
       config:
         - subnet: 173.20.0.0/16
-
-

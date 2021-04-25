@@ -1,22 +1,26 @@
 .DEFAULT_GOAL := build
 
-.PHONY: update-modules build keys
+.PHONY: update-modules build key
 
 
 deps:
 	go mod tidy
 	go mod download
-link:
-	ln -s /home/syi/src/simplifi/eth-contracts/wrappers/ external/
 
 build: keys
 	go build -o bridge  cmd/node.go
 
-keys:
-	go run key/keygen.go --prefix srv3
+key:
+	go run key/keygen.go --prefix $(name)
 
 clean:
-	rm ./bridge keys/*.key
+	rm -f ./bridge keys/*.key
 
 all: deps keys build
+
+.PHONY: docker
+develop:
+	go run key/keygen.go --prefix $(keyname);
+	@docker-compose up -d $(servicename);
+	@docker-compose logs -f $(servicename)
 

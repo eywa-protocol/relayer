@@ -6,14 +6,9 @@ services:
     build:
       context: ../
       dockerfile: ./p2p-bridge/Dockerfile
-      args:
-        - NAMEFILE_KEY=boot
     depends_on:
       - ganache_net1
       - ganache_net2
-    env_file:
-      - ../eth-contracts/truffle/env_connect_to_network_1.env
-      - ../eth-contracts/truffle/env_connect_to_network_2.env
     environment:
         - TYPE_ADAPTER_ENV=./bootstrap.env
     networks:

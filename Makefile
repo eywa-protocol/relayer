@@ -7,7 +7,7 @@ deps:
 	go mod tidy
 	go mod download
 
-build: keys
+build:
 	go build -o bridge  cmd/node.go
 
 key:
@@ -16,7 +16,7 @@ key:
 clean:
 	rm -f ./bridge keys/*.key ./eth-contracts -r
 
-all: deps keys build
+all: deps build
 
 .PHONY: docker
 develop: clean

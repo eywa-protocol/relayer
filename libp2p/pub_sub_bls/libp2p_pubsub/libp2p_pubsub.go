@@ -6,11 +6,13 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/model"
+	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	mrand "math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -407,4 +409,24 @@ func connectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 		return
 	}
 	return
+}
+
+func (c *Libp2pPubSub) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
+	fmt.Print("START BLS NODE\n")
+	wg := &sync.WaitGroup{}
+	defer wg.Done()
+	node.Advance(0)
+	wg.Add(1)
+	go runBLSNode(node, stop, wg)
+	wg.Add(-fails)
+	wg.Wait()
+	fmt.Println("The END")
+}
+
+func runBLSNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	err := node.WaitForMsg(stop)
+	if err != nil {
+		fmt.Errorf(err.Error())
+	}
 }

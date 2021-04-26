@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/model"
+	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
+	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	messageSigpb "github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
@@ -16,6 +19,9 @@ import (
 	"github.com/linkpoolio/bridges"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"go.dedis.ch/kyber/v3"
+	"go.dedis.ch/kyber/v3/pairing"
+	"go.dedis.ch/kyber/v3/sign"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,7 +44,8 @@ type Node struct {
 	Host              host.Host
 	Dht               *dht.IpfsDHT
 	Service           *libp2p.Service
-	Comm              model.CommunicationInterface
+	P2PPubSub         *libp2p_pubsub.Libp2pPubSub
+	NodeBLS           modelBLS.Node
 }
 
 type addrList []multiaddr.Multiaddr
@@ -93,16 +100,29 @@ func NewNode() (err error) {
 
 	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
 
+	n.NodeBLS = *n.newBLSNode(4)
+
+	n.P2PPubSub.StartBLSNode(&n.NodeBLS, 1, 0)
+
+	go libp2p.Discover(n.Ctx, n.Host, n.Dht, "test", config.Config.TickerInterval)
+	/*err = n.runRPCService()
+	if err != nil {
+		return
+	}*/
+
+	n.Server.Start(config.Config.PORT_1)
+	run(n.Host, cancel)
+	return
+}
+
+func (n Node) runRPCService() (err error) {
 	n.Service = libp2p.NewService(n.Host, protocol.ID("network-start"))
 	err = n.Service.SetupRPC()
 	if err != nil {
 		logrus.Fatal(err)
 		return
 	}
-	go libp2p.Discover(n.Ctx, n.Host, n.Dht, "test", config.Config.TickerInterval)
-	go n.Service.StartMessaging(ctx, config.Config.TickerInterval)
-	n.Server.Start(config.Config.PORT_1)
-	run(n.Host, cancel)
+	n.Service.StartMessaging(n.Ctx, config.Config.TickerInterval)
 	return
 }
 
@@ -178,6 +198,30 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
-func (n Node) startBroadcast() {
-	n.Comm.Broadcast([]byte("weqweqwe"))
+func (n Node) newBLSNode(num int) *modelBLS.Node {
+	n.P2PPubSub = new(libp2p_pubsub.Libp2pPubSub)
+	n.P2PPubSub.InitializePubSub(n.Host)
+	suite := pairing.NewSuiteBn256()
+	prvKey := suite.Scalar().Pick(suite.RandomStream())
+	pubKey := suite.Point().Mul(prvKey, nil)
+	publicKeys := make([]kyber.Point, 0)
+	publicKeys = append(publicKeys, pubKey)
+	mask, _ := sign.NewMask(suite, publicKeys, nil)
+	fmt.Printf("HostId %v\n", n.Host.ID())
+	fmt.Printf("Host config Id %v\n", config.Config.ID)
+	return &modelBLS.Node{
+		Id:           config.Config.ID,
+		TimeStep:     0,
+		ThresholdWit: num/2 + 1,
+		ThresholdAck: num/2 + 1,
+		Acks:         0,
+		ConvertMsg:   &messageSigpb.Convert{},
+		Comm:         n.P2PPubSub,
+		History:      make([]modelBLS.MessageWithSig, 0),
+		Signatures:   make([][]byte, num),
+		SigMask:      mask,
+		PublicKeys:   publicKeys,
+		PrivateKey:   prvKey,
+		Suite:        suite,
+	}
 }

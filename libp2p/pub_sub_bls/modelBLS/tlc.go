@@ -7,6 +7,7 @@ import (
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/sign/bdn"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -17,14 +18,21 @@ const ChanLen = 500
 var Logger1 *log.Logger
 
 // Advance will change the step of the node to a new one and then broadcast a message to the network.
-func (node *Node) Advance(step int) {
+func (node *Node) Advance(step int) (err error) {
 	node.TimeStep = step
 	node.Acks = 0
 	node.Wits = 0
+	logFile, err := os.OpenFile("./nodeBLS.log", os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return
+	}
+	Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
 
 	fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
-	Logger1.SetPrefix(strconv.FormatInt(time.Now().Unix(), 10) + " ")
-	Logger1.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	tm := time.Now().Unix()
+	l := Logger1
+	l.SetPrefix(strconv.FormatInt(tm, 10) + " ")
+	l.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -37,11 +45,15 @@ func (node *Node) Advance(step int) {
 	for i := range node.PublicKeys {
 		node.Signatures[i] = nil
 	}
-	mask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
+	mask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
+	if err != nil {
+		return
+	}
 	node.SigMask = mask
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
 	node.Comm.Broadcast(*msgBytes)
+	return
 }
 
 // waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
@@ -185,7 +197,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
 					if err != nil {
-						panic(err)
+						fmt.Println("node ", node.Id, "PANIC AggregateSignatures: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
+						return
 					}
 					msg.Signature, err = aggSignature.MarshalBinary()
 					if err != nil {
@@ -198,7 +211,6 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
 						fmt.Println("node ", node.Id, "PANIC Sig: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
-						//panic(err)
 						return
 					}
 
@@ -234,10 +246,16 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				msg.Signature = signature
 
 				// Add mask for the signature
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				if err != nil {
+					fmt.Printf("ERROR NewMask: node (%d)\n", err)
+					return
+
+				}
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
-					panic(err)
+					fmt.Printf("ERROR keyMask.SetBit: node (%d)\n", node.Id)
+					return
 				}
 				msg.Mask = keyMask.Mask()
 
@@ -314,7 +332,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	}
 
 	//fmt.Println(node.PublicKeys[keyMask.IndexOfNthEnabled(0)],"\n MSG SIGNATURE		",msg.Signature,"\n")
-	fmt.Printf("verifing nodes signature pubKeys %v", node.PublicKeys)
+	fmt.Printf("verifing nodes signature pubKeys %v\n", node.PublicKeys)
 
 	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
 	// Verify message signature
@@ -322,6 +340,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	if err != nil {
 		return
 	}
+	fmt.Print("Boneh-Drijvers-Neven Signature Verified !!!\n\n")
 	return nil
 }
 

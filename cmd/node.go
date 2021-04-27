@@ -77,6 +77,11 @@ func NewNode(path string) (err error) {
 	server := n.NewBridge()
 	n.Server = *server
 	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
+
+
+	//helpers.WorkerEvent(n.EthClient_1, config.Config.PROXY_NETWORK1)
+	helpers.ListenOracleRequest(n.EthClient_1, common.HexToAddress(config.Config.PROXY_NETWORK1))
+	
 	var bootstrapPeers []multiaddr.Multiaddr
 	if len(config.Config.BOOTSTRAP_PEER) > 0 {
 		ma, err := multiaddr.NewMultiaddr(config.Config.BOOTSTRAP_PEER)
@@ -119,7 +124,7 @@ func (n Node) runRPCService() (err error) {
 	return
 }
 
-func (n Node) initEthClients() (err error) {
+func (n *Node) initEthClients() (err error) {
 	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	n.EthClient_1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {

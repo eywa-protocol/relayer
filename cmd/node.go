@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"github.com/DigiU-Lab/p2p-bridge/helpers"
 )
 
 type Node struct {
@@ -83,8 +84,11 @@ func NewNode() (err error) {
 
 	server := n.NewBridge()
 	n.Server = *server
-	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
-	var bootstrapPeers []multiaddr.Multiaddr
+	logrus.Printf("n.Config.PORT %d", config.Config.PORT)
+
+	//helpers.WorkerEvent(n.EthClient_1, config.Config.PROXY_NETWORK1)
+	helpers.ListenOracleRequest(n.EthClient_1, common.HexToAddress(config.Config.PROXY_NETWORK1))
+	/*var bootstrapPeers []multiaddr.Multiaddr
 	if len(config.Config.BOOTSTRAP_PEER) > 0 {
 		ma, err := multiaddr.NewMultiaddr(config.Config.BOOTSTRAP_PEER)
 		if err != nil {
@@ -110,7 +114,7 @@ func NewNode() (err error) {
 		return
 	}*/
 
-	n.Server.Start(config.Config.PORT_1)
+	n.Server.Start(config.Config.PORT)
 	run(n.Host, cancel)
 	return
 }
@@ -126,8 +130,8 @@ func (n Node) runRPCService() (err error) {
 	return
 }
 
-func (n Node) initEthClients() (err error) {
-	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
+func (n *Node) initEthClients() (err error) {
+
 	n.EthClient_1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {
 		return
@@ -137,10 +141,15 @@ func (n Node) initEthClients() (err error) {
 	if err != nil {
 		return
 	}
+
+	logrus.Printf("Successful connect to NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
+	logrus.Printf("Successful connect to NETWORK_RPC_2 %s", config.Config.NETWORK_RPC_2)
+
 	return
 }
 
-func (n Node) NewBridge() (srv *bridges.Server) {
+func (n *Node) NewBridge() (srv *bridges.Server) {
+
 	var bridgesList []bridges.Bridge
 	ad, err := common2.NewDBridge(n.EthClient_1, "Health Chain 1", "1", common2.HealthFirst)
 	if err != nil {
@@ -154,7 +163,7 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 		return
 	}
 
-	// ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequest)
+	// ad3, err := common2.NewDBridge(n.EthClient_1, "Testtt", "test", common2.Testtt)
 	// if err != nil {
 	// 	logrus.Fatal(err)
 	// 	return
@@ -170,7 +179,7 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 	bridgesList = append(bridgesList, ad)
 	bridgesList = append(bridgesList, ad2)
-	// bridgesList = append(bridgesList, ad3)
+	//bridgesList = append(bridgesList, ad3)
 	// bridgesList = append(bridgesList, ad4)
 	srv = bridges.NewServer(bridgesList...)
 	return

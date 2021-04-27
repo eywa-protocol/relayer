@@ -19,7 +19,7 @@ type AppConfig struct {
 	ECDSA_KEY_1               string
 	P2P_PORT                  int
 	PORT_2                    int
-	PORT_1                    int
+	PORT                      int
 	LISTEN_NETWORK_2          string
 	LISTEN_NETWORK_1          string
 	ORACLE_CONTRACT_ADDRESS_2 string
@@ -32,6 +32,11 @@ type AppConfig struct {
 	NETWORK_RPC_1             string
 	KEY_FILE                  string
 	BOOTSTRAP_PEER            string
+	ID                        int
+
+	PROXY_NETWORK1            string
+	MOCKDEX_NETWORK1          string
+
 }
 
 // LoadConfig loads config from files

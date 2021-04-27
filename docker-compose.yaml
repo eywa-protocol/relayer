@@ -29,6 +29,8 @@ services:
     networks:
       static-network:
         ipv4_address: 173.20.128.56
+    ports:
+     - "8080:8080"
   # adapter_2:
   #   build:
   #     context: ../

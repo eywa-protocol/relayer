@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"flag"
 	"fmt"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -28,7 +29,6 @@ import (
 )
 
 type Node struct {
-	Config            config.AppConfig
 	Ctx               context.Context
 	Router            *mux.Router
 	Server            bridges.Server
@@ -50,25 +50,18 @@ type Node struct {
 
 type addrList []multiaddr.Multiaddr
 
-func NewNode() (err error) {
+func NewNode(path string) (err error) {
 
-	dir, err := os.Getwd()
+	err = loadNodeConfig(path)
 	if err != nil {
-		logrus.Fatal(err)
+		return
 	}
-	logrus.Printf("started in directory %s", dir)
-	cnf, err := config.LoadConfigAndArgs()
-	if err != nil {
-		logrus.Fatal(err)
-	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	n := &Node{
-		Config:            *cnf,
 		Ctx:               ctx,
 		CurrentRendezvous: "FirstRun",
-		//BRIDGE_1_ADDRESS:          common.HexToAddress(os.Getenv("BRIDGE_1_ADDRESS")),
-		//ORACLE_1_ADDRESS: common.HexToAddress(os.Getenv("ORACLE_1_ADDRESS")),
 	}
 
 	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
@@ -97,7 +90,7 @@ func NewNode() (err error) {
 	if err != nil {
 		return
 	}
-
+	_ = libp2p.WriteHostAddrToConfig(n.Host, "keys/peer.env")
 	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
 
 	n.NodeBLS = *n.newBLSNode(4)
@@ -140,6 +133,20 @@ func (n Node) initEthClients() (err error) {
 	return
 }
 
+func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
+	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
+	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
+	if err != nil {
+		return
+	}
+
+	c2, err = ethclient.Dial(config.Config.NETWORK_RPC_2)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (n Node) NewBridge() (srv *bridges.Server) {
 	var bridgesList []bridges.Bridge
 	ad, err := common2.NewDBridge(n.EthClient_1, "Health Chain 1", "1", common2.HealthFirst)
@@ -154,11 +161,11 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 		return
 	}
 
-	ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequestV2)
-	if err != nil {
-		logrus.Fatal(err)
-		return
-	}
+	/*	ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequestV2)
+		if err != nil {
+			logrus.Fatal(err)
+			return
+		}*/
 
 	ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
 
@@ -169,17 +176,37 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 	bridgesList = append(bridgesList, ad)
 	bridgesList = append(bridgesList, ad2)
-	bridgesList = append(bridgesList, ad3)
+	//bridgesList = append(bridgesList, ad3)
 	bridgesList = append(bridgesList, ad4)
 	srv = bridges.NewServer(bridgesList...)
 	return
 }
 
 func main() {
-	err := NewNode()
-	if err != nil {
-		logrus.Fatalf(" NewNode %v", err)
+	var mode string
+	var path string
+	flag.StringVar(&mode, "mode", "serve", "Specify mode. Default is serve")
+	flag.StringVar(&path, "cnf", ".", "config file absolute path")
+	flag.Usage = func() {
+		fmt.Printf("Usage of our Program: \n")
+		fmt.Printf("./bridge -mode [serve|init] -cnf mynode.env\n")
 	}
+	flag.Parse()
+	logrus.Printf("mode %v path %v", mode, path)
+	if mode == "serve" {
+		err := NewNode(path)
+		if err != nil {
+			logrus.Fatalf("NewNode %v", err)
+			panic(err)
+		}
+	} else {
+		err := nodeInit(path)
+		if err != nil {
+			logrus.Fatalf("nodeInit %v", err)
+			panic(err)
+		}
+	}
+
 }
 
 func run(h host.Host, cancel func()) {
@@ -224,4 +251,61 @@ func (n Node) newBLSNode(num int) *modelBLS.Node {
 		PrivateKey:   prvKey,
 		Suite:        suite,
 	}
+}
+
+func loadNodeConfig(path string) (err error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		logrus.Fatal(err)
+		return
+	}
+	logrus.Printf("started in directory %s", dir)
+	err = config.LoadConfigAndArgs(path)
+	if err != nil {
+		logrus.Fatal(err)
+		return
+	}
+	return
+}
+
+func nodeInit(path string) (err error) {
+	logrus.Print("nodeInit START")
+	pub, err := common2.CreateBN256Key()
+	if err != nil {
+		return
+	}
+	logrus.Printf("pubkey %v", pub)
+	//common.ReadPointFromFile("")
+	common2.CreateRSAKey()
+	err = loadNodeConfig(path)
+	if err != nil {
+		return
+	}
+
+	logrus.Printf("keyfile %v port %v", config.Config.KEY_FILE, config.Config.P2P_PORT)
+	h, err := libp2p.NewHost(context.Background(), 0, config.Config.KEY_FILE, config.Config.P2P_PORT)
+	if err != nil {
+		return
+	}
+	nodeURL := libp2p.WriteHostAddrToConfig(h, "keys/peer.env")
+	c1, c2, err := getEthClients()
+
+	if err != nil {
+		return
+	}
+
+	logrus.Printf("nodelist 1 %v", common.HexToAddress(config.Config.ECDSA_KEY_1))
+
+	err = common2.RegisterNode(c1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub))
+	if err != nil {
+		return
+	}
+
+	logrus.Printf("nodelist 2 %v", common.HexToAddress(config.Config.NODELIST_NETWORK2))
+	err = common2.RegisterNode(c2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub))
+	if err != nil {
+		return
+	}
+
+	return
 }

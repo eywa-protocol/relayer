@@ -2,7 +2,9 @@ package libp2p
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -44,4 +46,28 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	wg.Wait()
 
 	return kdht, nil
+}
+
+func WriteHostAddrToConfig(host2 host.Host, filename string) (nodeURL string) {
+	for i, addr := range host2.Addrs() {
+		if i == 0 {
+			nodeURL = fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
+			logrus.Printf("Node Address: %s\n", nodeURL)
+			err := ioutil.WriteFile(filename, []byte(nodeURL), 0644)
+			if err != nil {
+				logrus.Fatal(err)
+				panic(err)
+			}
+		}
+	}
+	return
+}
+
+func GetAddrsFromHost(host2 host.Host) (nodeAddrs []string) {
+	for _, addr := range host2.Addrs() {
+		nodeURL := fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
+		logrus.Printf("Node Address: %s\n", nodeURL)
+		nodeAddrs = append(nodeAddrs, nodeURL)
+	}
+	return
 }

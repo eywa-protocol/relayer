@@ -8,5 +8,5 @@ import (
 )
 
 func GetContractByAddressNetwork1(config config.AppConfig, ethClient *ethclient.Client) (out *wrappers.Bridge, err error) {
-	return wrappers.NewBridge(common.HexToAddress(config.BRIDGE_ADDRESS_1), ethClient)
+	return wrappers.NewBridge(common.HexToAddress(config.BRIDGE_ADDRESS_NETWORK1), ethClient)
 }

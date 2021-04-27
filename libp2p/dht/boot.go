@@ -4,7 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/DigiU-Lab/p2p-bridge/keys"
+	common2 "github.com/DigiU-Lab/p2p-bridge/common"
+	libp2p2 "github.com/DigiU-Lab/p2p-bridge/libp2p"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -17,7 +18,6 @@ import (
 	ddht "github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -76,7 +76,7 @@ func NewDHTBootPeer(keyFile string, port int) (err error) {
 
 	}
 
-	WriteHostAddrToConfig(host, "NewDHTBootPeer.env")
+	libp2p2.WriteHostAddrToConfig(host, "keys/NewDHTBootPeer.env")
 	sk := host.Peerstore().PrivKey(host.ID())
 	bz, _ := crypto.MarshalPrivateKey(sk)
 	logrus.Printf("KEY %v", bz)
@@ -97,20 +97,6 @@ func setBootNodeURLEnv(botNodeURL string) {
 	err := os.Setenv("P2P_URL", botNodeURL)
 	if err != nil {
 		logrus.Errorf("err %v", err)
-	}
-}
-
-func WriteHostAddrToConfig(host2 host.Host, filename string) {
-	for i, addr := range host2.Addrs() {
-		if i == 1 {
-			nodeURL := fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
-			logrus.Printf("Node Address: %s\n", nodeURL)
-			err := ioutil.WriteFile(filename, []byte(nodeURL), 0777)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-		}
-
 	}
 }
 
@@ -359,7 +345,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, rendezvous str
 }*/
 
 func identityFromKey(keyFile string) (identity libp2p.Option, err error) {
-	privKey, err := keys.ReadHostKey(keyFile)
+	privKey, err := common2.ReadHostKey(keyFile)
 	if err != nil {
 		logrus.Errorf("ERROR GETTING CERT %v", err)
 		return

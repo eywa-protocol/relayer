@@ -3,8 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"flag"
+	"github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 )
@@ -23,7 +23,7 @@ func exportKeys(prefix string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeKey(rsa, prefix+"-rsa"); err != nil {
+	if err := common.WriteKey(rsa, prefix+"-rsa"); err != nil {
 		return err
 	}
 
@@ -31,7 +31,7 @@ func exportKeys(prefix string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeKey(ecdsa, prefix+"-ecdsa"); err != nil {
+	if err := common.WriteKey(ecdsa, prefix+"-ecdsa"); err != nil {
 		return err
 	}
 
@@ -39,7 +39,7 @@ func exportKeys(prefix string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeKey(ed, prefix+"-ed25519"); err != nil {
+	if err := common.WriteKey(ed, prefix+"-ed25519"); err != nil {
 		return err
 	}
 
@@ -47,15 +47,5 @@ func exportKeys(prefix string) error {
 	if err != nil {
 		return err
 	}
-	return writeKey(sec, prefix+"-secp256k1")
-}
-
-func writeKey(priv crypto.PrivKey, name string) error {
-	privBytes, err := crypto.MarshalPrivateKey(priv)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	filename := name + ".key"
-	logrus.Println("Exporting key to", filename)
-	return ioutil.WriteFile("keys/"+filename, privBytes, 0644)
+	return common.WriteKey(sec, prefix+"-secp256k1")
 }

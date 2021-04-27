@@ -1,10 +1,13 @@
-package keys
+package common
 
 import (
 	"crypto/rand"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/sirupsen/logrus"
+	"go.dedis.ch/kyber/v3/pairing"
+	"go.dedis.ch/kyber/v3/util/encoding"
 	"io/ioutil"
+	"os"
 )
 
 // We pass in both the private keys of host and peer.
@@ -65,4 +68,68 @@ func GenPrivPubkey() ([]byte, []byte, error) {
 	logrus.Print("privkey", privkey)
 	return privkey, pubkey, nil
 
+}
+
+func WriteKey(priv crypto.PrivKey, name string) error {
+	privBytes, err := crypto.MarshalPrivateKey(priv)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	filename := name + ".key"
+	logrus.Println("Exporting key to", filename)
+	return ioutil.WriteFile("keys/"+filename, privBytes, 0644)
+}
+
+func ReadPointFromFile(fileName string) {
+	suite := pairing.NewSuiteBn256()
+	file, err := os.Open(fileName)
+	if err != nil {
+		panic(err)
+	}
+	p, err := encoding.ReadHexScalar(suite, file)
+	if err != nil {
+		panic(err)
+	}
+
+	pubKey := suite.Point().Mul(p, nil)
+	strPub, err := encoding.PointToStringHex(suite, pubKey)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Print(strPub)
+}
+
+func CreateBN256Key() (strPub string, err error) {
+	suite := pairing.NewSuiteBn256()
+	prvKey := suite.Scalar().Pick(suite.RandomStream())
+	pubKey := suite.Point().Mul(prvKey, nil)
+	str, err := encoding.ScalarToStringHex(suite, prvKey)
+	if err != nil {
+		return
+	}
+	err = os.WriteFile("keys/bn256.key", []byte(str), 0644)
+	if err != nil {
+		return
+	}
+
+	strPub, err = encoding.PointToStringHex(suite, pubKey)
+	if err != nil {
+		return
+	}
+
+	err = os.WriteFile("keys/bn256.pub.key", []byte(strPub), 0644)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func CreateRSAKey() {
+	pr, _, err := crypto.GenerateRSAKeyPair(2048, rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	if err := WriteKey(pr, "key-rsa"); err != nil {
+		panic(err)
+	}
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
-	"math/big"
 	"strings"
 )
 
@@ -52,7 +51,7 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 	return
 }
 
-func SetMockPoolTestRequestV2(helper *bridges.Helper) (o *Output, err error) {
+/*func SetMockPoolTestRequestV2(helper *bridges.Helper) (o *Output, err error) {
 	o = &Output{}
 
 	reqId := helper.GetIntParam("id")
@@ -69,12 +68,12 @@ func SetMockPoolTestRequestV2(helper *bridges.Helper) (o *Output, err error) {
 
 	txOpts1 := bind.NewKeyedTransactor(pKey1)
 
-	mockDexPoolContract1, err := wrappers.NewMockDexPool(common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_1), client1)
+	mockBridgeContract1, err := wrappers.NewBridge(common.HexToAddress(config.Config.BRIDGE_ADDRESS_NETWORK1), client1)
 	if err != nil {
 		return
 	}
 
-	tx, err := mockDexPoolContract1.SendRequestTestV2(txOpts1, big.NewInt(reqId), common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_2))
+	tx, err := mockBridgeContract1.TransmitRequestV2(txOpts1, big.NewInt(reqId), common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_2))
 
 	if err != nil {
 		return
@@ -83,6 +82,30 @@ func SetMockPoolTestRequestV2(helper *bridges.Helper) (o *Output, err error) {
 	logrus.Printf("TX HASH %x", tx.Hash())
 	o.ChainId = fmt.Sprintf("%s", tx.ChainId())
 	o.TxHash = tx.Hash().Hex()
+	return
+}*/
+
+func RegisterNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, pubKey []byte) (err error) {
+	logrus.Printf("REGISTERING NODE sender:%v", nodeWallet)
+	pKey1, err := ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	if err != nil {
+		return
+	}
+
+	txOpts1 := bind.NewKeyedTransactor(pKey1)
+
+	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
+	if err != nil {
+		return
+	}
+
+	tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, pubKey, true)
+
+	if err != nil {
+		return
+	}
+
+	logrus.Printf("TX HASH %x", tx.Hash().Hex())
 	return
 }
 

@@ -2,12 +2,19 @@ package helpers
 
 import (
 	"context"
+	"strings"
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
+	ethereum "github.com/ethereum/go-ethereum"
+	"math/big"
 )
+
+
 
 type OracleRequest struct {
 	RequestType    string
@@ -45,8 +52,8 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	return
 }
 
-func ListenOracleRequest(client ethclient.Client, contractAddress common.Address) (oracleRequest OracleRequest, err error) {
-	bridgeFilterer, err := wrappers.NewBridge(contractAddress, &client)
+func ListenOracleRequest(client *ethclient.Client, contractAddress common.Address) (oracleRequest OracleRequest, err error) {
+	bridgeFilterer, err := wrappers.NewBridge(contractAddress, client)
 	if err != nil {
 		return
 	}
@@ -77,4 +84,56 @@ func ListenOracleRequest(client ethclient.Client, contractAddress common.Address
 		}
 	}()
 	return
+}
+
+func WorkerEvent(client *ethclient.Client, _contractAddress string) {
+
+	contractAddress := common.HexToAddress(_contractAddress)
+    query 			:= ethereum.FilterQuery{
+					        FromBlock: big.NewInt(20),
+					        ToBlock:   nil,
+					        Addresses: []common.Address{
+					            contractAddress,
+					        },
+					    }
+
+    logs, err := client.FilterLogs(context.Background(), query)
+    	if err != nil { logrus.Fatal(err) }		
+	contractAbi, err := abi.JSON(strings.NewReader(string(wrappers.BridgeABI)))
+    	if err != nil {logrus.Fatal(err)}			    
+	eventSignature := []byte("OracleRequest(string,address,bytes32,bytes,address,address)")
+    	eventOracleRequest := crypto.Keccak256Hash(eventSignature)
+	
+	for _, vLog := range logs {
+        logrus.Info("Log Block Number: ", vLog.BlockNumber)
+		logrus.Info("Log Top: ",  vLog.Topics)
+
+        switch vLog.Topics[0].Hex() {
+
+        	case eventOracleRequest.Hex(): 
+        		  logrus.Info("EventOracleRequest triggered")
+        		  
+				  res, err := contractAbi.Unpack("OracleRequest", vLog.Data)
+				  if err != nil {logrus.Fatal(err)}
+
+  				  var oracleRequest = OracleRequest{
+						RequestType:    res[0].(string),
+						Bridge:         res[1].(common.Address),
+						RequestId:      res[2].([32]byte),
+						Selector:       res[3].([]byte),
+						ReceiveSide:    res[4].(common.Address),
+						OppositeBridge: res[5].(common.Address),
+					}
+				  
+				  logrus.Info("DEBUG", oracleRequest)
+				  
+        }
+	}
+
+    _=contractAbi
+    _=contractAddress
+	
+	//logrus.Info("DEBUG", eventOracleRequest.Hex())
+	//logrus.Info("DEBUG", logs)
+
 }

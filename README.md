@@ -19,6 +19,14 @@ this.enableNode_2     = true;
 
 const tx1 = await this.nodeList.addNode(adrWalletNode1, this.p2pAddressNode_1, this.pubKeyNode_1, this.enableNode_1);
 ```
+
+
+### Пример работы с air
+
+```json
+$ docker-compose stop dev-adapter && docker-compose rm dev-adapter && docker rmi p2p-bridge_dev-adapter -f # optional
+$ export TYPE_ADAPTER_ENV=./bootstrap.env && keyname=boot servicename=dev-adapter make develop
+```
   
 
 

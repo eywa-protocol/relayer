@@ -104,6 +104,11 @@ func NewNode(path, name string) (err error) {
 
 	n.EthClient_1, n.EthClient_2, err = getEthClients()
 
+	/** Listen event OracleRequest on net_1 */
+	helpers.ListenOracleRequest(n.EthClient_1, n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK1), common.HexToAddress(config.Config.PROXY_NETWORK2))
+	/** Listen event ReceiveRequest on net_2 */
+	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+
 	if err != nil {
 		return
 	}

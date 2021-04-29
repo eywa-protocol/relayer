@@ -26,7 +26,7 @@ type AppConfig struct {
 func LoadConfig(config AppConfig) error {
 	v := viper.New()
 	v.SetConfigType("env")
-	v.SetConfigName("config")
+	v.SetConfigName("bootstrap")
 	v.SetEnvPrefix("cross-chain")
 	v.AutomaticEnv()
 	v.AddConfigPath(".")

@@ -4,30 +4,46 @@ services:
 
   bootstrap_node:
     build:
-      context: ./
-      dockerfile: ./Dockerfile
-    env_file:
-      - ./env_p2p_.env
+      context: ../
+      dockerfile: ./p2p-bridge/Dockerfile
+    depends_on:
+      - ganache_net1
+      - ganache_net2
+    environment:
+        - TYPE_ADAPTER_ENV=bootstrap.env
     networks:
       static-network:
         ipv4_address: 152.20.128.55
-    ports:
-      - "8081:8081" # for debug
-
-
-  node:
+  # node:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./Dockerfile
+  #   env_file:
+  #     - ./env_p2p__2.env
+  #   networks:
+  #     static-network:
+  #       ipv4_address: 152.20.128.58
+  ganache_net1:
     build:
-      context: ./
-      dockerfile: ./Dockerfile
-    env_file:
-      - ./env_p2p__2.env
+      context: ../
+      dockerfile: ./eth-contracts/truffle/docker/network1/ganache/Dockerfile
     networks:
       static-network:
-        ipv4_address: 152.20.128.58
-
-
-
-
+        ipv4_address: 152.20.128.11
+    ports:
+     - "7545:7545"
+  ganache_net2:
+    build:
+      context: ../
+      dockerfile: ./eth-contracts/truffle/docker/network2/ganache/Dockerfile
+    networks:
+      static-network:
+        ipv4_address: 152.20.128.12
+    ports:
+     - "8545:8545"        
 networks:
   static-network:
     name: bridge_p2p
+    ipam:
+      config:
+        - subnet: 152.20.0.0/16

@@ -51,55 +51,15 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 	return
 }
 
-/*func SetMockPoolTestRequestV2(helper *bridges.Helper) (o *Output, err error) {
-	o = &Output{}
-
-	reqId := helper.GetIntParam("id")
-	client1, err := Connect(config.Config.NETWORK_RPC_1)
-	if err != nil {
-		return
-
-	}
-
-	pKey1, err := ToECDSAFromHex(config.Config.ECDSA_KEY_1)
-	if err != nil {
-		return
-	}
-
-	txOpts1 := bind.NewKeyedTransactor(pKey1)
-
-	mockBridgeContract1, err := wrappers.NewBridge(common.HexToAddress(config.Config.BRIDGE_ADDRESS_NETWORK1), client1)
-	if err != nil {
-		return
-	}
-
-	tx, err := mockBridgeContract1.TransmitRequestV2(txOpts1, big.NewInt(reqId), common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_2))
-
-	if err != nil {
-		return
-	}
-
-	logrus.Printf("TX HASH %x", tx.Hash())
-	o.ChainId = fmt.Sprintf("%s", tx.ChainId())
-	o.TxHash = tx.Hash().Hex()
-	return
-}*/
-
-func RegisterNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, pubKey []byte) (err error) {
+func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
 	logrus.Printf("REGISTERING NODE sender:%v", nodeWallet)
-	pKey1, err := ToECDSAFromHex(config.Config.ECDSA_KEY_1)
-	if err != nil {
-		return
-	}
-
-	txOpts1 := bind.NewKeyedTransactor(pKey1)
-
+	txOpts1 := bind.NewKeyedTransactor(pk)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
 		return
 	}
 
-	tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, pubKey, true)
+	tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
 
 	if err != nil {
 		return
@@ -109,42 +69,59 @@ func RegisterNode(client *ethclient.Client, nodeListContractAddress common.Addre
 	return
 }
 
+func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeListNode, err error) {
+	logrus.Printf("GetNodesFromContract: %v", nodeListContractAddress)
+	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+	if err != nil {
+		return
+	}
+
+	nodes, err = nodeList.GetNodes(&bind.CallOpts{})
+
+	if err != nil {
+		return
+	}
+	return
+}
+
+func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address) {
+	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+	if err != nil {
+		return
+	}
+
+	nodes, err := nodeList.GetNodes(&bind.CallOpts{})
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	for _, node1 := range nodes {
+		logrus.Printf("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, node1.P2pAddress, node1.BlsPointAddr)
+	}
+
+}
+
+func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeListNode, err error) {
+	logrus.Printf("GetNode : %v", nodeListContractAddress)
+	PrintNodes(client, nodeListContractAddress)
+	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+	if err != nil {
+		return
+	}
+
+	if exist, _ := nodeList.NodeExists(&bind.CallOpts{}, nodeBLSAddr); !exist {
+		logrus.Errorf("NODE DOES NOT EXIST %v", nodeBLSAddr)
+		panic(err)
+	}
+	node, err = nodeList.GetNode(&bind.CallOpts{}, nodeBLSAddr)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func ChainlinkData(helper *bridges.Helper) (o *Output, err error) {
 	o = &Output{}
 	fmt.Print(helper.Data)
 	o.Data2 = *helper.Data
 	return
 }
-
-/*func GetP2PBootstrapPeerId(helper *bridges.Helper) (o *Output, err error) {
-	o = &Output{}
-	reqId := helper.GetIntParam("id")
-	client1, err := Connect(config.Config.NETWORK_RPC_1)
-	if err != nil {
-		return
-
-	}
-
-	pKey1, err := ToECDSAFromHex(config.Config.ECDSA_KEY_1)
-	if err != nil {
-		return
-	}
-
-	txOpts1 := bind.NewKeyedTransactor(pKey1)
-
-	mockDexPoolContract1, err := wrappers.NewMockDexPool(common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_1), client1)
-	if err != nil {
-		return
-	}
-
-	tx, err := mockDexPoolContract1.SendRequestTest(txOpts1, big.NewInt(reqId), common.HexToAddress(config.Config.TOKENPOOL_ADDRESS_2))
-
-	if err != nil {
-		return
-	}
-
-	logrus.Printf("TX HASH %x", tx.Hash())
-	o.ChainId = fmt.Sprintf("%s", tx.ChainId())
-	o.TxHash = tx.Hash().Hex()
-	return
-}*/

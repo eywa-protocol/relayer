@@ -3,7 +3,7 @@ package tls
 import (
 	"context"
 	"fmt"
-	"github.com/DigiU-Lab/p2p-bridge/keys"
+	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	"io/ioutil"
@@ -13,7 +13,7 @@ import (
 
 func StartClient(peerIDString string) error {
 
-	priv, _, err := keys.ReadKeys("../keys/cl1-ecdsa.key", "../keys/cl1-rsa.key")
+	priv, _, err := common2.ReadKeys("../keys/cl1-ecdsa.key", "../keys/cl1-rsa.key")
 	if err != nil {
 		return err
 	}

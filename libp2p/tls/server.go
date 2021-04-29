@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/DigiU-Lab/p2p-bridge/keys"
+	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"net"
 	"time"
 
@@ -21,7 +21,7 @@ func StartServer() (id peer.ID, err error) {
 	//if err != nil {
 	//	return
 	//}
-	priv, _, err := keys.ReadKeys("../keys/tls1-ecdsa.key", "../keys/tls1-rsa.key")
+	priv, _, err := common2.ReadKeys("../keys/tls1-ecdsa.key", "../keys/tls1-rsa.key")
 	if err != nil {
 		return
 	}

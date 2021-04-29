@@ -4,7 +4,7 @@ go 1.16
 
 replace github.com/DigiU-Lab/p2p-bridge => ./
 
-replace github.com/DigiU-Lab/eth-contracts-go-wrappers => /home/syi/src/DigiU/eth-contracts/wrappers
+replace github.com/DigiU-Lab/eth-contracts-go-wrappers => ../eth-contracts/wrappers
 
 require (
 	github.com/DigiU-Lab/eth-contracts-go-wrappers v0.0.0-20210419095758-51b134180ee0
@@ -31,4 +31,5 @@ require (
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0
 	go.dedis.ch/kyber/v3 v3.0.13
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 )

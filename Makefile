@@ -7,16 +7,16 @@ deps:
 	go mod tidy
 	go mod download
 
-build: keys
+build:
 	go build -o bridge  cmd/node.go
 
 key:
 	go run key/keygen.go --prefix $(name)
 
 clean:
-	rm ./bridge keys/*.key
+	rm ./bridge keys/*.key keys/*.env
 
-all: deps keys build
+all: deps build
 
 
 boot_key:

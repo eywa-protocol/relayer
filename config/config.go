@@ -36,6 +36,7 @@ type AppConfig struct {
 
 	PROXY_NETWORK1            string
 	MOCKDEX_NETWORK1          string
+	PROXY_NETWORK2            string
 
 }
 

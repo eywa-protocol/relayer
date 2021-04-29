@@ -2,19 +2,17 @@ package helpers
 
 import (
 	"context"
-	"strings"
+	"math/big"
+
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
-	ethereum "github.com/ethereum/go-ethereum"
-	"math/big"
+
+	"crypto/ecdsa"
 )
-
-
 
 type OracleRequest struct {
 	RequestType    string
@@ -52,8 +50,16 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	return
 }
 
-func ListenOracleRequest(client *ethclient.Client, contractAddress common.Address) (oracleRequest OracleRequest, err error) {
-	bridgeFilterer, err := wrappers.NewBridge(contractAddress, client)
+/**
+* Catch event from first side
+ */
+func ListenOracleRequest(
+	clientNetwork_1 *ethclient.Client,
+	clientNetwork_2 *ethclient.Client,
+	proxyNetwork_1 common.Address,
+	proxyNetwork_2 common.Address) (oracleRequest OracleRequest, err error) {
+
+	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork_1, clientNetwork_1)
 	if err != nil {
 		return
 	}
@@ -72,6 +78,41 @@ func ListenOracleRequest(client *ethclient.Client, contractAddress common.Addres
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
 				logrus.Printf("OracleRequest id: %d type: %d\n", event.RequestId, event.RequestType)
+
+				privateKey, err := crypto.HexToECDSA("95472b385de2c871fb293f07e76a56e8e93ea4e743fe940afbd44c30730211dc")
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				publicKey := privateKey.Public()
+				publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+				if !ok {
+					logrus.Fatal("error casting public key to ECDSA")
+				}
+				fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+				nonce, err := clientNetwork_2.PendingNonceAt(context.Background(), fromAddress)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				gasPrice, err := clientNetwork_2.SuggestGasPrice(context.Background())
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				auth := bind.NewKeyedTransactor(privateKey)
+				auth.Nonce = big.NewInt(int64(nonce))
+				auth.Value = big.NewInt(0)     // in wei
+				auth.GasLimit = uint64(300000) // in units
+				auth.GasPrice = gasPrice
+
+				instance, err := wrappers.NewBridge(proxyNetwork_2, clientNetwork_2)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+
+				/**   TODO: apporove that tx was real  */
+				/**   TODO: apporove that tx was real  */
+				/**   TODO: apporove that tx was real  */
+				/**   TODO: apporove that tx was real  */
+
 				oracleRequest = OracleRequest{
 					RequestType:    event.RequestType,
 					Bridge:         event.Bridge,
@@ -80,60 +121,50 @@ func ListenOracleRequest(client *ethclient.Client, contractAddress common.Addres
 					ReceiveSide:    event.ReceiveSide,
 					OppositeBridge: event.OppositeBridge,
 				}
+				/** Invoke bridge on another side */
+				tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+
+				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
+
 			}
 		}
 	}()
 	return
 }
 
-func WorkerEvent(client *ethclient.Client, _contractAddress string) {
+//TODO: sinchroniize between ListenOracleRequest
+func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.Address) {
 
-	contractAddress := common.HexToAddress(_contractAddress)
-    query 			:= ethereum.FilterQuery{
-					        FromBlock: big.NewInt(20),
-					        ToBlock:   nil,
-					        Addresses: []common.Address{
-					            contractAddress,
-					        },
-					    }
+	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork, clientNetwork)
+	if err != nil {
+		return
+	}
+	channel := make(chan *wrappers.BridgeReceiveRequest)
+	opt := &bind.WatchOpts{}
 
-    logs, err := client.FilterLogs(context.Background(), query)
-    	if err != nil { logrus.Fatal(err) }		
-	contractAbi, err := abi.JSON(strings.NewReader(string(wrappers.BridgeABI)))
-    	if err != nil {logrus.Fatal(err)}			    
-	eventSignature := []byte("OracleRequest(string,address,bytes32,bytes,address,address)")
-    	eventOracleRequest := crypto.Keccak256Hash(eventSignature)
-	
-	for _, vLog := range logs {
-        logrus.Info("Log Block Number: ", vLog.BlockNumber)
-		logrus.Info("Log Top: ",  vLog.Topics)
-
-        switch vLog.Topics[0].Hex() {
-
-        	case eventOracleRequest.Hex(): 
-        		  logrus.Info("EventOracleRequest triggered")
-        		  
-				  res, err := contractAbi.Unpack("OracleRequest", vLog.Data)
-				  if err != nil {logrus.Fatal(err)}
-
-  				  var oracleRequest = OracleRequest{
-						RequestType:    res[0].(string),
-						Bridge:         res[1].(common.Address),
-						RequestId:      res[2].([32]byte),
-						Selector:       res[3].([]byte),
-						ReceiveSide:    res[4].(common.Address),
-						OppositeBridge: res[5].(common.Address),
-					}
-				  
-				  logrus.Info("DEBUG", oracleRequest)
-				  
-        }
+	sub, err := bridgeFilterer.WatchReceiveRequest(opt, channel)
+	if err != nil {
+		return
 	}
 
-    _=contractAbi
-    _=contractAddress
-	
-	//logrus.Info("DEBUG", eventOracleRequest.Hex())
-	//logrus.Info("DEBUG", logs)
+	go func() {
+		for {
+			select {
+			case err := <-sub.Err():
+				logrus.Println("ReceiveRequest error:", err)
+			case event := <-channel:
+				logrus.Printf("ReceiveRequest: ", event.ReqId, event.ReceiveSide, event.Tx)
+
+				/** TODO:
+				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
+				*/
+
+			}
+		}
+	}()
+	return
 
 }

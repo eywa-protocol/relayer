@@ -4,8 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
+	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
@@ -22,10 +27,6 @@ import (
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
-	"os"
-	"os/signal"
-	"syscall"
-	"github.com/DigiU-Lab/p2p-bridge/helpers"
 )
 
 type Node struct {
@@ -86,8 +87,11 @@ func NewNode() (err error) {
 	n.Server = *server
 	logrus.Printf("n.Config.PORT %d", config.Config.PORT)
 
-	//helpers.WorkerEvent(n.EthClient_1, config.Config.PROXY_NETWORK1)
-	helpers.ListenOracleRequest(n.EthClient_1, common.HexToAddress(config.Config.PROXY_NETWORK1))
+	/** Listen event OracleRequest on net_1 */
+	helpers.ListenOracleRequest(n.EthClient_1, n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK1), common.HexToAddress(config.Config.PROXY_NETWORK2))
+	/** Listen event ReceiveRequest on net_2 */
+	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+
 	/*var bootstrapPeers []multiaddr.Multiaddr
 	if len(config.Config.BOOTSTRAP_PEER) > 0 {
 		ma, err := multiaddr.NewMultiaddr(config.Config.BOOTSTRAP_PEER)
@@ -168,7 +172,6 @@ func (n *Node) NewBridge() (srv *bridges.Server) {
 	// 	logrus.Fatal(err)
 	// 	return
 	// }
-
 
 	// ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
 

@@ -93,29 +93,25 @@ func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
 	if err != nil {
 		return
 	}
-
-	//pubKey := suite.Point().Mul(p, nil)
-	//strPub, err := encoding.PointToStringHex(suite, pubKey)
-	//if err != nil {
-	//	return
-	//}
-	//logrus.Print(strPub)
 	return
 }
 
-/*
-	pubKey := suite.Point().Mul(prvKey, nil)
-	blsAddr := common.BytesToAddress([]byte(pubKey.String()))
-	//blsAddress := common.BytesToAddress(common2.Keccak256([]byte(pub)))
-*/
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
 
 func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err error) {
 	suite := pairing.NewSuiteBn256()
-	nodeKeyFile := "keys/" + name + "-bn256.key"
-	_, err = os.Stat(nodeKeyFile)
 
-	if os.IsNotExist(err) {
+	nodeKeyFile := "keys/" + name + "-bn256.key"
+
+	if !fileExists(nodeKeyFile) {
 		logrus.Printf("CREATING KEYS")
+
 		prvKey := suite.Scalar().Pick(suite.RandomStream())
 		pubKey := suite.Point().Mul(prvKey, nil)
 		//blsAddr = common.BytesToAddress([]byte(pubKey.String()))
@@ -137,7 +133,6 @@ func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err err
 		if err != nil {
 			panic(err)
 		}
-
 	} else {
 		p, err := ReadScalarFromFile(nodeKeyFile)
 		if err != nil {

@@ -155,7 +155,7 @@ func NewNode(path, name string) (err error) {
 	//_ = libp2p.WriteHostAddrToConfig(n.Host, "keys/peer.env")
 	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
 
-	n.NodeBLS, err = n.newBLSNode(name, nodesPubKeys)
+	n.NodeBLS, err = n.newBLSNode(name, nodesPubKeys, config.Config.THRESHOLD)
 	if err != nil {
 		logrus.Errorf("newBLSNode %v", err)
 		return err
@@ -270,7 +270,7 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
-func (n Node) newBLSNode(name string, publicKeys []kyber.Point) (*modelBLS.Node, error) {
+func (n Node) newBLSNode(name string, publicKeys []kyber.Point, threshold int) (*modelBLS.Node, error) {
 	n.P2PPubSub = new(libp2p_pubsub.Libp2pPubSub)
 	n.P2PPubSub.InitializePubSub(n.Host)
 	suite := pairing.NewSuiteBn256()
@@ -299,8 +299,8 @@ func (n Node) newBLSNode(name string, publicKeys []kyber.Point) (*modelBLS.Node,
 	return &modelBLS.Node{
 		Id:           int(node.NodeId),
 		TimeStep:     0,
-		ThresholdWit: len(publicKeys)/2 + 1,
-		ThresholdAck: len(publicKeys)/2 + 1,
+		ThresholdWit: threshold/2 + 1,
+		ThresholdAck: threshold/2 + 1,
 		Acks:         0,
 		ConvertMsg:   &messageSigpb.Convert{},
 		Comm:         n.P2PPubSub,

@@ -105,6 +105,9 @@ func fileExists(filename string) bool {
 }
 
 func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err error) {
+	if !fileExists("keys/") {
+		os.MkdirAll("keys", os.ModePerm)
+	}
 	suite := pairing.NewSuiteBn256()
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"

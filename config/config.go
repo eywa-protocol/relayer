@@ -20,6 +20,9 @@ type AppConfig struct {
 	NODELIST_NETWORK1       string
 	NETWORK_RPC_2           string
 	NETWORK_RPC_1           string
+	PROXY_NETWORK1          string
+	MOCKDEX_NETWORK1        string
+	PROXY_NETWORK2          string
 }
 
 // LoadConfig loads config from files

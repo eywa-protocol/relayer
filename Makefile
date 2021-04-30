@@ -19,5 +19,3 @@ clean:
 all: deps build
 
 
-boot_key:
-	go run key/keygen.go --prefix boot

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
+	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
@@ -55,7 +56,7 @@ func main() {
 	var mode string
 	var path string
 	flag.StringVar(&mode, "mode", "serve", "relayer mode. Default is serve")
-	flag.StringVar(&path, "cnf", "config.env", "config file absolute path")
+	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
 	flag.Parse()
 	logrus.Printf("mode %v path %v", mode, path)
 	file := filepath.Base(path)

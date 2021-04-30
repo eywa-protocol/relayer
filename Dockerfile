@@ -8,12 +8,14 @@ WORKDIR /p2p-bridge-b
 
 ADD    ./p2p-bridge .
 
-RUN make  deps build
+RUN make
 
 FROM golang:alpine
 
 COPY --from=build /p2p-bridge-b/bridge ./
+
 COPY --from=build /p2p-bridge-b/$TYPE_ADAPTER_ENV ./
 
-#EXPOSE ${PORT}
+EXPOSE ${PORT}
+
 ENTRYPOINT ./bridge -mode init -cnf $PWD/$TYPE_ADAPTER_ENV && ./bridge -cnf $PWD/$TYPE_ADAPTER_ENV

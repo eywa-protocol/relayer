@@ -88,13 +88,12 @@ func NewNode(path, name string) (err error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	n := &Node{
 		Ctx:               ctx,
 		CurrentRendezvous: "FirstRun",
 	}
 
-	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	n.pKey, err = common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}
@@ -355,7 +354,7 @@ func nodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("keyfile %v port %v", "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
+	logrus.Printf("keyfile  %v port %v", "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
 	h, err := libp2p.NewHost(context.Background(), 0, "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
 	if err != nil {
 		return
@@ -367,23 +366,23 @@ func nodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(config.Config.ECDSA_KEY_1), pub)
-	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(os.Getenv("ECDSA_KEY_1")), pub)
+	pKey1, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(os.Getenv("ECDSA_KEY_1")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
 	common2.PrintNodes(c1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	logrus.Printf("nodelist 2 %v", common.HexToAddress(config.Config.NODELIST_NETWORK2))
 
-	pKey2, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+	pKey2, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_2"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(os.Getenv("ECDSA_KEY_2")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}

@@ -1,5 +1,5 @@
 eth-contracts
-keys/*.key
+keys
 bridge
 tmp
 node*.env

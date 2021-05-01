@@ -2,3 +2,4 @@ eth-contracts
 keys/*.key
 bridge
 tmp
+node*.env

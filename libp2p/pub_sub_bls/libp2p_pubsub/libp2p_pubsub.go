@@ -9,6 +9,7 @@ import (
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
 	mrand "math/rand"
 	"strconv"
 	"strings"
@@ -41,11 +42,12 @@ type Libp2pPubSub struct {
 }
 
 func (c *Libp2pPubSub) BroadcastMsg(msg model.Message) {
-
+	panic("not implemented")
 }
 
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
+	logrus.Printf("BROADCASTING MESSAGE !!!! TOPIC %v", c.topic)
 	// Broadcasting to a topic in PubSub
 	go func(msgBytes []byte, topic string, pubsub *pubsub.PubSub) {
 		// Send the message with a delay in order to prevent message loss in libp2p
@@ -412,21 +414,27 @@ func connectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 }
 
 func (c *Libp2pPubSub) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
+
 	fmt.Print("START BLS NODE\n")
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
 	node.Advance(0)
 	wg.Add(1)
+	wg.Add(fails)
 	go runBLSNode(node, stop, wg)
-	wg.Add(-fails)
 	wg.Wait()
-	fmt.Println("The END")
+	fmt.Println("BLS Node Started")
 }
 
 func runBLSNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	err := node.WaitForMsg(stop)
 	if err != nil {
-		fmt.Errorf(err.Error())
+		logrus.Error(err)
 	}
+}
+
+func runNode(node *model.Node, stop int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	node.WaitForMsg(stop)
 }

@@ -7,7 +7,7 @@ tmp_dir = "tmp"
 
 [build]
 # Just plain old shell command. You could use `make` as well.
-cmd = "go build -o bridge  ./cmd/node.go"
+cmd = "go build -o bridge  ./cmd/node.go && ./bridge -mode init -cnf ${TYPE_ADAPTER_ENV} "
 bin = "bridge"
 # Customize binary.
 full_bin = "APP_ENV=dev APP_USER=air ./bridge -cnf ${TYPE_ADAPTER_ENV} "

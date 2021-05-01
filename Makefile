@@ -20,7 +20,6 @@ all: deps build
 
 .PHONY: docker
 develop: clean
-	go run key/keygen.go --prefix $(keyname);
 	@docker-compose up -d $(servicename);
 	@docker-compose logs -f $(servicename)
 

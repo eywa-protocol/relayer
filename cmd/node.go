@@ -5,10 +5,6 @@ import (
 	"crypto/ecdsa"
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/helpers"

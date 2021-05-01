@@ -1,13 +1,13 @@
 package common
 
 import (
-	"context"
+"context"
 	"crypto/ecdsa"
 	"fmt"
+	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/DigiU-Lab/p2p-bridge/config"
-	//wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
-	//"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	//"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/linkpoolio/bridges"

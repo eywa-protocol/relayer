@@ -2,21 +2,18 @@ package modelBLS
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/sign/bdn"
-	"log"
 	"sync"
 )
 
-const ChanLen = 500
-
-var Logger1 *log.Logger
-
 // Advance will change the step of the node to a new one and then broadcast a message to the network.
-func (node *Node) Advance(step int) {
+func (node *Node) AdvanceWithTopic(step int, topic string) {
+	if topic != "" {
+		node.Comm.Reconnect(topic)
+	}
 	node.TimeStep = step
 	node.Acks = 0
 	node.Wits = 0
@@ -43,12 +40,13 @@ func (node *Node) Advance(step int) {
 }
 
 // waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
-func (node *Node) WaitForMsg(stop int) (err error) {
+func (node *Node) WaitForMsgNEW() (err error) {
 	mutex := &sync.Mutex{}
 	end := false
 	msgChan := make(chan *[]byte, ChanLen)
 	nodeTimeStep := 0
-
+	stop := 1
+	logrus.Printf("IRST STEP")
 	for nodeTimeStep <= stop {
 		// For now we assume that the underlying receive function is blocking
 
@@ -71,7 +69,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 			msgBytes := <-msgChan
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
-			logrus.Printf("node %d\n in nodeTimeStep %d;\nReceived MSG with\n msg.Step %d\n MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
+			logrus.Printf("node %d in nodeTimeStep %d Received MSG with msg.Step %d MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
 
 			// Used for stopping the execution after some timesteps
 			if nodeTimeStep == stop {
@@ -90,6 +88,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					msg.History = node.History
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
 					node.Comm.Broadcast(*msgBytes)
+
 				}
 				return
 			}
@@ -138,7 +137,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					return
 				}
 				mutex.Unlock()
-				fmt.Printf("node %d received ACK from node %d\n", node.Id, msg.Source)
+				fmt.Printf("received ACK. node %d %d\n", node.Id, msg.Source)
 
 				msgHash := calculateHash(*msg, node.ConvertMsg)
 
@@ -210,8 +209,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 			case Raw:
 				if msg.Step > nodeTimeStep+1 {
 					return
-				} else if msg.Step == nodeTimeStep+1 {
-					// Node needs to catch up with the message
+				} else if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
 					// Update nodes local history. Append history from message to local history
 					mutex.Lock()
 					node.History = append(node.History, *msg)
@@ -262,80 +260,4 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 	}
 	return err
-}
-
-func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
-	// Verify that it's really witnessed by majority of nodes by checking the signature and number of them
-	sig := msg.Signature
-	mask := msg.Mask
-
-	msg.Signature = nil
-	msg.Mask = nil
-	msg.MsgType = Raw
-
-	h := sha256.New()
-	h.Write(*node.ConvertMsg.MessageToBytes(*msg))
-	msgHash := h.Sum(nil)
-
-	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	err = keyMask.SetMask(mask)
-	if err != nil {
-		return
-	}
-
-	if keyMask.CountEnabled() < node.ThresholdAck {
-		err = errors.New("not Enough sigantures")
-		return
-	}
-
-	aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, keyMask)
-	if err != nil {
-		panic(err)
-		return
-	}
-
-	// Verify message signature
-	fmt.Println("RCVD AggSig: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
-	err = bdn.Verify(node.Suite, aggPubKey, msgHash, sig)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Aggregated Signature VERIFIED: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
-
-	return nil
-}
-
-func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err error) {
-
-	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	err = keyMask.SetMask(msg.Mask)
-	if err != nil {
-		panic(err)
-		return
-	}
-
-	fmt.Println(node.PublicKeys[keyMask.IndexOfNthEnabled(0)], "\n MSG SIGNATURE		", msg.Signature)
-	//fmt.Println(node.PublicKeys)
-
-	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
-	// Verify message signature
-	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
-	if err != nil {
-		return
-	}
-	fmt.Println("signature VERIFIED !!!!!")
-
-	return nil
-}
-
-func calculateHash(msg MessageWithSig, converter MessageInterface) []byte {
-	msg.Signature = nil
-	msg.Mask = nil
-	msg.MsgType = Raw
-
-	h := sha256.New()
-	h.Write(*converter.MessageToBytes(msg))
-	msgHash := h.Sum(nil)
-	return msgHash
 }

@@ -197,6 +197,33 @@ func (c *Libp2pPubSub) InitializePubSub(h core.Host) {
 
 }
 
+// initializePubSub creates a PubSub for the peer and also subscribes to a topic
+func (c *Libp2pPubSub) InitializePubSubWithTopic(h core.Host, topic string) {
+	var err error
+	// Creating pubsub
+	// every peer has its own PubSub
+	c.pubsub, err = applyPubSub(h)
+	if err != nil {
+		fmt.Printf("Error : %v\n", err)
+		return
+	}
+
+	if topic != "" {
+		c.topic = topic
+	} else {
+		c.InitializePubSub(h)
+		return
+	}
+
+	// Creating a subscription and subscribing to the topic
+	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	if err != nil {
+		fmt.Printf("Error : %v\n", err)
+		return
+	}
+
+}
+
 // InitializeVictim initializes buffer for keeping messages when a node is attacked by adversary.
 func (c *Libp2pPubSub) InitializeVictim(makeBuffer bool) {
 	// victim is always false in initialization

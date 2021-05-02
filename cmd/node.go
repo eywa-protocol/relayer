@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"flag"
 	"fmt"
+	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/helpers"
@@ -12,11 +13,15 @@ import (
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	messageSigpb "github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/linkpoolio/bridges"
 	"github.com/multiformats/go-multiaddr"
@@ -25,6 +30,7 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
+	"math/big"
 	"os"
 	"os/signal"
 	p "path"
@@ -32,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 type Node struct {
@@ -91,7 +98,7 @@ func NewNode(path, name string) (err error) {
 
 	n := &Node{
 		Ctx:               ctx,
-		CurrentRendezvous: "FirstRun",
+		CurrentRendezvous: "Init",
 	}
 
 	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
@@ -105,9 +112,11 @@ func NewNode(path, name string) (err error) {
 
 	n.EthClient_1, n.EthClient_2, err = getEthClients()
 
-	/** Listen event OracleRequest on net_1 */
-	helpers.ListenOracleRequest(n.EthClient_1, n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK1), common.HexToAddress(config.Config.PROXY_NETWORK2))
-	/** Listen event ReceiveRequest on net_2 */
+	_, err = n.ListenNodeOracleRequest()
+	if err != nil {
+		logrus.Errorf(err.Error())
+	}
+
 	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 
 	if err != nil {
@@ -154,22 +163,21 @@ func NewNode(path, name string) (err error) {
 	}
 	//_ = libp2p.WriteHostAddrToConfig(n.Host, "keys/peer.env")
 	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
-
+	logrus.Print("//////////////////////////////   newBLSNode STARTING")
+	n.P2PPubSub = n.initNewPubSub()
 	n.NodeBLS, err = n.newBLSNode(name, nodesPubKeys, config.Config.THRESHOLD)
 	if err != nil {
 		logrus.Errorf("newBLSNode %v", err)
 		return err
 	}
-
-	//n.P2PPubSub.StartBLSNode(n.NodeBLS, 1, 1)
-	StartTest(n.NodeBLS, 2, 1)
-	go libp2p.Discover(n.Ctx, n.Host, n.Dht, "TLC", config.Config.TickerInterval)
+	logrus.Print("newBLSNode STARTED /////////////////////////////////")
 	/*err = n.runRPCService()
 	if err != nil {
 		return
 	}*/
 
 	n.Server.Start(config.Config.PORT_1)
+
 	run(n.Host, cancel)
 	return
 }
@@ -178,18 +186,20 @@ func NewNode(path, name string) (err error) {
 //
 //}
 
-func runNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
+func (n Node) RunNode(wg *sync.WaitGroup) {
 	defer wg.Done()
-	node.WaitForMsg(stop)
+	n.NodeBLS.WaitForMsgNEW()
 }
 
-// StartTest is used for starting tlc nodes
-func StartTest(node *modelBLS.Node, stop int, fails int) {
+func (n Node) StartProtocolByOracleRequest(topic string) {
 	wg := &sync.WaitGroup{}
+	defer wg.Done()
 	wg.Add(1)
-	go node.Advance(0)
+	go n.NodeBLS.AdvanceWithTopic(0, topic)
 	wg.Add(1)
-	go runNode(node, stop, wg)
+	go n.NodeBLS.WaitForMsgNEW()
+	wg.Add(1)
+	go n.RunNode(wg)
 	wg.Wait()
 	fmt.Println("The END")
 }
@@ -270,10 +280,15 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
+func (n Node) initNewPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
+	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
+	p2pPubSub.InitializePubSubWithTopic(n.Host, n.CurrentRendezvous)
+	return
+}
+
 func (n Node) newBLSNode(name string, publicKeys []kyber.Point, threshold int) (*modelBLS.Node, error) {
-	n.P2PPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	n.P2PPubSub.InitializePubSub(n.Host)
 	suite := pairing.NewSuiteBn256()
+
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 	prvKey, err := common2.ReadScalarFromFile(nodeKeyFile)
 	if err != nil {
@@ -384,4 +399,127 @@ func nodeInit(path, name string) (err error) {
 
 	common2.PrintNodes(c2, common.HexToAddress(config.Config.NODELIST_NETWORK2))
 	return
+}
+
+func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, err error) {
+
+	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
+	if err != nil {
+		return
+	}
+	channel := make(chan *wrappers.BridgeOracleRequest)
+	opt := &bind.WatchOpts{}
+
+	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
+	if err != nil {
+		return
+	}
+
+	go func() {
+		for {
+			select {
+			case err := <-sub.Err():
+				logrus.Println("OracleRequest error:", err)
+			case event := <-channel:
+				logrus.Printf("OracleRequest %v id: %v type: %v\n", common2.ToHex(event.RequestId), event.RequestId, event.RequestType)
+				n.CurrentRendezvous = common2.ToHex(event.RequestId)
+				n.P2PPubSub = n.initNewPubSub()
+				go n.StartProtocolByOracleRequest(n.CurrentRendezvous)
+				go n.Discover()
+
+				/*	n.ReceiveRequestV2(event)*/
+
+			}
+		}
+	}()
+	return
+}
+
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequest helpers.OracleRequest, err error) {
+	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		logrus.Fatal("error casting public key to ECDSA")
+	}
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	nonce, err := n.EthClient_2.PendingNonceAt(n.Ctx, fromAddress)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	gasPrice, err := n.EthClient_2.SuggestGasPrice(n.Ctx)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	auth := bind.NewKeyedTransactor(privateKey)
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)     // in wei
+	auth.GasLimit = uint64(300000) // in units
+	auth.GasPrice = gasPrice
+
+	instance, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_2)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	/**   TODO: apporove that tx was real  */
+	/**   TODO: apporove that tx was real  */
+	/**   TODO: apporove that tx was real  */
+	/**   TODO: apporove that tx was real  */
+
+	oracleRequest = helpers.OracleRequest{
+		RequestType:    event.RequestType,
+		Bridge:         event.Bridge,
+		RequestId:      event.RequestId,
+		Selector:       event.Selector,
+		ReceiveSide:    event.ReceiveSide,
+		OppositeBridge: event.OppositeBridge,
+	}
+	/** Invoke bridge on another side */
+	tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
+	return
+
+}
+
+func (n Node) Discover() {
+	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+
+	discovery.Advertise(n.Ctx, routingDiscovery, n.CurrentRendezvous)
+
+	ticker := time.NewTicker(5)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-n.Ctx.Done():
+			return
+		case <-ticker.C:
+
+			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, n.CurrentRendezvous)
+			if err != nil {
+				logrus.Fatal(err)
+			}
+
+			for _, p := range peers {
+				if p.ID == n.Host.ID() {
+					continue
+				}
+				if n.Host.Network().Connectedness(p.ID) != network.Connected {
+					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
+					fmt.Printf("Connected to peer %s\n", p.ID.Pretty())
+					if err != nil {
+						continue
+					}
+				}
+			}
+		}
+	}
 }

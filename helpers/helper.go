@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
@@ -57,7 +58,7 @@ func ListenOracleRequest(
 	clientNetwork_1 *ethclient.Client,
 	clientNetwork_2 *ethclient.Client,
 	proxyNetwork_1 common.Address,
-	proxyNetwork_2 common.Address) (oracleRequest OracleRequest, err error) {
+	proxyNetwork_2 common.Address) (oracleRequest OracleRequest, tx *types.Transaction, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork_1, clientNetwork_1)
 	if err != nil {
@@ -77,7 +78,7 @@ func ListenOracleRequest(
 			case err := <-sub.Err():
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("OracleRequest id: %d type: %d\n", event.RequestId, event.RequestType)
+				logrus.Printf("OracleRequest id: %v type: %v\n", event.RequestId, event.RequestType)
 
 				privateKey, err := crypto.HexToECDSA("95472b385de2c871fb293f07e76a56e8e93ea4e743fe940afbd44c30730211dc")
 				if err != nil {
@@ -122,7 +123,7 @@ func ListenOracleRequest(
 					OppositeBridge: event.OppositeBridge,
 				}
 				/** Invoke bridge on another side */
-				tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
+				tx, err = instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
 				if err != nil {
 					logrus.Fatal(err)
 				}

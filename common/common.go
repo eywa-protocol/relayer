@@ -60,13 +60,24 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 		return
 	}
 
-	tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
-
+	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
 	if err != nil {
 		return
-	}
+	} 
+	
+	if(res){
+			logrus.Printf("Node already registred, on address: ", blsAddr)
+			return
+	}else{
+			tx, err1 := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
+			if err != nil {
+				err = err1
+				return
+			}
+			logrus.Printf("TX HASH %x", tx.Hash().Hex())
 
-	logrus.Printf("TX HASH %x", tx.Hash().Hex())
+
+	}
 	return
 }
 

@@ -19,7 +19,7 @@ clean:
 all: deps build
 
 .PHONY: docker
-develop: clean
+develop:
 	@docker-compose up -d $(servicename);
 	@docker-compose logs -f $(servicename)
 

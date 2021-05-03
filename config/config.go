@@ -9,6 +9,7 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
+
 	TickerInterval          time.Duration
 	ECDSA_KEY_2             string
 	ECDSA_KEY_1             string

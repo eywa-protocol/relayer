@@ -95,13 +95,12 @@ func NewNode(path, name string) (err error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	n := &Node{
 		Ctx:               ctx,
 		CurrentRendezvous: "Init",
 	}
 
-	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	n.pKey, err = common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}
@@ -226,10 +225,15 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	if err != nil {
 		return
 	}
+
+	logrus.Printf("Successful connect to NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
+	logrus.Printf("Successful connect to NETWORK_RPC_2 %s", config.Config.NETWORK_RPC_2)
+
 	return
 }
 
-func (n Node) NewBridge() (srv *bridges.Server) {
+func (n *Node) NewBridge() (srv *bridges.Server) {
+
 	var bridgesList []bridges.Bridge
 	ad, err := common2.NewDBridge(n.EthClient_1, "Health Chain 1", "1", common2.HealthFirst)
 	if err != nil {
@@ -243,13 +247,14 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 		return
 	}
 
+
 	/*	ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequestV2)
 		if err != nil {
 			logrus.Fatal(err)
 			return
 		}*/
 
-	ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
+	// ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
 
 	if err != nil {
 		logrus.Fatal(err)
@@ -259,7 +264,7 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 	bridgesList = append(bridgesList, ad)
 	bridgesList = append(bridgesList, ad2)
 	//bridgesList = append(bridgesList, ad3)
-	bridgesList = append(bridgesList, ad4)
+	// bridgesList = append(bridgesList, ad4)
 	srv = bridges.NewServer(bridgesList...)
 	return
 }
@@ -364,7 +369,7 @@ func nodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("keyfile %v port %v", "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
+	logrus.Printf("keyfile  %v port %v", "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
 	h, err := libp2p.NewHost(context.Background(), 0, "keys/"+name+"-ecdsa.key", config.Config.P2P_PORT)
 	if err != nil {
 		return
@@ -376,23 +381,23 @@ func nodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(config.Config.ECDSA_KEY_1), pub)
-	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(os.Getenv("ECDSA_KEY_1")), pub)
+	pKey1, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(os.Getenv("ECDSA_KEY_1")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
 	common2.PrintNodes(c1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	logrus.Printf("nodelist 2 %v", common.HexToAddress(config.Config.NODELIST_NETWORK2))
 
-	pKey2, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+	pKey2, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_2"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(os.Getenv("ECDSA_KEY_2")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}

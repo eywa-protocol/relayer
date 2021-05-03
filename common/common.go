@@ -1,7 +1,7 @@
 package common
 
 import (
-	"context"
+"context"
 	"crypto/ecdsa"
 	"fmt"
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
@@ -51,6 +51,7 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 	return
 }
 
+
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
 	logrus.Printf("REGISTERING NODE sender:%v", nodeWallet)
 	txOpts1 := bind.NewKeyedTransactor(pk)
@@ -59,13 +60,24 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 		return
 	}
 
-	tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
-
+	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
 	if err != nil {
 		return
-	}
+	} 
+	
+	if(res){
+			logrus.Printf("Node already registred, on address: ", blsAddr)
+			return
+	}else{
+			tx, err1 := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
+			if err != nil {
+				err = err1
+				return
+			}
+			logrus.Printf("TX HASH %x", tx.Hash().Hex())
 
-	logrus.Printf("TX HASH %x", tx.Hash().Hex())
+
+	}
 	return
 }
 
@@ -81,6 +93,7 @@ func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress comm
 	if err != nil {
 		return
 	}
+	
 	return
 }
 

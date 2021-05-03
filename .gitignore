@@ -1,1 +1,5 @@
+eth-contracts
+keys
+bridge
+tmp
 node*.env

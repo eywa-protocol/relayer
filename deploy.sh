@@ -16,11 +16,12 @@ docker-compose stop && docker-compose rm && \
 docker-compose up -d ganache_net1 && \
 docker-compose up -d ganache_net2 && \
 cd ../eth-contracts && \
-make && \
+make clean && \
 cd ./truffle && \
 npx truffle migrate --reset --network network1 && npx truffle migrate --reset --network network2 && \
+cd .. && make wrappers && \
 pwd
-cd ../../p2p-bridge && \
+cd ../p2p-bridge && \
 
 
 Env1Path="../eth-contracts/truffle/env_connect_to_network1.env"

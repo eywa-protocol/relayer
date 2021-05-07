@@ -3,6 +3,11 @@ package node
 import (
 	"context"
 	"errors"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/helpers"
@@ -15,10 +20,6 @@ import (
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/util/encoding"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 )
 
 func loadNodeConfig(path string) (err error) {
@@ -68,23 +69,23 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(config.Config.ECDSA_KEY_1), pub)
-	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(os.Getenv("ECDSA_KEY_1")), pub)
+	pKey1, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(os.Getenv("ECDSA_KEY_1")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
 	common2.PrintNodes(c1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	logrus.Printf("nodelist 2 %v", common.HexToAddress(config.Config.NODELIST_NETWORK2))
 
-	pKey2, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+	pKey2, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_2"))
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(os.Getenv("ECDSA_KEY_2")), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}
@@ -123,7 +124,7 @@ func NewNode(path, name string, port int) (err error) {
 		CurrentRendezvous: "Init",
 	}
 
-	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	n.pKey, err = common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_1"))
 	if err != nil {
 		return
 	}

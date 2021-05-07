@@ -29,6 +29,7 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 )
@@ -216,7 +217,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 }
 
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequest helpers.OracleRequest, err error) {
-	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+	privateKey, err := common2.ToECDSAFromHex(os.Getenv("ECDSA_KEY_2"))
 	if err != nil {
 		logrus.Fatal(err)
 	}

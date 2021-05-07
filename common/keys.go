@@ -185,10 +185,23 @@ func Keccak256(data ...[]byte) []byte {
 	return d.Sum(nil)
 }
 
-func GenECDSAKey(prefix string) error {
-	ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
-	if err != nil {
-		return err
+func GenECDSAKey(prefix string) (err error) {
+	nodeKeyFile := "keys/" + prefix + "-ecdsa.key"
+	if !fileExists(nodeKeyFile) {
+		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+		if err != nil {
+			return err
+		}
+		err = WriteKey(ecdsa, prefix+"-ecdsa")
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = ReadHostKey(nodeKeyFile)
+		if err != nil {
+			return err
+		}
 	}
-	return WriteKey(ecdsa, prefix+"-ecdsa")
+
+	return
 }

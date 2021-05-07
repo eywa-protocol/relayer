@@ -44,3 +44,20 @@ func NewHost(ctx context.Context, seed int64, keyFile string, port int) (host ho
 	return
 
 }
+
+func NewHostFromKeyFila(ctx context.Context, keyFile string, port int) (host host.Host, err error) {
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
+	if err != nil {
+		return
+	}
+
+	id, err := IdentityFromKey(keyFile)
+	if err != nil {
+		return
+	}
+	host, err = libp2p.New(ctx,
+		libp2p.ListenAddrs(addr),
+		id,
+	)
+	return
+}

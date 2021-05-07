@@ -82,21 +82,21 @@ services:
         ipv4_address: 172.20.128.57
 
 
-#  dev-adapter:
-#    build:
-#      context: ../
-#      dockerfile: ./p2p-bridge/Dockerfile
-#    depends_on:
-#      - ganache_net1
-#      - ganache_net2
-#    environment:
-#      - TYPE_ADAPTER_ENV=${TYPE_ADAPTER_ENV}
-#    volumes:
-#      - ./:/p2p-bridge
-#      - ../eth-contracts/wrappers:/eth-contracts/wrappers
-#    networks:
-#      static-network:
-#        ipv4_address: 172.20.128.56
+  dev-adapter:
+    build:
+      context: ../
+      dockerfile: ./p2p-bridge/Dockerfile
+    depends_on:
+      - ganache_net1
+      - ganache_net2
+    environment:
+      - TYPE_ADAPTER_ENV=${TYPE_ADAPTER_ENV}
+    volumes:
+      - ./:/p2p-bridge
+      - ../eth-contracts/wrappers:/eth-contracts/wrappers
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.56
 
 
   ganache_net1:

@@ -8,7 +8,7 @@ deps:
 	go mod download
 
 build:
-	go build -o bridge  cmd/node.go
+	go build -o bridge  cmd/main.go
 
 key:
 	go run key/keygen.go --prefix $(name)

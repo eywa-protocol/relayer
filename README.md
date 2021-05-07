@@ -25,7 +25,7 @@ const tx1 = await this.nodeList.addNode(adrWalletNode1, this.p2pAddressNode_1, t
 
 ```json
 $ docker-compose stop dev-adapter && docker-compose rm dev-adapter && docker rmi p2p-bridge_dev-adapter -f # optional
-$ export TYPE_ADAPTER_ENV=./bootstrap.env && keyname=boot servicename=dev-adapter make develop
+$ export TYPE_ADAPTER_ENV=bootstrap.env && export ECDSA_KEY_1=0x60cc6f7a3b09e5080dc86cc0fd80e29545683ad4336012b221998b448d2d57bb && export ECDSA_KEY_2=0x469e5c05e289274dd8570c31f2f0f21236f2e071613ac9c565821985e7ae641e  && servicename=dev-adapter make develop
 ```
   
 

@@ -195,7 +195,6 @@ func NewNode(path, name string, port int) (err error) {
 	if n.NodeBLS == nil {
 		err = errors.New("newBLSNode NIL")
 		logrus.Errorf("%v")
-		return err
 	}
 	logrus.Print("newBLSNode STARTED /////////////////////////////////")
 	/*err = n.runRPCService()

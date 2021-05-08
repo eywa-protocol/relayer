@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -52,7 +53,7 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Printf("REGISTERING NODE sender:%v", nodeWallet)
+	logrus.Printf("REGISTERING NODE sender:%v with PK %v blsAddress %v ", nodeWallet, pk, blsAddr)
 	txOpts1 := bind.NewKeyedTransactor(pk)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
@@ -106,7 +107,7 @@ func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address
 		logrus.Fatal(err)
 	}
 	for _, node1 := range nodes {
-		logrus.Printf("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, node1.P2pAddress, node1.BlsPointAddr)
+		logrus.Printf("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, string(node1.P2pAddress), node1.BlsPointAddr)
 	}
 
 }
@@ -120,7 +121,9 @@ func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, n
 	}
 
 	if exist, _ := nodeList.NodeExists(&bind.CallOpts{}, nodeBLSAddr); !exist {
-		logrus.Errorf("NODE DOES NOT EXIST %v", nodeBLSAddr)
+		errMsg := fmt.Sprintf("NODE DOES NOT EXIST %v", nodeBLSAddr)
+		err = errors.New(errMsg)
+		return
 	}
 	node, err = nodeList.GetNode(&bind.CallOpts{}, nodeBLSAddr)
 	if err != nil {

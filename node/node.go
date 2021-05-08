@@ -51,22 +51,28 @@ type Node struct {
 
 type addrList []multiaddr.Multiaddr
 
-func (n Node) RunNode(wg *sync.WaitGroup) {
-	defer wg.Done()
-	n.NodeBLS.WaitForMsgNEW()
-}
+//func (n Node) RunNode(wg *sync.WaitGroup) {
+//	defer wg.Done()
+//	n.NodeBLS.WaitForMsgNEW()
+//}
 
-func (n Node) StartProtocolByOracleRequest(topic string) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
+	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
 	wg.Add(1)
-	go n.NodeBLS.AdvanceWithTopic(0, topic)
+	go n.NodeBLS.AdvanceWithTopic(0, n.CurrentRendezvous)
 	wg.Add(1)
-	go n.NodeBLS.WaitForMsgNEW()
-	wg.Add(1)
-	go n.RunNode(wg)
+	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
+	consensus := <-consensuChannel
+	if consensus {
+		logrus.Println("Call external contract method test")
+		n.ReceiveRequestV2(event)
+	}
+	//wg.Add(1)
+	//go n.RunNode(wg)
 	wg.Wait()
-	fmt.Println("The END")
+	logrus.Println("The END of Protocol")
 }
 
 func (n Node) runRPCService() (err error) {
@@ -142,11 +148,8 @@ func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point, threshold 
 
 	blsAddr := common2.BLSAddrFromKeyFile(nodeKeyFile)
 	if !n.nodeExiats(blsAddr) {
-		err := NodeInit(path, name)
-		if err != nil {
-			logrus.Fatalf("nodeInit %v", err)
-			panic(err)
-		}
+		logrus.Errorf("node %x with keyFile %s", blsAddr, nodeKeyFile)
+
 	} else {
 		logrus.Printf("BLS ADDRESS %v ", blsAddr)
 		node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
@@ -159,7 +162,7 @@ func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point, threshold 
 			return nil, err
 		}
 
-		fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, node.P2pAddress, node.NodeId, node.BlsPubKey, node.NodeWallet)
+		fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, string(node.P2pAddress), node.NodeId, string(node.BlsPubKey), node.NodeWallet)
 		fmt.Printf("---------------->NODE ID %d %v\n", node.NodeId, int(node.NodeId))
 
 		blsNode = &modelBLS.Node{
@@ -201,19 +204,22 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 			case err := <-sub.Err():
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("OracleRequest %v id: %v type: %v\n", common2.ToHex(event.RequestId), event.RequestId, event.RequestType)
-				n.CurrentRendezvous = common2.ToHex(event.RequestId)
+				logrus.Printf("OracleRequest %v %v id: %v\n", event.RequestType, common2.ToHex(event.RequestId), common2.ToHex(event.RequestId))
+				n.CurrentRendezvous = common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub()
-				go n.StartProtocolByOracleRequest(n.CurrentRendezvous)
 				go n.Discover()
-
-				/*	n.ReceiveRequestV2(event)*/
+				go n.StartProtocolByOracleRequest(event)
 
 			}
 		}
 	}()
 	return
 }
+
+//func (n Node)getProtocolResult(resultCh chan string)  {
+//	time.Sleep(2 * time.Second)
+//	resultCh <-  n.StartProtocolByOracleRequest(n.CurrentRendezvous)
+//}
 
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequest helpers.OracleRequest, err error) {
 	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
@@ -270,11 +276,13 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequ
 }
 
 func (n Node) Discover() {
+	logrus.Print("CurrentRendezvous ", n.CurrentRendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+	//logrus.Print("routingDiscovery ", routingDiscovery.)
 
 	discovery.Advertise(n.Ctx, routingDiscovery, n.CurrentRendezvous)
 
-	ticker := time.NewTicker(5)
+	ticker := time.NewTicker(config.Config.TickerInterval)
 	defer ticker.Stop()
 
 	for {
@@ -287,15 +295,16 @@ func (n Node) Discover() {
 			if err != nil {
 				logrus.Fatal(err)
 			}
-
 			for _, p := range peers {
+				//logrus.Print("PEER ", p.Addrs)
 				if p.ID == n.Host.ID() {
 					continue
 				}
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
-					fmt.Printf("Connected to peer %s\n", p.ID.Pretty())
+					logrus.Printf("!!!!!!!!!!!!!!!!!!!!!! Connected to peer %s !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111\n", p.ID.Pretty())
 					if err != nil {
+						logrus.Error(err)
 						continue
 					}
 				}

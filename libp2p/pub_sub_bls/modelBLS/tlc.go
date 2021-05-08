@@ -315,9 +315,6 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		return
 	}
 
-	fmt.Println(node.PublicKeys[keyMask.IndexOfNthEnabled(0)], "\n MSG SIGNATURE		", msg.Signature)
-	//fmt.Println(node.PublicKeys)
-
 	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
 	// Verify message signature
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)

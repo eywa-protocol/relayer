@@ -69,9 +69,10 @@ account23="0xe84538a8b4059da88d5a76544329093da99603fe05b0f1332f737c74253688c3"
 account24="0x469e5c05e289274dd8570c31f2f0f21236f2e071613ac9c565821985e7ae641e"
 account25="0x95472b385de2c871fb293f07e76a56e8e93ea4e743fe940afbd44c30730211dc"
 
-docker-compose up -d
+make clean
+docker-compose up -d --build --scale node=7 --no-recreate
 docker-compose ps
-docker-compose logs -f -t
+docker-compose logs -f -t | grep -v ganache
 
 
 

@@ -40,13 +40,13 @@ func (node *Node) AdvanceWithTopic(step int, topic string) {
 }
 
 // waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
-func (node *Node) WaitForMsgNEW() (err error) {
+func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 	mutex := &sync.Mutex{}
 	end := false
 	msgChan := make(chan *[]byte, ChanLen)
 	nodeTimeStep := 0
 	stop := 1
-	logrus.Printf("IRST STEP")
+	logrus.Printf("FIRST STEP")
 	for nodeTimeStep <= stop {
 		// For now we assume that the underlying receive function is blocking
 
@@ -73,11 +73,11 @@ func (node *Node) WaitForMsgNEW() (err error) {
 
 			// Used for stopping the execution after some timesteps
 			if nodeTimeStep == stop {
-				fmt.Println("Break reached by node ", node.Id)
+				logrus.Printf("-------> Consensus achieved by node %v", node.Id)
 				mutex.Lock()
 				end = true
 				mutex.Unlock()
-				return
+				consensusAgreed <- true
 			}
 
 			// If the received message is from a lower step, send history to the node to catch up
@@ -162,8 +162,6 @@ func (node *Node) WaitForMsgNEW() (err error) {
 					panic(err)
 				}
 				index := keyMask.IndexOfNthEnabled(0)
-				logrus.Printf("----------> INDEX %v", index)
-				logrus.Printf("----------> NODE ID %v", node.Id)
 				// Add signature to the list of signatures
 				node.Signatures[index] = msg.Signature
 
@@ -234,6 +232,7 @@ func (node *Node) WaitForMsgNEW() (err error) {
 
 				// Add mask for the signature
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
 					panic(err)
@@ -259,5 +258,5 @@ func (node *Node) WaitForMsgNEW() (err error) {
 		}(nodeTimeStep)
 
 	}
-	return err
+	return
 }

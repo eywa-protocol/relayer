@@ -73,7 +73,7 @@ make clean
 docker-compose up -d --build --scale node=7 --no-recreate
 docker-compose ps
 docker-compose logs -f -t | grep -v ganache
-
+docker restart $(docker ps -a --format "{{.Names}}" | grep node)
 
 
 

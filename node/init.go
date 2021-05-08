@@ -198,7 +198,7 @@ func NewNode(path, name string, port int) (err error) {
 	logrus.Printf("//////////////////////////////   newBLSNode STARTING with THRESHOLD: len(nodes) %d len(bootstrapPeers) %d", len(nodes), len(bootstrapPeers))
 	n.P2PPubSub = n.initNewPubSub()
 
-	n.NodeBLS, err = n.NewBLSNode(path, name, nodesPubKeys, len(bootstrapPeers))
+	n.NodeBLS, err = n.NewBLSNode(path, name, nodesPubKeys, len(bootstrapPeers)/2+1)
 	if err != nil {
 		logrus.Errorf(err.Error())
 		return err

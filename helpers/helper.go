@@ -78,8 +78,8 @@ func ListenOracleRequest(
 	go func() {
 		for {
 			select {
-			case err := <-sub.Err():
-				logrus.Println("OracleRequest error:", err)
+			case _ = <-sub.Err():
+				break
 			case event := <-channel:
 				logrus.Printf("OracleRequest id: %v type: %v\n", event.RequestId, event.RequestType)
 
@@ -157,8 +157,8 @@ func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.A
 	go func() {
 		for {
 			select {
-			case err := <-sub.Err():
-				logrus.Println("ReceiveRequest error:", err)
+			case _ = <-sub.Err():
+				break
 			case event := <-channel:
 				logrus.Printf("ReceiveRequest: ", event.ReqId, event.ReceiveSide, event.Tx)
 

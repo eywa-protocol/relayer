@@ -324,7 +324,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	if err != nil {
 		return
 	}
-	fmt.Println("signature VERIFIED !!!!!")
+	fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

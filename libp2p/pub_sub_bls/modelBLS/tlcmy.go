@@ -124,18 +124,18 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				fmt.Printf("received ACK. node %d %d\n", node.Id, msg.Source)
 
 				msgHash := calculateHash(*msg, node.ConvertMsg)
-				fmt.Print("calculated Hash")
+				fmt.Print("calculated Hash\n")
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
 					logrus.Error(err)
 				}
-				fmt.Print("verified Ack Signature")
+				fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
 					logrus.Error(err)
 				}
-				fmt.Print("node SigMask Merged ")
+				fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
 				node.Acks += 1
 
@@ -166,17 +166,17 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
 					if err != nil {
-						logrus.Println("node ", node.Id, "PANIC AggregateSignatures: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
 						logrus.Error(err)
 					}
+
 					msg.Signature, err = aggSignature.MarshalBinary()
 					if err != nil {
 						logrus.Error(err)
 					}
-
+					fmt.Printf("AggregatePublicKeys")
 					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
 
-					// Verify before sending message to others
+					fmt.Printf("Verify before sending message to others")
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
 						logrus.Error(err)
@@ -185,6 +185,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
 					node.Comm.Broadcast(*msgBytes)
 				}
+
 				mutex.Unlock()
 
 			case Raw:

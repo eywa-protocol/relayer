@@ -76,6 +76,8 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				logrus.Printf("-------> Consensus achieved by node %v", node.Id)
 				mutex.Lock()
 				end = true
+				node.TimeStep++
+				node.Advance(nodeTimeStep)
 				mutex.Unlock()
 				consensusAgreed <- true
 			}
@@ -122,18 +124,18 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				fmt.Printf("received ACK. node %d %d\n", node.Id, msg.Source)
 
 				msgHash := calculateHash(*msg, node.ConvertMsg)
-
+				fmt.Print("calculated Hash")
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
-					return
+					logrus.Error(err)
 				}
-
+				fmt.Print("verified Ack Signature")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
-					panic(err)
+					logrus.Error(err)
 				}
-
+				fmt.Print("node SigMask Merged ")
 				// Count acks toward the threshold
 				node.Acks += 1
 
@@ -165,11 +167,11 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
 					if err != nil {
 						logrus.Println("node ", node.Id, "PANIC AggregateSignatures: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
-						panic(err)
+						logrus.Error(err)
 					}
 					msg.Signature, err = aggSignature.MarshalBinary()
 					if err != nil {
-						panic(err)
+						logrus.Error(err)
 					}
 
 					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
@@ -177,9 +179,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					// Verify before sending message to others
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
-						fmt.Println("node ", node.Id, "PANIC Sig: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
-						//panic(err)
-						return
+						logrus.Error(err)
 					}
 
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
@@ -207,7 +207,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 				signature, err := bdn.Sign(node.Suite, node.PrivateKey, msgHash)
 				if err != nil {
-					panic(err)
+					logrus.Error(err)
 				}
 
 				// Adding signature and ack to message. These fields were empty when message got signed
@@ -218,7 +218,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
-					panic(err)
+					logrus.Error(err)
 				}
 				msg.Mask = keyMask.Mask()
 

@@ -30,7 +30,9 @@ import (
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
+	"go.dedis.ch/kyber/v3/util/encoding"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 )
@@ -67,12 +69,17 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	wg.Add(1)
 	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
 	consensus := <-consensuChannel
-	if consensus {
+	executed := false
+	if consensus && !executed {
 		logrus.Println("Call external contract method test")
-		n.ReceiveRequestV2(event)
+		recept, err := n.ReceiveRequestV2(event)
+		if err != nil {
+			logrus.Errorf("%v", err)
+		}
+		if recept != nil {
+			executed = true
+		}
 	}
-	//wg.Add(1)
-	//go n.RunNode(wg)
 	wg.Wait()
 	logrus.Println("The END of Protocol")
 }
@@ -139,8 +146,24 @@ func (n Node) nodeExiats(blsAddr common.Address) bool {
 
 }
 
-func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point) (blsNode *modelBLS.Node, err error) {
+func (n Node) NewBLSNode(path, name string) (blsNode *modelBLS.Node, err error) {
+	var bootstrapPeers []multiaddr.Multiaddr
 	suite := pairing.NewSuiteBn256()
+	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
+	if err != nil {
+		return
+	}
+	publicKeys := make([]kyber.Point, 0)
+	for _, node := range nodes {
+		peerMA, _ := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
+		bootstrapPeers = append(bootstrapPeers, peerMA)
+		blsPubKey := string(node.BlsPubKey[:])
+		p, err := encoding.ReadHexPoint(suite, strings.NewReader(blsPubKey))
+		if err != nil {
+			panic(err)
+		}
+		publicKeys = append(publicKeys, p)
+	}
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 	prvKey, err := common2.ReadScalarFromFile(nodeKeyFile)
@@ -180,8 +203,8 @@ func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point) (blsNode *
 		blsNode = &modelBLS.Node{
 			Id:           int(node.NodeId),
 			TimeStep:     0,
-			ThresholdWit: 2,
-			ThresholdAck: 2,
+			ThresholdWit: 7,
+			ThresholdAck: 7,
 			Acks:         0,
 			ConvertMsg:   &messageSigpb.Convert{},
 			Comm:         n.P2PPubSub,
@@ -216,7 +239,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 			case err := <-sub.Err():
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("OracleRequest %v %v id: %v\n", event.RequestType, common2.ToHex(event.RequestId), common2.ToHex(event.RequestId))
+				//logrus.Printf("OracleRequest %v %v id: %v\n", event.RequestType, common2.ToHex(event.RequestId), common2.ToHex(event.RequestId))
 				n.CurrentRendezvous = common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub()
 				go n.Discover()

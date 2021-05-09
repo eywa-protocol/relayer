@@ -19,7 +19,6 @@ Env1Path="../eth-contracts/truffle/env_connect_to_network1.env"
 Env2Path="../eth-contracts/truffle/env_connect_to_network2.env"
 BootPath="bootstrap.env"
 
-./gana.sh
 
 
 BRIDGE_ADDRESS_NETWORK1=$(parseMyConfig BRIDGE_ADDRESS_NETWORK1 $Env1Path)
@@ -49,7 +48,7 @@ writeMyConfig MOCKDEX_NETWORK2 $MOCKDEX_NETWORK2 "$BootPath"
 
 
 
-./compose.sh
+
 
 
 

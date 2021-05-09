@@ -309,6 +309,9 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err error) {
 
 	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
+	if err != nil {
+		return
+	}
 	err = keyMask.SetMask(msg.Mask)
 	if err != nil {
 		panic(err)
@@ -316,14 +319,13 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	}
 
 	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
-	// Verify message signature
+
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
 		return
 	}
 	fmt.Println("signature VERIFIED !!!!!")
-
-	return nil
+	return
 }
 
 func calculateHash(msg MessageWithSig, converter MessageInterface) []byte {

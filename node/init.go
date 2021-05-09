@@ -13,9 +13,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/util/encoding"
 	"os"
 	"os/signal"
 	"strconv"
@@ -132,44 +129,20 @@ func NewNode(path, name string, port int) (err error) {
 	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
 
 	n.EthClient_1, n.EthClient_2, err = getEthClients()
-
-	//n.ReceiveRequestV2(event)
 	if err != nil {
 		return
 	}
-	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
-	if err != nil {
-		return
-	}
-	logrus.Printf("------------> node count %v", len(nodes))
-	for _, node := range nodes {
-		logrus.Printf("NODES: %v", string(node.P2pAddress[:]))
-	}
 
-	var bootstrapPeers []multiaddr.Multiaddr
-	suite := pairing.NewSuiteBn256()
-
-	nodesPubKeys := make([]kyber.Point, 0)
-	logrus.Print("Adding PEERS ~~~~~~~~~~~~")
-	for i, node := range nodes {
-		logrus.Printf("Node:%d\n %v\n %v\n %v\n %v\n", i, node.Enable, node.NodeWallet, string(node.P2pAddress[:]), string(node.BlsPubKey[:]))
-		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
+	/*	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 		if err != nil {
-			return err
+			return
 		}
-		bootstrapPeers = append(bootstrapPeers, peerMA)
-		blsPubKey := string(node.BlsPubKey[:])
-		logrus.Printf("BlsPubKey %v", blsPubKey)
-		p, err := encoding.ReadHexPoint(suite, strings.NewReader(blsPubKey))
-		if err != nil {
-			panic(err)
+		logrus.Printf("------------> node count %v", len(nodes))
+		for _, node := range nodes {
+			logrus.Printf("NODES: %v", string(node.P2pAddress[:]))
 		}
-		nodesPubKeys = append(nodesPubKeys, p)
-	}
+	*/
 
-	//for _, peer := range bootstrapPeers {
-	//	logrus.Printf("peer multyAddress %v", peer)
-	//}
 	key_file := "keys/" + name + "-ecdsa.key"
 	bls_key_file := "keys/" + name + "-bn256.key"
 	blsAddr := common2.BLSAddrFromKeyFile(bls_key_file)
@@ -190,12 +163,11 @@ func NewNode(path, name string, port int) (err error) {
 		return
 	}
 	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< HOST ID %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>", n.Host.ID())
-	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
+	n.Dht, err = n.initDHT()
 
-	logrus.Printf("//////////////////////////////   Total nodes %d  bootstrap %d newBLSNode found closest", len(nodes), len(bootstrapPeers))
 	n.P2PPubSub = n.initNewPubSub()
 
-	n.NodeBLS, err = n.NewBLSNode(path, name, nodesPubKeys)
+	n.NodeBLS, err = n.NewBLSNode(path, name)
 	if err != nil {
 		logrus.Errorf(err.Error())
 		return err

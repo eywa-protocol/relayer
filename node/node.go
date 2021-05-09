@@ -70,7 +70,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
 	consensus := <-consensuChannel
 	executed := false
-	if consensus && !executed {
+	if consensus == true && executed == false {
 		logrus.Println("Call external contract method test")
 		recept, err := n.ReceiveRequestV2(event)
 		if err != nil {

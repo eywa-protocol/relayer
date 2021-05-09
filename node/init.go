@@ -37,6 +37,16 @@ func loadNodeConfig(path string) (err error) {
 
 func NodeInit(path, name string) (err error) {
 	logrus.Print("nodeInit START")
+	hostName, _ := os.Hostname()
+	keysList := os.Getenv("ECDSA_KEY_1")
+	strNum := string(hostName[len(hostName)-1])
+	nodeHostId, _ := strconv.Atoi(strNum)
+	config.Config.ECDSA_KEY_1 = strings.Split(keysList, ",")[nodeHostId]
+
+	keysList2 := os.Getenv("ECDSA_KEY_2")
+	config.Config.ECDSA_KEY_2 = strings.Split(keysList2, ",")[nodeHostId]
+
+	logrus.Printf("----------> %v key1 %v key2 %v", string(hostName[len(hostName)-1]), config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
 
 	err = loadNodeConfig(path)
 	if err != nil {

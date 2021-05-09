@@ -304,12 +304,12 @@ func TestBLS(t *testing.T) {
 	simpleTestBLS(t, 5, 9900, 2)
 }
 
-func TestOneStepBLS(t *testing.T) {
-	logFile, _ := os.OpenFile("../../../oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
-	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	Delayed = false
-	simpleTestOneStepBLS(t, 5, 9900)
-}
+//func TestOneStepBLS(t *testing.T) {
+//	logFile, _ := os.OpenFile("../../../oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
+//	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
+//	Delayed = false
+//	simpleTestOneStepBLS(t, 5, 9900)
+//}
 
 func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {
 	nodes, hosts := setupHostsBLS(n, initialPort)
@@ -328,22 +328,22 @@ func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {
 	LogOutputBLS(t, nodes)
 }
 
-func simpleTestOneStepBLS(t *testing.T, n int, initialPort int) {
-	nodes, hosts := setupHostsBLS(n, initialPort)
-
-	defer func() {
-		fmt.Println("Closing hosts")
-		for _, h := range hosts {
-			_ = (*h).Close()
-		}
-	}()
-
-	err := setupNetworkTopology(hosts)
-	require.Nil(t, err)
-	// PubSub is ready and we can start our algorithm
-	StartTestOneStepBLS(nodes)
-	LogOutputBLS(t, nodes)
-}
+//func simpleTestOneStepBLS(t *testing.T, n int, initialPort int) {
+//	nodes, hosts := setupHostsBLS(n, initialPort)
+//
+//	defer func() {
+//		fmt.Println("Closing hosts")
+//		for _, h := range hosts {
+//			_ = (*h).Close()
+//		}
+//	}()
+//
+//	err := setupNetworkTopology(hosts)
+//	require.Nil(t, err)
+//	// PubSub is ready and we can start our algorithm
+//	StartTestOneStepBLS(nodes)
+//	LogOutputBLS(t, nodes)
+//}
 
 func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	// nodes used in tlc model
@@ -420,21 +420,21 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 }
 
 // StartTest is used for starting tlc nodes
-func StartTestOneStepBLS(nodes []*modelBLS.Node) {
-	fmt.Print("START")
-	wg := &sync.WaitGroup{}
-
-	for _, node := range nodes {
-
-		node.Advance(0)
-	}
-	for _, node := range nodes {
-		wg.Add(1)
-		go runOneStepNodeBLS(node, wg)
-	}
-	wg.Wait()
-	fmt.Println("The END")
-}
+//func StartTestOneStepBLS(nodes []*modelBLS.Node) {
+//	fmt.Print("START")
+//	wg := &sync.WaitGroup{}
+//
+//	for _, node := range nodes {
+//
+//		node.Advance(0)
+//	}
+//	for _, node := range nodes {
+//		wg.Add(1)
+//		go runOneStepNodeBLS(node, wg)
+//	}
+//	wg.Wait()
+//	fmt.Println("The END")
+//}
 
 func LogOutputBLS(t *testing.T, nodes []*modelBLS.Node) {
 	for i := range nodes {
@@ -451,10 +451,10 @@ func runNodeBLS(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 	}
 }
 
-func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup) {
-	defer wg.Done()
-	err := node.WaitForMsgNEW()
-	if err != nil {
-		fmt.Errorf(err.Error())
-	}
-}
+//func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup) {
+//	defer wg.Done()
+//	err := node.WaitForMsgNEW()
+//	if err != nil {
+//		fmt.Errorf(err.Error())
+//	}
+//}

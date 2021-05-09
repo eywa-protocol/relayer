@@ -13,11 +13,13 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"math/rand"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"unicode"
 )
 
 func loadNodeConfig(path string) (err error) {
@@ -39,12 +41,19 @@ func NodeInit(path, name string) (err error) {
 	logrus.Print("nodeInit START")
 	hostName, _ := os.Hostname()
 	keysList := os.Getenv("ECDSA_KEY_1")
-	strNum := string(hostName[len(hostName)-1])
+	strNum := strings.TrimPrefix(hostName, "p2p-bridge_node_")
+	strNum = strings.TrimRightFunc(strNum, func(r rune) bool {
+		return !unicode.IsNumber(r)
+	})
 	nodeHostId, _ := strconv.Atoi(strNum)
-	config.Config.ECDSA_KEY_1 = strings.Split(keysList, ",")[nodeHostId]
+	if nodeHostId == 0 || nodeHostId > len(keysList)-1 {
+		nodeHostId = rand.Intn(len(keysList))
+	}
+
+	config.Config.ECDSA_KEY_1 = strings.Split(keysList, ",")[nodeHostId-1]
 
 	keysList2 := os.Getenv("ECDSA_KEY_2")
-	config.Config.ECDSA_KEY_2 = strings.Split(keysList2, ",")[nodeHostId]
+	config.Config.ECDSA_KEY_2 = strings.Split(keysList2, ",")[nodeHostId-1]
 
 	logrus.Printf("----------> %v key1 %v key2 %v", string(hostName[len(hostName)-1]), config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
 

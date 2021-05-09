@@ -308,7 +308,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	}
 	receipt, err = helpers.WaitTransaction(n.EthClient_2, tx)
 	if err != nil || receipt == nil {
-		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed", err.Error()))
+		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err.Error()))
 	}
 
 	return

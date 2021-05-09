@@ -131,7 +131,7 @@ func ListenOracleRequest(
 					logrus.Fatal(err)
 				}
 
-				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
+				logrus.Printf("tx in first chain has been triggered :  %x", tx.Hash())
 
 			}
 		}
@@ -160,7 +160,7 @@ func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.A
 			case _ = <-sub.Err():
 				break
 			case event := <-channel:
-				logrus.Printf("ReceiveRequest: ", event.ReqId, event.ReceiveSide, event.Tx)
+				logrus.Printf("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, event.Tx)
 
 				/** TODO:
 				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)

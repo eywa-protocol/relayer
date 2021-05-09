@@ -165,7 +165,7 @@ func NewNode(path, name string, port int) (err error) {
 
 	registeredPort, err := strconv.Atoi(words[4])
 	if err == nil {
-		logrus.Error("Caanot obtain port %T, %v", registeredPort, err)
+		logrus.Error("Caanot obtain port %d, %v", registeredPort, err)
 	}
 	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< PORT %d >>>>>>>>>>>>>>>>>>>>>>>>>>>>", registeredPort)
 	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort)

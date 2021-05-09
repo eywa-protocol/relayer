@@ -10,11 +10,8 @@ deps:
 build:
 	go build -o bridge  cmd/main.go
 
-key:
-	go run key/keygen.go --prefix $(name)
-
 clean:
-	rm -f ./bridge keys/*.key ./eth-contracts -r
+	rm -f ./bridge keys/*.key
 
 all: deps build
 

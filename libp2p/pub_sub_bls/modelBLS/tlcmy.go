@@ -69,7 +69,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 			msgBytes := <-msgChan
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
-			logrus.Printf("node %d in nodeTimeStep %d Received MSG with msg.Step %d MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
+			//logrus.Printf("node %d in nodeTimeStep %d Received MSG with msg.Step %d MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
 
 			// Used for stopping the execution after some timesteps
 			if nodeTimeStep == stop {
@@ -104,30 +104,12 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				if err != nil {
 					return
 				}
-
-				if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
-					// Update nodes local history. Append history from message to local history
-					mutex.Lock()
-					node.History = append(node.History, *msg)
-
-					// Advance
-					node.Advance(msg.Step)
-					node.Wits += 1
-					mutex.Unlock()
-				} else if msg.Step == nodeTimeStep {
-
-					mutex.Lock()
-					fmt.Printf("WITS: node %d , %d\n", node.Id, node.Wits)
-					// Count message toward the threshold
-					node.Wits += 1
-					if node.Wits >= node.ThresholdWit {
-						// Log the message in history
-						node.History = append(node.History, *msg)
-						// Advance to next time step
-						node.Advance(nodeTimeStep + 1)
-					}
-					mutex.Unlock()
-				}
+				mutex.Lock()
+				fmt.Printf("WITS: node %d , %d\n", node.Id, node.Wits)
+				node.Wits += 1
+				node.TimeStep += 1
+				node.Advance(nodeTimeStep + 1)
+				mutex.Unlock()
 
 			case Ack:
 				// Checking that the ack is for message of this step
@@ -146,7 +128,6 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					return
 				}
 
-				// add message's mask to existing mask
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
@@ -159,11 +140,13 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
 				err = keyMask.SetMask(msg.Mask)
 				if err != nil {
-					panic(err)
+					logrus.Errorf(err.Error())
 				}
 				index := keyMask.IndexOfNthEnabled(0)
 				// Add signature to the list of signatures
-				node.Signatures[index] = msg.Signature
+				if index < len(node.Signatures) {
+					node.Signatures[index] = msg.Signature
+				}
 
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold

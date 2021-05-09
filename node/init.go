@@ -79,8 +79,6 @@ func NodeInit(path, name string) (err error) {
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
-	common2.PrintNodes(c1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
-	logrus.Printf("nodelist 2 %v", common.HexToAddress(config.Config.NODELIST_NETWORK2))
 
 	pKey2, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
 	if err != nil {
@@ -91,7 +89,6 @@ func NodeInit(path, name string) (err error) {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}
 
-	common2.PrintNodes(c2, common.HexToAddress(config.Config.NODELIST_NETWORK2))
 	return
 }
 
@@ -170,9 +167,9 @@ func NewNode(path, name string, port int) (err error) {
 		nodesPubKeys = append(nodesPubKeys, p)
 	}
 
-	for _, peer := range bootstrapPeers {
-		logrus.Printf("peer multyAddress %v", peer)
-	}
+	//for _, peer := range bootstrapPeers {
+	//	logrus.Printf("peer multyAddress %v", peer)
+	//}
 	key_file := "keys/" + name + "-ecdsa.key"
 	bls_key_file := "keys/" + name + "-bn256.key"
 	blsAddr := common2.BLSAddrFromKeyFile(bls_key_file)
@@ -187,18 +184,18 @@ func NewNode(path, name string, port int) (err error) {
 	if err == nil {
 		logrus.Error("Caanot obtain port %T, %v", registeredPort, err)
 	}
-	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< PORT %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>", registeredPort)
+	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< PORT %d >>>>>>>>>>>>>>>>>>>>>>>>>>>>", registeredPort)
 	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort)
 	if err != nil {
 		return
 	}
-
+	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< HOST ID %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>", n.Host.ID())
 	n.Dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
 
-	logrus.Printf("//////////////////////////////   newBLSNode STARTING with THRESHOLD: len(nodes) %d len(bootstrapPeers) %d", len(nodes), len(bootstrapPeers))
+	logrus.Printf("//////////////////////////////   Total nodes %d  bootstrap %d newBLSNode found closest", len(nodes), len(bootstrapPeers))
 	n.P2PPubSub = n.initNewPubSub()
 
-	n.NodeBLS, err = n.NewBLSNode(path, name, nodesPubKeys, len(bootstrapPeers)/2+1)
+	n.NodeBLS, err = n.NewBLSNode(path, name, nodesPubKeys)
 	if err != nil {
 		logrus.Errorf(err.Error())
 		return err

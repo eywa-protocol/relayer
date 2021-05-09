@@ -2,8 +2,11 @@ package helpers
 
 import (
 	"context"
+	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
+	"time"
 
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -168,4 +171,24 @@ func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.A
 	}()
 	return
 
+}
+
+func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
+	var receipt *types.Receipt
+	var err error
+	for {
+		receipt, err = client.TransactionReceipt(context.Background(), tx.Hash())
+		if receipt == nil || err == ethereum.NotFound {
+			time.Sleep(time.Millisecond * 500)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("transaction %s failed: %v", tx.Hash().Hex(), err)
+		}
+		break
+	}
+	if receipt.Status != 1 {
+		return nil, fmt.Errorf("failed transaction: %s", tx.Hash().Hex())
+	}
+	return receipt, nil
 }

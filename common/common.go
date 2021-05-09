@@ -7,6 +7,7 @@ import (
 	"fmt"
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/DigiU-Lab/p2p-bridge/config"
+	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -53,7 +54,7 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Printf("REGISTERING NODE sender:%v with PK %v blsAddress %v ", nodeWallet, pk, blsAddr)
+	logrus.Printf("client: %v REGISTERING node %v in contract %v NODE sender:%v with PK %v blsAddress %v ", client, p2pAddress, nodeListContractAddress, nodeWallet, pk, blsAddr)
 	txOpts1 := bind.NewKeyedTransactor(pk)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
@@ -65,17 +66,19 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 		return
 	}
 
-	if res {
-		logrus.Printf("Node already registred, on address: ", blsAddr)
-		return
-	} else {
-		tx, err1 := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
+	if !res {
+		tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
 		if err != nil {
-			err = err1
-			return
+			return err
 		}
 		logrus.Printf("TX HASH %x", tx.Hash().Hex())
-
+		receipt, err := helpers.WaitTransaction(client, tx)
+		if err != nil {
+			return err
+		}
+		if receipt == nil {
+			return errors.New(fmt.Sprintf("AddNode Failed %v %v %v %v %v", txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey))
+		}
 	}
 	return
 }
@@ -114,7 +117,6 @@ func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address
 
 func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeListNode, err error) {
 	logrus.Printf("GetNode : %v", nodeListContractAddress)
-	PrintNodes(client, nodeListContractAddress)
 	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
 		return

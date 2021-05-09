@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
@@ -14,6 +15,7 @@ import (
 	messageSigpb "github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
@@ -137,7 +139,7 @@ func (n Node) nodeExiats(blsAddr common.Address) bool {
 
 }
 
-func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point, threshold int) (blsNode *modelBLS.Node, err error) {
+func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point) (blsNode *modelBLS.Node, err error) {
 	suite := pairing.NewSuiteBn256()
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
@@ -164,12 +166,22 @@ func (n Node) NewBLSNode(path, name string, publicKeys []kyber.Point, threshold 
 
 		fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, string(node.P2pAddress), node.NodeId, string(node.BlsPubKey), node.NodeWallet)
 		fmt.Printf("---------------->NODE ID %d %v\n", node.NodeId, int(node.NodeId))
+		peerForConsensus, err := n.Dht.GetClosestPeers(n.Ctx, n.Host.ID().String())
+		if err != nil {
+			logrus.Errorf("%v", err.Error())
+		}
+		consensusCount := len(peerForConsensus)
+		if consensusCount < 3 {
+			logrus.Warnf("consensusCount: %d IS LESS THEN THREE NODES !!!", consensusCount)
+			consensusCount = 3
+		}
+		logrus.Printf("consensusCount %d ", consensusCount)
 
 		blsNode = &modelBLS.Node{
 			Id:           int(node.NodeId),
 			TimeStep:     0,
-			ThresholdWit: threshold/2 + 1,
-			ThresholdAck: threshold/2 + 1,
+			ThresholdWit: 2,
+			ThresholdAck: 2,
 			Acks:         0,
 			ConvertMsg:   &messageSigpb.Convert{},
 			Comm:         n.P2PPubSub,
@@ -208,7 +220,9 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 				n.CurrentRendezvous = common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub()
 				go n.Discover()
-				go n.StartProtocolByOracleRequest(event)
+				if event != nil {
+					go n.StartProtocolByOracleRequest(event)
+				}
 
 			}
 		}
@@ -221,7 +235,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 //	resultCh <-  n.StartProtocolByOracleRequest(n.CurrentRendezvous)
 //}
 
-func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequest helpers.OracleRequest, err error) {
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
 	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
 	if err != nil {
 		logrus.Fatal(err)
@@ -256,7 +270,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequ
 	/**   TODO: apporove that tx was real  */
 	/**   TODO: apporove that tx was real  */
 
-	oracleRequest = helpers.OracleRequest{
+	oracleRequest := helpers.OracleRequest{
 		RequestType:    event.RequestType,
 		Bridge:         event.Bridge,
 		RequestId:      event.RequestId,
@@ -267,10 +281,13 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (oracleRequ
 	/** Invoke bridge on another side */
 	tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
+	}
+	receipt, err = helpers.WaitTransaction(n.EthClient_2, tx)
+	if err != nil || receipt == nil {
+		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed", err.Error()))
 	}
 
-	logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
 	return
 
 }

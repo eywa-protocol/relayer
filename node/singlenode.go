@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"os"
+	"strings"
 
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -24,8 +25,8 @@ func NewSingleNode(path string) (err error) {
 	}
 	/** parametrs does't exist in consfig */
 	if config.Config.ECDSA_KEY_1 == "" {
-		config.Config.ECDSA_KEY_1 = os.Getenv("ECDSA_KEY_1")
-		config.Config.ECDSA_KEY_2 = os.Getenv("ECDSA_KEY_2")
+		config.Config.ECDSA_KEY_1 = strings.Split(os.Getenv("ECDSA_KEY_1"), ",")[0]
+		config.Config.ECDSA_KEY_2 = strings.Split(os.Getenv("ECDSA_KEY_2"), ",")[0]
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

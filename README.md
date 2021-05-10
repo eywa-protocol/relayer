@@ -27,6 +27,16 @@ const tx1 = await this.nodeList.addNode(adrWalletNode1, this.p2pAddressNode_1, t
 $ docker-compose stop dev-adapter && docker-compose rm dev-adapter && docker rmi p2p-bridge_dev-adapter -f # optional
 $ export TYPE_ADAPTER_ENV=./bootstrap.env && keyname=boot servicename=dev-adapter make develop
 ```
+
+### Пример запуска теста в режиме single mode
+
+```json
+$ echo "в файле 4_rebuild_nodes.sh раскоментарить нужный кусок скрипта"
+$ cd p2p-bridge
+$ ./deploy.sh
+$ cd eth-contracts/truffle
+$ npm run integration-test:local
+```
   
 
 

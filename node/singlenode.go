@@ -12,6 +12,7 @@ import (
 	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,13 @@ func NewSingleNode(path string) (err error) {
 	n.Server = *server
 
 	n.EthClient_1, n.EthClient_2, _ = getEthClients()
+
+	pendingTxFromNetwork1 := make(chan *types.Transaction)
+	pendingTxFromNetwork2 := make(chan *types.Transaction)
+
+	var pendingListWaitRecieptFromNetwork1 []types.Transaction
+	var pendingListWaitRecieptFromNetwork2 []types.Transaction
+
 	/**
 	* subscribe on events newtwork1
 	 */
@@ -47,10 +55,19 @@ func NewSingleNode(path string) (err error) {
 		n.EthClient_2,
 		common.HexToAddress(config.Config.PROXY_NETWORK1),
 		common.HexToAddress(config.Config.PROXY_NETWORK2),
-		config.Config.ECDSA_KEY_2)
+		config.Config.ECDSA_KEY_2,
+		pendingTxFromNetwork2)
 	if err != nil {
 		panic(err)
 	}
+	go func() {
+		for {
+			_resolvedTx := <-pendingTxFromNetwork2
+			pendingListWaitRecieptFromNetwork2 = append(pendingListWaitRecieptFromNetwork2, *_resolvedTx)
+			logrus.Printf("Tx: %s was added in pending list into network2", pendingListWaitRecieptFromNetwork2[len(pendingListWaitRecieptFromNetwork2)-1].Hash())
+			logrus.Printf("The count of pending tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
+		}
+	}()
 
 	/**
 	* subscribe on events newtwork2
@@ -60,10 +77,19 @@ func NewSingleNode(path string) (err error) {
 		n.EthClient_1,
 		common.HexToAddress(config.Config.PROXY_NETWORK2),
 		common.HexToAddress(config.Config.PROXY_NETWORK1),
-		config.Config.ECDSA_KEY_1)
+		config.Config.ECDSA_KEY_1,
+		pendingTxFromNetwork1)
 	if err != nil {
 		panic(err)
 	}
+	go func() {
+		for {
+			__resolvedTx := <-pendingTxFromNetwork1
+			pendingListWaitRecieptFromNetwork1 = append(pendingListWaitRecieptFromNetwork1, *__resolvedTx)
+			logrus.Printf("Tx: %s was added in pending list into network1", pendingListWaitRecieptFromNetwork1[len(pendingListWaitRecieptFromNetwork1)-1].Hash())
+			logrus.Printf("The count of pending tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
+		}
+	}()
 
 	port := config.Config.PORT_1
 	n.Server.Start(port)
@@ -80,7 +106,8 @@ func subscNodeOracleRequest(
 	clientNetwork_2 *ethclient.Client,
 	proxyNetwork_1 common.Address,
 	proxyNetwork_2 common.Address,
-	sender string) (oracleRequest helpers.OracleRequest, err error) {
+	sender string,
+	pendingTx chan *types.Transaction) (oracleRequest helpers.OracleRequest, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork_1, clientNetwork_1)
 	if err != nil {
@@ -147,6 +174,8 @@ func subscNodeOracleRequest(
 				if err != nil {
 					logrus.Fatal(err)
 				}
+
+				pendingTx <- tx
 
 				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
 

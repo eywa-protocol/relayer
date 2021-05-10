@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // Config is global object that holds all application level variables.
@@ -23,6 +24,7 @@ type AppConfig struct {
 	PROXY_NETWORK1          string
 	MOCKDEX_NETWORK1        string
 	PROXY_NETWORK2          string
+	MOCKDEX_NETWORK2        string
 }
 
 // LoadConfig loads config from files

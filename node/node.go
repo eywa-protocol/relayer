@@ -203,8 +203,8 @@ func (n Node) NewBLSNode(path, name string) (blsNode *modelBLS.Node, err error) 
 		blsNode = &modelBLS.Node{
 			Id:           int(node.NodeId),
 			TimeStep:     0,
-			ThresholdWit: 7,
-			ThresholdAck: 7,
+			ThresholdWit: consensusCount/2 + 1,
+			ThresholdAck: consensusCount/2 + 1,
 			Acks:         0,
 			ConvertMsg:   &messageSigpb.Convert{},
 			Comm:         n.P2PPubSub,

@@ -151,7 +151,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
-					panic(err)
+					logrus.Error(err)
+					return
 				}
 
 				// Count acks toward the threshold
@@ -160,6 +161,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
 				err = keyMask.SetMask(msg.Mask)
 				if err != nil {
+					logrus.Error(err)
 					panic(err)
 				}
 				index := keyMask.IndexOfNthEnabled(0)
@@ -314,7 +316,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	}
 	err = keyMask.SetMask(msg.Mask)
 	if err != nil {
-		panic(err)
+		logrus.Error(err)
 		return
 	}
 

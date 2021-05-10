@@ -34,28 +34,36 @@ func loadNodeConfig(path string) (err error) {
 		logrus.Fatal(err)
 		return
 	}
-	return
-}
-
-func NodeInit(path, name string) (err error) {
-	logrus.Print("nodeInit START")
 	hostName, _ := os.Hostname()
 	keysList := os.Getenv("ECDSA_KEY_1")
+	keys := strings.Split(keysList, ",")
+
 	strNum := strings.TrimPrefix(hostName, "p2p-bridge_node_")
 	strNum = strings.TrimRightFunc(strNum, func(r rune) bool {
 		return !unicode.IsNumber(r)
 	})
 	nodeHostId, _ := strconv.Atoi(strNum)
-	if nodeHostId == 0 || nodeHostId > len(keysList)-1 {
-		nodeHostId = rand.Intn(len(keysList))
+	if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+		nodeHostId = rand.Intn(len(keys))
 	}
 
-	config.Config.ECDSA_KEY_1 = strings.Split(keysList, ",")[nodeHostId-1]
+	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
 
 	keysList2 := os.Getenv("ECDSA_KEY_2")
-	config.Config.ECDSA_KEY_2 = strings.Split(keysList2, ",")[nodeHostId-1]
+	keys2 := strings.Split(keysList2, ",")
+	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
 
-	logrus.Printf("----------> %v key1 %v key2 %v", string(hostName[len(hostName)-1]), config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
+	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" {
+		panic(errors.New("you need key to start node"))
+	}
+
+	logrus.Printf("hostName %s nodeHostId %v key1 %v key2 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
+
+	return
+}
+
+func NodeInit(path, name string) (err error) {
+	logrus.Print("nodeInit START")
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -193,7 +201,7 @@ func NewNode(path, name string, port int) (err error) {
 	}
 	if n.NodeBLS == nil {
 		err = errors.New("newBLSNode NIL")
-		logrus.Errorf(err.Error())
+		return err
 	} else {
 		n.Dht, err = n.initDHT()
 		if err != nil {

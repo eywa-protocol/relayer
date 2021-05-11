@@ -1,8 +1,10 @@
 package common
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"github.com/ethereum/go-ethereum/common"
+	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/sirupsen/logrus"
 	"go.dedis.ch/kyber/v3"
@@ -204,4 +206,19 @@ func GenECDSAKey(prefix string) (err error) {
 	}
 
 	return
+}
+
+func AddressFromPrivKey(skey string) (address common.Address) {
+	privateKey, err := ToECDSAFromHex(skey)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		logrus.Fatal("error casting public key to ECDSA")
+	}
+	address = ecrypto.PubkeyToAddress(*publicKeyECDSA)
+	return
+
 }

@@ -2,8 +2,6 @@ package common
 
 import (
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/sirupsen/logrus"
-
 	//"github.com/gorilla/mux"
 	"github.com/linkpoolio/bridges"
 )
@@ -48,7 +46,6 @@ func (ap *DBridge) Run(helper *bridges.Helper) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.Print(res)
 	return res, nil
 
 }

@@ -10,9 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"math/big"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -35,22 +37,49 @@ func loadNodeConfig(path string) (err error) {
 		return
 	}
 	hostName, _ := os.Hostname()
+
 	keysList := os.Getenv("ECDSA_KEY_1")
 	keys := strings.Split(keysList, ",")
+	keysList2 := os.Getenv("ECDSA_KEY_2")
+	keys2 := strings.Split(keysList2, ",")
 
 	strNum := strings.TrimPrefix(hostName, "p2p-bridge_node_")
 	strNum = strings.TrimRightFunc(strNum, func(r rune) bool {
 		return !unicode.IsNumber(r)
 	})
 	nodeHostId, _ := strconv.Atoi(strNum)
-	if nodeHostId == 0 || nodeHostId > len(keys)-1 {
-		nodeHostId = rand.Intn(len(keys))
+
+	c1, c2, err := getEthClients()
+	if err != nil {
+		logrus.Fatal(err)
+
+	}
+
+	var getRandomKeyForTestIfNoFunds func()
+	getRandomKeyForTestIfNoFunds = func() {
+		config.Config.ECDSA_KEY_1 = keys[nodeHostId]
+		config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
+		balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+
+		balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+
+		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
+			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
+			//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+			nodeHostId = rand.Intn(len(keys))
+			//}
+			getRandomKeyForTestIfNoFunds()
+		}
+
 	}
 
 	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-
-	keysList2 := os.Getenv("ECDSA_KEY_2")
-	keys2 := strings.Split(keysList2, ",")
 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
 
 	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" {
@@ -160,16 +189,6 @@ func NewNode(path, name string, port int) (err error) {
 		return
 	}
 
-	/*	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
-		if err != nil {
-			return
-		}
-		logrus.Printf("------------> node count %v", len(nodes))
-		for _, node := range nodes {
-			logrus.Printf("NODES: %v", string(node.P2pAddress[:]))
-		}
-	*/
-
 	key_file := "keys/" + name + "-ecdsa.key"
 	bls_key_file := "keys/" + name + "-bn256.key"
 	blsAddr := common2.BLSAddrFromKeyFile(bls_key_file)
@@ -181,8 +200,8 @@ func NewNode(path, name string, port int) (err error) {
 	words := strings.Split(string(q.P2pAddress), "/")
 
 	registeredPort, err := strconv.Atoi(words[4])
-	if err == nil {
-		logrus.Error("Caanot obtain port %d, %v", registeredPort, err)
+	if err != nil {
+		logrus.Errorf("Caanot obtain port %d, %v", registeredPort, err)
 	}
 	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< PORT %d >>>>>>>>>>>>>>>>>>>>>>>>>>>>", registeredPort)
 	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort)
@@ -191,32 +210,33 @@ func NewNode(path, name string, port int) (err error) {
 	}
 	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< HOST ID %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>", n.Host.ID())
 	n.Dht, err = n.initDHT()
+	if err != nil {
+		return
+	}
+
+	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
+	discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
 
 	n.P2PPubSub = n.initNewPubSub()
 
-	n.NodeBLS, err = n.NewBLSNode(path, name)
+	n.PublicKeys, err = n.SetPublicKeys()
+	if err != nil {
+		return
+	}
+
+	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
+	if err != nil {
+		return
+	}
+
+	logrus.Printf("---------- ListenNodeOracleRequest -------------")
+	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
-		return err
 	}
-	if n.NodeBLS == nil {
-		err = errors.New("newBLSNode NIL")
-		return err
-	} else {
-		n.Dht, err = n.initDHT()
-		if err != nil {
-			logrus.Errorf(err.Error())
-			return err
-		}
-		logrus.Printf("---------- ListenNodeOracleRequest -------------")
-		_, err = n.ListenNodeOracleRequest()
-		if err != nil {
-			logrus.Errorf(err.Error())
-		}
-		logrus.Printf("---------- ListenReceiveRequest -------------")
-		helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	logrus.Printf("---------- ListenReceiveRequest -------------")
+	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 
-	}
 	logrus.Print("newBLSNode STARTED /////////////////////////////////")
 	/*err = n.runRPCService()
 	if err != nil {
@@ -253,12 +273,16 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 		return
 	}
 	for _, node := range nodes {
-		//logrus.Printf("Node:%d\n %v\n %v\n %v\n %v\n", i, node.Enable, node.NodeWallet, string(node.P2pAddress[:]), string(node.BlsPubKey[:]))
 		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
 		if err != nil {
 			return nil, err
 		}
 		bootstrapPeers = append(bootstrapPeers, peerMA)
 	}
-	return libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
+	if err != nil {
+		return
+	}
+	_ = dht.Bootstrap(n.Ctx)
+	return
 }

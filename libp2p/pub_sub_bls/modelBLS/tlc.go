@@ -303,7 +303,7 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("Aggregated Signature VERIFIED: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
+	fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<< Aggregated Signature VERIFIED ! ! ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 	return nil
 }

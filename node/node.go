@@ -22,6 +22,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/linkpoolio/bridges"
@@ -51,6 +52,11 @@ type Node struct {
 	Service           *libp2p.Service
 	P2PPubSub         *libp2p_pubsub.Libp2pPubSub
 	NodeBLS           *modelBLS.Node
+	Routing           routing.PeerRouting
+	Discovery         *discovery.RoutingDiscovery
+	PublicKeys        []kyber.Point
+	BLSAddress        common.Address
+	PrivKey           kyber.Scalar
 }
 
 type addrList []multiaddr.Multiaddr
@@ -61,10 +67,13 @@ type addrList []multiaddr.Multiaddr
 //}
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
+	n.NodeBLS, _ = n.NewBLSNode()
+
 	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
 	wg.Add(1)
+	discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
 	go n.NodeBLS.AdvanceWithTopic(0, n.CurrentRendezvous)
 	wg.Add(1)
 	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
@@ -146,17 +155,14 @@ func (n Node) nodeExiats(blsAddr common.Address) bool {
 
 }
 
-func (n Node) NewBLSNode(path, name string) (blsNode *modelBLS.Node, err error) {
-	var bootstrapPeers []multiaddr.Multiaddr
+func (n Node) SetPublicKeys() (publicKeys []kyber.Point, err error) {
+	publicKeys = make([]kyber.Point, 0)
 	suite := pairing.NewSuiteBn256()
 	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}
-	publicKeys := make([]kyber.Point, 0)
 	for _, node := range nodes {
-		peerMA, _ := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
-		bootstrapPeers = append(bootstrapPeers, peerMA)
 		blsPubKey := string(node.BlsPubKey[:])
 		p, err := encoding.ReadHexPoint(suite, strings.NewReader(blsPubKey))
 		if err != nil {
@@ -164,41 +170,54 @@ func (n Node) NewBLSNode(path, name string) (blsNode *modelBLS.Node, err error) 
 		}
 		publicKeys = append(publicKeys, p)
 	}
+	return
+}
+
+func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAddr common.Address, err error) {
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
-	prvKey, err := common2.ReadScalarFromFile(nodeKeyFile)
+	prvKey, err = common2.ReadScalarFromFile(nodeKeyFile)
 	if err != nil {
-		return nil, err
+		return
 	}
+	blsAddr = common2.BLSAddrFromKeyFile(nodeKeyFile)
+	return
+}
 
-	blsAddr := common2.BLSAddrFromKeyFile(nodeKeyFile)
-	if !n.nodeExiats(blsAddr) {
-		logrus.Errorf("node %x with keyFile %s", blsAddr, nodeKeyFile)
+func (n Node) NewBLSNode() (blsNode *modelBLS.Node, err error) {
+
+	suite := pairing.NewSuiteBn256()
+	if !n.nodeExiats(n.BLSAddress) {
+		logrus.Errorf("node %x with keyFile %s does not exist", n.BLSAddress)
 
 	} else {
-		logrus.Printf("BLS ADDRESS %v ", blsAddr)
-		node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
+		//logrus.Printf("BLS ADDRESS %v ", n.BLSAddress)
+		node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), n.BLSAddress)
 		if err != nil {
 			return nil, err
 		}
 
-		mask, err := sign.NewMask(suite, publicKeys, nil)
+		mask, err := sign.NewMask(suite, n.PublicKeys, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, string(node.P2pAddress), node.NodeId, string(node.BlsPubKey), node.NodeWallet)
+		//fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, string(node.P2pAddress), node.NodeId, string(node.BlsPubKey), node.NodeWallet)
 		fmt.Printf("---------------->NODE ID %d %v\n", node.NodeId, int(node.NodeId))
-		peerForConsensus, err := n.Dht.GetClosestPeers(n.Ctx, n.Host.ID().String())
-		if err != nil {
-			logrus.Errorf("%v", err.Error())
+
+		//n.Dht.RefreshRoutingTable()
+		//n.Dht.RoutingTable().Print()
+		peerForConsensus := n.P2PPubSub.ListPeersByTopic(n.CurrentRendezvous)
+
+		if len(peerForConsensus) == 0 {
+			logrus.Error(errors.New("no peers in table"))
 		}
 		consensusCount := len(peerForConsensus)
 		if consensusCount < 3 {
 			logrus.Warnf("consensusCount: %d IS LESS THEN THREE NODES !!!", consensusCount)
 			consensusCount = 3
 		}
-		logrus.Printf("consensusCount %d ", consensusCount)
+		logrus.Printf("\\\\\\\\\\\\\\\\\\\\\\ consensusCount %d //////////////////////////////////", consensusCount)
 
 		blsNode = &modelBLS.Node{
 			Id:           int(node.NodeId),
@@ -209,10 +228,10 @@ func (n Node) NewBLSNode(path, name string) (blsNode *modelBLS.Node, err error) 
 			ConvertMsg:   &messageSigpb.Convert{},
 			Comm:         n.P2PPubSub,
 			History:      make([]modelBLS.MessageWithSig, 0),
-			Signatures:   make([][]byte, len(publicKeys)),
+			Signatures:   make([][]byte, len(n.PublicKeys)),
 			SigMask:      mask,
-			PublicKeys:   publicKeys,
-			PrivateKey:   prvKey,
+			PublicKeys:   n.PublicKeys,
+			PrivateKey:   n.PrivKey,
 			Suite:        suite,
 		}
 	}
@@ -261,21 +280,21 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
 	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		logrus.Fatal("error casting public key to ECDSA")
+		logrus.Error("error casting public key to ECDSA")
 	}
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 	nonce, err := n.EthClient_2.PendingNonceAt(n.Ctx, fromAddress)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
 	gasPrice, err := n.EthClient_2.SuggestGasPrice(n.Ctx)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
 	auth := bind.NewKeyedTransactor(privateKey)
 	auth.Nonce = big.NewInt(int64(nonce))
@@ -285,7 +304,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 
 	instance, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_2)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
 
 	/**   TODO: apporove that tx was real  */
@@ -316,12 +335,11 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 }
 
 func (n Node) Discover() {
+
 	logrus.Print("CurrentRendezvous ", n.CurrentRendezvous)
+	n.P2PPubSub.InitializePubSubWithTopic(n.Host, n.CurrentRendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
-	//logrus.Print("routingDiscovery ", routingDiscovery.)
-
 	discovery.Advertise(n.Ctx, routingDiscovery, n.CurrentRendezvous)
-
 	ticker := time.NewTicker(config.Config.TickerInterval)
 	defer ticker.Stop()
 
@@ -330,13 +348,31 @@ func (n Node) Discover() {
 		case <-n.Ctx.Done():
 			return
 		case <-ticker.C:
-
+			n.FindPeers()
 			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, n.CurrentRendezvous)
 			if err != nil {
 				logrus.Fatal(err)
 			}
+
+			peerIds := n.P2PPubSub.ListPeersByTopic(n.CurrentRendezvous)
+			for _, pID := range peerIds {
+				//logrus.Printf("discovery.FindPeers PEER %v  - - - - - - - - - - - - - - >", p.Addrs)
+				if pID == n.Host.ID() {
+					continue
+				}
+				if n.Host.Network().Connectedness(pID) != network.Connected {
+					_, err = n.Host.Network().DialPeer(n.Ctx, pID)
+					logrus.Printf("!!!!!!!!!!!!!!!!!!!!!! Connected to peer %s ! ! ! ! ! ! !\n", pID.Pretty())
+
+					if err != nil {
+						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
+						continue
+					}
+				}
+			}
+
 			for _, p := range peers {
-				//logrus.Print("PEER ", p.Addrs)
+				//logrus.Printf("discovery.FindPeers PEER %v  - - - - - - - - - - - - - - >", p.Addrs)
 				if p.ID == n.Host.ID() {
 					continue
 				}
@@ -344,11 +380,44 @@ func (n Node) Discover() {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
 					logrus.Printf("!!!!!!!!!!!!!!!!!!!!!! Connected to peer %s !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111\n", p.ID.Pretty())
 					if err != nil {
-						logrus.Error(err)
+						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
 						continue
 					}
 				}
 			}
 		}
 	}
+}
+
+func (n Node) FindPeers() {
+	//logrus.Printf("Начинаю поиcк узлов\n")
+	peerInfos, err := discovery.FindPeers(n.Ctx, n.Discovery, n.CurrentRendezvous)
+	if len(peerInfos) != 0 {
+		discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
+	} else {
+		return
+	}
+	if len(peerInfos) > 1 {
+		logrus.Printf("нвйдено узлов: %v", len(peerInfos))
+	}
+
+	for i, pe := range peerInfos {
+		logrus.Printf("(%d):%s\n", i, pe.ID.Pretty())
+	}
+	if err != nil {
+		panic(err)
+	}
+	for _, peerInfo := range peerInfos {
+		//logrus.Printf("%v нашел узел: %s\n",n.Host.ID().Pretty(),  peerInfo.ID.Pretty())
+		if peerInfo.ID == n.Host.ID() {
+			continue
+		}
+		logrus.Printf("Пробую подключиться:%s\n", peerInfo.ID.Pretty())
+		if err := n.Host.Connect(n.Ctx, peerInfo); err != nil {
+			logrus.Printf("Узел: %s\n", peerInfo.ID.Pretty())
+			continue
+		}
+		logrus.Printf("Успешно подключен:%s\n", peerInfo.ID.Pretty())
+	}
+	time.Sleep(time.Minute * 2)
 }

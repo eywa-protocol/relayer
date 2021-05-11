@@ -11,9 +11,6 @@ import (
 
 // Advance will change the step of the node to a new one and then broadcast a message to the network.
 func (node *Node) AdvanceWithTopic(step int, topic string) {
-	if topic != "" {
-		node.Comm.Reconnect(topic)
-	}
 	node.TimeStep = step
 	node.Acks = 0
 	node.Wits = 0
@@ -73,7 +70,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 			// Used for stopping the execution after some timesteps
 			if nodeTimeStep == stop {
-				logrus.Printf("-------> Consensus achieved by node %v", node.Id)
+				logrus.Printf("<<<<<<<<<<<<<<<<<<<<<<<< Consensus achieved by node %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", node.Id)
 				mutex.Lock()
 				end = true
 				node.TimeStep++

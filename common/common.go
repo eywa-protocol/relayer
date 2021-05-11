@@ -54,7 +54,6 @@ func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Printf("client: %v REGISTERING node %v in contract %v NODE sender:%v with PK %v blsAddress %v ", client, p2pAddress, nodeListContractAddress, nodeWallet, pk, blsAddr)
 	txOpts1 := bind.NewKeyedTransactor(pk)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
@@ -67,6 +66,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 	}
 
 	if !res {
+		logrus.Printf("client: %v REGISTERING node %v in contract %v NODE sender:%v with PK %v blsAddress %v ", client, string(p2pAddress), nodeListContractAddress, nodeWallet, pk, blsAddr)
 		tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
 		if err != nil {
 			return err

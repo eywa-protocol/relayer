@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	common2 "github.com/DigiU-Lab/p2p-bridge/common"
-	"github.com/DigiU-Lab/p2p-bridge/node"
-	"github.com/sirupsen/logrus"
 	p "path"
 	"path/filepath"
 	"strings"
+
+	common2 "github.com/DigiU-Lab/p2p-bridge/common"
+	"github.com/DigiU-Lab/p2p-bridge/node"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -34,6 +35,14 @@ func main() {
 		err = node.NodeInit(path, fname)
 		if err != nil {
 			logrus.Fatalf("nodeInit %v", err)
+			panic(err)
+		}
+
+	} else if mode == "singlenode" {
+		logrus.Info("Enabled single node mode")
+		node.NewSingleNode(path)
+		if err != nil {
+			logrus.Fatalf("NewSingleNode %v", err)
 			panic(err)
 		}
 

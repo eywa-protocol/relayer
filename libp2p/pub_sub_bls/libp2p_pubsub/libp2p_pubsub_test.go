@@ -308,7 +308,7 @@ func TestOneStepBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../../../oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
 	Delayed = false
-	simpleTestOneStepBLS(t, 5, 9900)
+	simpleTestOneStepBLS(t, 9, 9900)
 }
 
 func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {
@@ -419,7 +419,7 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 	fmt.Println("The END")
 }
 
-// StartTest is used for starting tlc nodes
+//StartTest is used for starting tlc nodes
 func StartTestOneStepBLS(nodes []*modelBLS.Node) {
 	fmt.Print("START")
 	wg := &sync.WaitGroup{}
@@ -453,8 +453,8 @@ func runNodeBLS(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 
 func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup) {
 	defer wg.Done()
-	err := node.WaitForMsgNEW()
-	if err != nil {
-		fmt.Errorf(err.Error())
-	}
+	consensuChannel := make(chan bool)
+	go node.WaitForMsgNEW(consensuChannel)
+	_ = <-consensuChannel
+	return
 }

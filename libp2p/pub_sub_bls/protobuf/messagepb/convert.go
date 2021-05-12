@@ -36,7 +36,6 @@ func (c *Convert) MessageToBytes(msg model.Message) *[]byte {
 		fmt.Printf("Error : %v\n", err)
 		return nil
 	}
-	fmt.Printf("msgBytes : %v\n", msgBytes)
 	return &msgBytes
 }
 

@@ -45,6 +45,10 @@ func (c *Libp2pPubSub) BroadcastMsg(msg model.Message) {
 	panic("not implemented")
 }
 
+func (c *Libp2pPubSub) ListPeersByTopic(topic string) []peer.ID {
+	return c.pubsub.ListPeers(topic)
+}
+
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
 	logrus.Printf("BROADCASTING MESSAGE !!!! TOPIC %v", c.topic)

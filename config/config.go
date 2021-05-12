@@ -1,15 +1,15 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // Config is global object that holds all application level variables.
 var Config AppConfig
 
 type AppConfig struct {
-
 	TickerInterval          time.Duration
 	ECDSA_KEY_2             string
 	ECDSA_KEY_1             string
@@ -24,7 +24,7 @@ type AppConfig struct {
 	PROXY_NETWORK1          string
 	MOCKDEX_NETWORK1        string
 	PROXY_NETWORK2          string
-	THRESHOLD               int
+	MOCKDEX_NETWORK2        string
 }
 
 // LoadConfig loads config from files

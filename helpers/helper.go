@@ -2,8 +2,11 @@ package helpers
 
 import (
 	"context"
+	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
+	"time"
 
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -75,8 +78,8 @@ func ListenOracleRequest(
 	go func() {
 		for {
 			select {
-			case err := <-sub.Err():
-				logrus.Println("OracleRequest error:", err)
+			case _ = <-sub.Err():
+				break
 			case event := <-channel:
 				logrus.Printf("OracleRequest id: %v type: %v\n", event.RequestId, event.RequestType)
 
@@ -128,7 +131,7 @@ func ListenOracleRequest(
 					logrus.Fatal(err)
 				}
 
-				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
+				logrus.Printf("tx in first chain has been triggered :  %x", tx.Hash())
 
 			}
 		}
@@ -154,10 +157,10 @@ func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.A
 	go func() {
 		for {
 			select {
-			case err := <-sub.Err():
-				logrus.Println("ReceiveRequest error:", err)
+			case _ = <-sub.Err():
+				break
 			case event := <-channel:
-				logrus.Printf("ReceiveRequest: ", event.ReqId, event.ReceiveSide, event.Tx)
+				logrus.Printf("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, event.Tx)
 
 				/** TODO:
 				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
@@ -168,4 +171,24 @@ func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.A
 	}()
 	return
 
+}
+
+func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
+	var receipt *types.Receipt
+	var err error
+	for {
+		receipt, err = client.TransactionReceipt(context.Background(), tx.Hash())
+		if receipt == nil || err == ethereum.NotFound {
+			time.Sleep(time.Millisecond * 500)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("transaction %s failed: %v", tx.Hash().Hex(), err)
+		}
+		break
+	}
+	if receipt.Status != 1 {
+		return nil, fmt.Errorf("failed transaction: %s", tx.Hash().Hex())
+	}
+	return receipt, nil
 }

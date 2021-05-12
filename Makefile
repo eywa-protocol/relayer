@@ -10,11 +10,8 @@ deps:
 build:
 	go build -o bridge  cmd/main.go
 
-key:
-	go run key/keygen.go --prefix $(name)
-
 clean:
-	rm -f ./bridge keys/*.key ./eth-contracts -r
+	rm -f ./bridge keys/*.key
 
 all: deps build
 
@@ -22,4 +19,10 @@ all: deps build
 develop:
 	@docker-compose up -d $(servicename);
 	@docker-compose logs -f $(servicename)
+
+bls_test:
+	 go test -v ./libp2p/pub_sub_bls/libp2p_pubsub -run TestBLS
+
+custom_bls_test:
+	 go test -v ./libp2p/pub_sub_bls/libp2p_pubsub -run TestOneStepBLS
 

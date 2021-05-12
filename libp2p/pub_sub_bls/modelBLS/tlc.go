@@ -151,7 +151,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
-					panic(err)
+					logrus.Error(err)
+					return
 				}
 
 				// Count acks toward the threshold
@@ -160,6 +161,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
 				err = keyMask.SetMask(msg.Mask)
 				if err != nil {
+					logrus.Error(err)
 					panic(err)
 				}
 				index := keyMask.IndexOfNthEnabled(0)
@@ -301,7 +303,7 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("Aggregated Signature VERIFIED: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
+	fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<< Aggregated Signature VERIFIED ! ! ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 	return nil
 }
@@ -309,24 +311,23 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err error) {
 
 	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
+	if err != nil {
+		return
+	}
 	err = keyMask.SetMask(msg.Mask)
 	if err != nil {
-		panic(err)
+		logrus.Error(err)
 		return
 	}
 
-	fmt.Println(node.PublicKeys[keyMask.IndexOfNthEnabled(0)], "\n MSG SIGNATURE		", msg.Signature)
-	//fmt.Println(node.PublicKeys)
-
 	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
-	// Verify message signature
+
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
 		return
 	}
-	fmt.Println("signature VERIFIED !!!!!")
-
-	return nil
+	fmt.Println("signature VERIFIED !!!!!\n")
+	return
 }
 
 func calculateHash(msg MessageWithSig, converter MessageInterface) []byte {

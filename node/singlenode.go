@@ -18,6 +18,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type PendingRequest struct {
+	Tx      types.Transaction
+	Event   helpers.OracleRequest
+	Reciept types.Receipt
+}
+
 func NewSingleNode(path string) (err error) {
 
 	err = loadNodeConfig(path)
@@ -41,11 +47,11 @@ func NewSingleNode(path string) (err error) {
 
 	n.EthClient_1, n.EthClient_2, _ = getEthClients()
 
-	pendingTxFromNetwork1 := make(chan *types.Transaction)
-	pendingTxFromNetwork2 := make(chan *types.Transaction)
+	pendingTxFromNetwork1 := make(chan *PendingRequest)
+	pendingTxFromNetwork2 := make(chan *PendingRequest)
 
-	var pendingListWaitRecieptFromNetwork1 []types.Transaction
-	var pendingListWaitRecieptFromNetwork2 []types.Transaction
+	var pendingListWaitRecieptFromNetwork1 = make(map[common.Hash]PendingRequest)
+	var pendingListWaitRecieptFromNetwork2 = make(map[common.Hash]PendingRequest)
 
 	/**
 	* subscribe on events newtwork1
@@ -60,12 +66,13 @@ func NewSingleNode(path string) (err error) {
 	if err != nil {
 		panic(err)
 	}
+	/** Save num tx in map  */
 	go func() {
 		for {
 			_resolvedTx := <-pendingTxFromNetwork2
-			pendingListWaitRecieptFromNetwork2 = append(pendingListWaitRecieptFromNetwork2, *_resolvedTx)
-			logrus.Printf("Tx: %s was added in pending list into network2", pendingListWaitRecieptFromNetwork2[len(pendingListWaitRecieptFromNetwork2)-1].Hash())
-			logrus.Printf("The count of pending tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
+			pendingListWaitRecieptFromNetwork2[_resolvedTx.Tx.Hash()] = *_resolvedTx
+			logrus.Printf("Tx: %s was added in pending list network2, receipt status: %v", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status)
+			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
 		}
 	}()
 
@@ -85,9 +92,9 @@ func NewSingleNode(path string) (err error) {
 	go func() {
 		for {
 			__resolvedTx := <-pendingTxFromNetwork1
-			pendingListWaitRecieptFromNetwork1 = append(pendingListWaitRecieptFromNetwork1, *__resolvedTx)
-			logrus.Printf("Tx: %s was added in pending list into network1", pendingListWaitRecieptFromNetwork1[len(pendingListWaitRecieptFromNetwork1)-1].Hash())
-			logrus.Printf("The count of pending tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
+			pendingListWaitRecieptFromNetwork1[__resolvedTx.Tx.Hash()] = *__resolvedTx
+			logrus.Printf("Tx: %s was added in pending list network1, receipt status: %v", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status)
+			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
 		}
 	}()
 
@@ -107,7 +114,7 @@ func subscNodeOracleRequest(
 	proxyNetwork_1 common.Address,
 	proxyNetwork_2 common.Address,
 	sender string,
-	pendingTx chan *types.Transaction) (oracleRequest helpers.OracleRequest, err error) {
+	pendingTx chan *PendingRequest) (oracleRequest helpers.OracleRequest, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork_1, clientNetwork_1)
 	if err != nil {
@@ -125,7 +132,7 @@ func subscNodeOracleRequest(
 			case err := <-sub.Err():
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("OracleRequest id: %d type: %d\n", event.RequestId, event.RequestType)
+				logrus.Printf("================== Catching OracleRequest event ===================\n")
 
 				privateKey, err := crypto.HexToECDSA(sender[2:])
 				if err != nil {
@@ -175,10 +182,16 @@ func subscNodeOracleRequest(
 					logrus.Fatal(err)
 				}
 
-				pendingTx <- tx
+				receipt, err := helpers.WaitTransaction(clientNetwork_2, tx)
+				if err != nil {
+					logrus.Warn("TX was refused, e.g. tx.status == fasle, ", tx.Hash())
+				}
 
-				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
-
+				pendingTx <- &PendingRequest{
+					Tx:      *tx,
+					Event:   oracleRequest,
+					Reciept: *receipt,
+				}
 			}
 		}
 	}()

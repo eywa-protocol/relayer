@@ -22,6 +22,7 @@ type PendingRequest struct {
 	Tx      types.Transaction
 	Event   helpers.OracleRequest
 	Reciept types.Receipt
+	From    common.Address
 }
 
 func NewSingleNode(path string) (err error) {
@@ -31,9 +32,14 @@ func NewSingleNode(path string) (err error) {
 		return
 	}
 	/** parametrs does't exist in consfig */
-	if config.Config.ECDSA_KEY_1 == "" {
+	if os.Getenv("ECDSA_KEY_1") != "" || os.Getenv("ECDSA_KEY_2") != "" {
 		config.Config.ECDSA_KEY_1 = strings.Split(os.Getenv("ECDSA_KEY_1"), ",")[0]
 		config.Config.ECDSA_KEY_2 = strings.Split(os.Getenv("ECDSA_KEY_2"), ",")[0]
+	}
+	/**  */
+	if os.Getenv("PROXY_NETWORK1") != "" || os.Getenv("PROXY_NETWORK2") != "" {
+		config.Config.PROXY_NETWORK1 = os.Getenv("PROXY_NETWORK1")
+		config.Config.PROXY_NETWORK2 = os.Getenv("PROXY_NETWORK2")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -71,7 +77,7 @@ func NewSingleNode(path string) (err error) {
 		for {
 			_resolvedTx := <-pendingTxFromNetwork2
 			pendingListWaitRecieptFromNetwork2[_resolvedTx.Tx.Hash()] = *_resolvedTx
-			logrus.Printf("Tx: %s was added in pending list network2, receipt status: %v", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status)
+			logrus.Printf("Tx: %s was added in pending list network2, receipt status: %v, sender: %s", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status, _resolvedTx.From)
 			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
 		}
 	}()
@@ -93,7 +99,7 @@ func NewSingleNode(path string) (err error) {
 		for {
 			__resolvedTx := <-pendingTxFromNetwork1
 			pendingListWaitRecieptFromNetwork1[__resolvedTx.Tx.Hash()] = *__resolvedTx
-			logrus.Printf("Tx: %s was added in pending list network1, receipt status: %v", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status)
+			logrus.Printf("Tx: %s was added in pending list network1, receipt status: %v, sender %s", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status, __resolvedTx.From)
 			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
 		}
 	}()
@@ -191,6 +197,7 @@ func subscNodeOracleRequest(
 					Tx:      *tx,
 					Event:   oracleRequest,
 					Reciept: *receipt,
+					From:    fromAddress,
 				}
 			}
 		}

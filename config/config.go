@@ -10,6 +10,7 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
+	config                  string
 	TickerInterval          time.Duration
 	ECDSA_KEY_2             string
 	ECDSA_KEY_1             string
@@ -31,7 +32,12 @@ type AppConfig struct {
 func LoadConfig(config AppConfig) error {
 	v := viper.New()
 	v.SetConfigType("env")
-	v.SetConfigName("bootstrap")
+	if config.config == "" {
+		v.SetConfigName("bootstrap")
+	} else {
+		v.SetConfigName(config.config)
+	}
+
 	v.SetEnvPrefix("cross-chain")
 	v.AutomaticEnv()
 	v.AddConfigPath(".")
@@ -50,5 +56,6 @@ func LoadConfigAndArgs(path string) (err error) {
 
 func NewConfig(path string) *AppConfig {
 	c := AppConfig{}
+	c.config = path
 	return &c
 }

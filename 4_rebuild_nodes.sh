@@ -7,26 +7,3 @@ docker-compose up -d --scale node=30
 #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
 docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
 docker-compose logs -f -t | grep -v ganache
-
-#
-# FOR SINGLE MODE
-#
-
-# docker-compose stop node
-# docker-compose rm   node
-# cd ../eth-contracts
-# make
-# cd ./truffle
-# npx truffle migrate --reset --network rinkeby && npx truffle migrate --reset --network bsctestnet
-
-# ./3_edit_configs.sh
-
-# make clean
-# export MODE=singlenode
-# export ECDSA_KEY_1=0x187994e6d93bb29e386fe7ab50232a6a2bea5d6f61046b803b9e9b8306b7d268
-# export ECDSA_KEY_2=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7
-# export PROXY_NETWORK1=wss://rinkeby.infura.io/ws/v3/ab95bf9f6dd743e6a8526579b76fe358
-# export PROXY_NETWORK2=https://data-seed-prebsc-1-s1.binance.org:8545/
-# docker-compose up -d node --build
-
-

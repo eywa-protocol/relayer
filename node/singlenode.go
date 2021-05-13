@@ -31,15 +31,15 @@ func NewSingleNode(path string) (err error) {
 	if err != nil {
 		return
 	}
-	/** parametrs does't exist in consfig */
+	/** if ENV empty then use config */
 	if os.Getenv("ECDSA_KEY_1") != "" || os.Getenv("ECDSA_KEY_2") != "" {
 		config.Config.ECDSA_KEY_1 = strings.Split(os.Getenv("ECDSA_KEY_1"), ",")[0]
 		config.Config.ECDSA_KEY_2 = strings.Split(os.Getenv("ECDSA_KEY_2"), ",")[0]
 	}
 	/**  */
-	if os.Getenv("PROXY_NETWORK1") != "" || os.Getenv("PROXY_NETWORK2") != "" {
-		config.Config.PROXY_NETWORK1 = os.Getenv("PROXY_NETWORK1")
-		config.Config.PROXY_NETWORK2 = os.Getenv("PROXY_NETWORK2")
+	if os.Getenv("NETWORK_RPC_1") != "" || os.Getenv("NETWORK_RPC_2") != "" {
+		config.Config.NETWORK_RPC_1 = os.Getenv("NETWORK_RPC_1")
+		config.Config.NETWORK_RPC_2 = os.Getenv("NETWORK_RPC_2")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -130,6 +130,7 @@ func subscNodeOracleRequest(
 	opt := &bind.WatchOpts{}
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
+		logrus.Error("Error %v", err.Error())
 		return
 	}
 	go func() {
@@ -162,7 +163,8 @@ func subscNodeOracleRequest(
 				auth.Nonce = big.NewInt(int64(nonce))
 				auth.Value = big.NewInt(0)     // in wei
 				auth.GasLimit = uint64(300000) // in units
-				auth.GasPrice = gasPrice
+				//NOTE!!! TODO: should be adjusted for optimal gas cunsumption
+				auth.GasPrice = new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 				instance, err := wrappers.NewBridge(proxyNetwork_2, clientNetwork_2)
 				if err != nil {
@@ -185,7 +187,7 @@ func subscNodeOracleRequest(
 				/** Invoke bridge on another side */
 				tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Error(err)
 				}
 
 				receipt, err := helpers.WaitTransaction(clientNetwork_2, tx)

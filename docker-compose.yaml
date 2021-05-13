@@ -6,7 +6,7 @@ services:
     build:
       context: ../
       dockerfile: ./p2p-bridge/Dockerfile
-    depends_on:
+#    depends_on:
 #      - ganache_net1
 #      - ganache_net2
     environment:
@@ -15,6 +15,8 @@ services:
         - TYPE_ADAPTER_ENV=bootstrap.env
         - ECDSA_KEY_1=${ECDSA_KEY_1}
         - ECDSA_KEY_2=${ECDSA_KEY_2}
+        - NETWORK_RPC_1=${NETWORK_RPC_1}
+        - NETWORK_RPC_2=${NETWORK_RPC_2}              
     networks:
       - static-network
 
@@ -29,6 +31,8 @@ services:
   #     - TYPE_ADAPTER_ENV=${TYPE_ADAPTER_ENV}
   #     - ECDSA_KEY_1=${ECDSA_KEY_1}
   #     - ECDSA_KEY_2=${ECDSA_KEY_2}
+  #     - NETWORK_RPC_1=${NETWORK_RPC_1}
+  #     - NETWORK_RPC_2=${NETWORK_RPC_2}
   #   volumes:
   #     - ./:/p2p-bridge
   #     - ../eth-contracts/wrappers:/eth-contracts/wrappers

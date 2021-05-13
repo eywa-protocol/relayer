@@ -18,4 +18,4 @@ docker-compose logs -f -t | grep -v ganache
 # export ECDSA_KEY_2=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7
 # export NETWORK_RPC_1=ws://172.20.128.11:7545
 # export NETWORK_RPC_2=ws://172.20.128.12:8545
-# docker-compose up -d --build
+# docker-compose up -d --build node

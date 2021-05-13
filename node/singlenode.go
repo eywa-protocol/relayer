@@ -12,10 +12,18 @@ import (
 	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
 )
+
+type PendingRequest struct {
+	Tx      types.Transaction
+	Event   helpers.OracleRequest
+	Reciept types.Receipt
+	From    common.Address
+}
 
 func NewSingleNode(path string) (err error) {
 
@@ -23,10 +31,15 @@ func NewSingleNode(path string) (err error) {
 	if err != nil {
 		return
 	}
-	/** parametrs does't exist in consfig */
-	if config.Config.ECDSA_KEY_1 == "" {
+	/** if ENV empty then use config */
+	if os.Getenv("ECDSA_KEY_1") != "" || os.Getenv("ECDSA_KEY_2") != "" {
 		config.Config.ECDSA_KEY_1 = strings.Split(os.Getenv("ECDSA_KEY_1"), ",")[0]
 		config.Config.ECDSA_KEY_2 = strings.Split(os.Getenv("ECDSA_KEY_2"), ",")[0]
+	}
+	/**  */
+	if os.Getenv("NETWORK_RPC_1") != "" || os.Getenv("NETWORK_RPC_2") != "" {
+		config.Config.NETWORK_RPC_1 = os.Getenv("NETWORK_RPC_1")
+		config.Config.NETWORK_RPC_2 = os.Getenv("NETWORK_RPC_2")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -39,6 +52,13 @@ func NewSingleNode(path string) (err error) {
 	n.Server = *server
 
 	n.EthClient_1, n.EthClient_2, _ = getEthClients()
+
+	pendingTxFromNetwork1 := make(chan *PendingRequest)
+	pendingTxFromNetwork2 := make(chan *PendingRequest)
+
+	var pendingListWaitRecieptFromNetwork1 = make(map[common.Hash]PendingRequest)
+	var pendingListWaitRecieptFromNetwork2 = make(map[common.Hash]PendingRequest)
+
 	/**
 	* subscribe on events newtwork1
 	 */
@@ -47,10 +67,20 @@ func NewSingleNode(path string) (err error) {
 		n.EthClient_2,
 		common.HexToAddress(config.Config.PROXY_NETWORK1),
 		common.HexToAddress(config.Config.PROXY_NETWORK2),
-		config.Config.ECDSA_KEY_2)
+		config.Config.ECDSA_KEY_2,
+		pendingTxFromNetwork2)
 	if err != nil {
 		panic(err)
 	}
+	/** Save num tx in map  */
+	go func() {
+		for {
+			_resolvedTx := <-pendingTxFromNetwork2
+			pendingListWaitRecieptFromNetwork2[_resolvedTx.Tx.Hash()] = *_resolvedTx
+			logrus.Printf("Tx: %s was added in pending list network2, receipt status: %v, sender: %s", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status, _resolvedTx.From)
+			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
+		}
+	}()
 
 	/**
 	* subscribe on events newtwork2
@@ -60,10 +90,19 @@ func NewSingleNode(path string) (err error) {
 		n.EthClient_1,
 		common.HexToAddress(config.Config.PROXY_NETWORK2),
 		common.HexToAddress(config.Config.PROXY_NETWORK1),
-		config.Config.ECDSA_KEY_1)
+		config.Config.ECDSA_KEY_1,
+		pendingTxFromNetwork1)
 	if err != nil {
 		panic(err)
 	}
+	go func() {
+		for {
+			__resolvedTx := <-pendingTxFromNetwork1
+			pendingListWaitRecieptFromNetwork1[__resolvedTx.Tx.Hash()] = *__resolvedTx
+			logrus.Printf("Tx: %s was added in pending list network1, receipt status: %v, sender %s", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status, __resolvedTx.From)
+			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
+		}
+	}()
 
 	port := config.Config.PORT_1
 	n.Server.Start(port)
@@ -80,7 +119,8 @@ func subscNodeOracleRequest(
 	clientNetwork_2 *ethclient.Client,
 	proxyNetwork_1 common.Address,
 	proxyNetwork_2 common.Address,
-	sender string) (oracleRequest helpers.OracleRequest, err error) {
+	sender string,
+	pendingTx chan *PendingRequest) (oracleRequest helpers.OracleRequest, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork_1, clientNetwork_1)
 	if err != nil {
@@ -90,6 +130,7 @@ func subscNodeOracleRequest(
 	opt := &bind.WatchOpts{}
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
+		logrus.Error("Error %v", err.Error())
 		return
 	}
 	go func() {
@@ -98,7 +139,7 @@ func subscNodeOracleRequest(
 			case err := <-sub.Err():
 				logrus.Println("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("OracleRequest id: %d type: %d\n", event.RequestId, event.RequestType)
+				logrus.Printf("================== Catching OracleRequest event ===================\n")
 
 				privateKey, err := crypto.HexToECDSA(sender[2:])
 				if err != nil {
@@ -122,7 +163,8 @@ func subscNodeOracleRequest(
 				auth.Nonce = big.NewInt(int64(nonce))
 				auth.Value = big.NewInt(0)     // in wei
 				auth.GasLimit = uint64(300000) // in units
-				auth.GasPrice = gasPrice
+				//NOTE!!! TODO: should be adjusted for optimal gas cunsumption
+				auth.GasPrice = new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 				instance, err := wrappers.NewBridge(proxyNetwork_2, clientNetwork_2)
 				if err != nil {
@@ -145,11 +187,20 @@ func subscNodeOracleRequest(
 				/** Invoke bridge on another side */
 				tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Error(err)
 				}
 
-				logrus.Printf("tx in first chain has been triggered :  ", tx.Hash())
+				receipt, err := helpers.WaitTransaction(clientNetwork_2, tx)
+				if err != nil {
+					logrus.Warn("TX was refused, e.g. tx.status == fasle, ", tx.Hash())
+				}
 
+				pendingTx <- &PendingRequest{
+					Tx:      *tx,
+					Event:   oracleRequest,
+					Reciept: *receipt,
+					From:    fromAddress,
+				}
 			}
 		}
 	}()

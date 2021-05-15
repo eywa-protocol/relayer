@@ -51,7 +51,7 @@ func main() {
 
 	} else if mode == "singlenode" {
 		logrus.Info("Enabled single node mode")
-		node.NewSingleNode(path)
+		err = node.NewSingleNode(path)
 		if err != nil {
 			logrus.Fatalf("NewSingleNode %v", err)
 			panic(err)

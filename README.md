@@ -25,10 +25,10 @@ const tx1 = await this.nodeList.addNode(adrWalletNode1, this.p2pAddressNode_1, t
 
 ```json
 $ docker-compose stop dev-adapter && docker-compose rm dev-adapter && docker rmi p2p-bridge_dev-adapter -f # optional
-$ export TYPE_ADAPTER_ENV=bootstrap.env && export ECDSA_KEY_1=0x60cc6f7a3b09e5080dc86cc0fd80e29545683ad4336012b221998b448d2d57bb && export ECDSA_KEY_2=0x469e5c05e289274dd8570c31f2f0f21236f2e071613ac9c565821985e7ae641e  && servicename=dev-adapter make develop
+$ export TYPE_ADAPTER_ENV=bootstrap.env && export ECDSA_KEY_1=0x187994e6d93bb29e386fe7ab50232a6a2bea5d6f61046b803b9e9b8306b7d268 && export ECDSA_KEY_2=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7 && export NETWORK_RPC_1=wss://rinkeby.infura.io/ws/v3/ab95bf9f6dd743e6a8526579b76fe358 && export NETWORK_RPC_2=ws://95.217.104.54:8576 && servicename=dev-adapter make develop
 ```
 
-### Пример запуска теста в режиме single mode
+### Пример запуска теста в режиме single mode в ЛОКАЛЬНОЙ СРЕДЕ
 
 ```json
 $ echo "в файле 4_rebuild_nodes.sh раскоментарить нужный кусок скрипта"
@@ -36,6 +36,15 @@ $ cd p2p-bridge
 $ ./deploy.sh
 $ cd eth-contracts/truffle
 $ npm run integration-test:local
+```
+
+### Пример запуска теста в режиме single mode в TESTNET
+
+```json
+$ cd p2p-bridge
+$ ./deploy.testnet.singlemode.sh
+$ cd eth-contracts/truffle
+$ npm run integration-test:testnet
 ```
   
 

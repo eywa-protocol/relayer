@@ -25,7 +25,7 @@ import (
 	"unicode"
 )
 
-func loadNodeConfig(path string) (err error) {
+func LoadNodeConfig(path string) (err error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		logrus.Fatal(err)
@@ -50,7 +50,7 @@ func loadNodeConfig(path string) (err error) {
 	})
 	nodeHostId, _ := strconv.Atoi(strNum)
 
-	c1, c2, err := getEthClients()
+	c1, c2, err := GetEthClients()
 	if err != nil {
 		logrus.Fatal(err)
 
@@ -96,7 +96,7 @@ func loadNodeConfig(path string) (err error) {
 func NodeInit(path, name string) (err error) {
 	logrus.Print("nodeInit START")
 
-	err = loadNodeConfig(path)
+	err = LoadNodeConfig(path)
 	if err != nil {
 		return
 	}
@@ -106,6 +106,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
+	//logrus.Printf("pubkey %v", pub)
 
 	err = common2.GenECDSAKey(name)
 	if err != nil {
@@ -118,16 +119,18 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 	nodeURL := libp2p.WriteHostAddrToConfig(h, "keys/"+name+"-peer.env")
-	c1, c2, err := getEthClients()
+	c1, c2, err := GetEthClients()
 
 	if err != nil {
 		return
 	}
 
+	logrus.Printf("nodelist1 blsAddress: %v", blsAddr)
 	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
 		return
 	}
+
 	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
@@ -163,7 +166,7 @@ func run(h host.Host, cancel func()) {
 
 func NewNode(path, name string, port int) (err error) {
 
-	err = loadNodeConfig(path)
+	err = LoadNodeConfig(path)
 	if err != nil {
 		return
 	}
@@ -185,7 +188,7 @@ func NewNode(path, name string, port int) (err error) {
 	n.Server = *server
 	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
 
-	n.EthClient_1, n.EthClient_2, err = getEthClients()
+	n.EthClient_1, n.EthClient_2, err = GetEthClients()
 	if err != nil {
 		return
 	}
@@ -227,7 +230,7 @@ func NewNode(path, name string, port int) (err error) {
 	}
 
 	logrus.Printf("---------- ListenNodeOracleRequest -------------")
-	err = n.ListenNodeOracleRequest()
+	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
@@ -250,7 +253,7 @@ func NewNode(path, name string, port int) (err error) {
 	return
 }
 
-func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
+func GetEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {

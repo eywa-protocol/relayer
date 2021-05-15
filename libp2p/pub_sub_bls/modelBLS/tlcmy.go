@@ -215,6 +215,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 				// Add mask for the signature
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				//logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
 					logrus.Error(err)

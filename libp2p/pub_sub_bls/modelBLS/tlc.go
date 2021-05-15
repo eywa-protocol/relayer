@@ -316,6 +316,8 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		logrus.Error(err)
 		return
 	}
+	logrus.Infof("keyMask.IndexOfNthEnabled %d", keyMask.IndexOfNthEnabled(0))
+	logrus.Infof("node.PublicKeys length %d", len(node.PublicKeys))
 
 	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
 
@@ -323,6 +325,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	if err != nil {
 		return
 	}
+	//fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

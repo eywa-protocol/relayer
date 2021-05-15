@@ -19,7 +19,7 @@ import (
 
 func NewSingleNode(path string) (err error) {
 
-	err = loadNodeConfig(path)
+	err = LoadNodeConfig(path)
 	if err != nil {
 		return
 	}
@@ -38,11 +38,11 @@ func NewSingleNode(path string) (err error) {
 	server := n.NewBridge()
 	n.Server = *server
 
-	n.EthClient_1, n.EthClient_2, _ = getEthClients()
+	n.EthClient_1, n.EthClient_2, _ = GetEthClients()
 	/**
 	* subscribe on events newtwork1
 	 */
-	_, err = subscNodeOracleRequest(
+	_, err = SubscribeNodeOracleRequest(
 		n.EthClient_1,
 		n.EthClient_2,
 		common.HexToAddress(config.Config.PROXY_NETWORK1),
@@ -55,7 +55,7 @@ func NewSingleNode(path string) (err error) {
 	/**
 	* subscribe on events newtwork2
 	 */
-	_, err = subscNodeOracleRequest(
+	_, err = SubscribeNodeOracleRequest(
 		n.EthClient_2,
 		n.EthClient_1,
 		common.HexToAddress(config.Config.PROXY_NETWORK2),
@@ -75,7 +75,7 @@ func NewSingleNode(path string) (err error) {
 /**
 * Catch event from first side
  */
-func subscNodeOracleRequest(
+func SubscribeNodeOracleRequest(
 	clientNetwork_1 *ethclient.Client,
 	clientNetwork_2 *ethclient.Client,
 	proxyNetwork_1 common.Address,

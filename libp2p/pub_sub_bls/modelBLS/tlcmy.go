@@ -132,7 +132,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				if err != nil {
 					logrus.Error(err)
 				}
-				fmt.Print("node SigMask Merged\n")
+				//fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
 				node.Acks += 1
 
@@ -143,10 +143,12 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				}
 				index := keyMask.IndexOfNthEnabled(0)
 				// Add signature to the list of signatures
-				if index < len(node.Signatures) {
-					node.Signatures[index] = msg.Signature
+				if index == -1 {
+					logrus.Error("no such pubkey")
+					mutex.Unlock()
+					break
 				}
-
+				node.Signatures[index] = msg.Signature
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
 					msg.MsgType = Wit
@@ -213,7 +215,6 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 				// Add mask for the signature
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
 					logrus.Error(err)

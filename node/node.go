@@ -141,7 +141,6 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 func (n Node) initNewPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
 	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	p2pPubSub.InitializePubSubWithTopic(n.Host, n.CurrentRendezvous)
 	return
 }
 
@@ -238,7 +237,7 @@ func (n Node) NewBLSNode() (blsNode *modelBLS.Node, err error) {
 	return
 }
 
-func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, err error) {
+func (n *Node) ListenNodeOracleRequest() (err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
 	if err != nil {
@@ -261,6 +260,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 				//logrus.Printf("OracleRequest %v %v id: %v\n", event.RequestType, common2.ToHex(event.RequestId), common2.ToHex(event.RequestId))
 				n.CurrentRendezvous = common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub()
+				n.P2PPubSub.InitializePubSubWithTopic(n.Host,n.CurrentRendezvous )
 				go n.Discover()
 				if event != nil {
 					go n.StartProtocolByOracleRequest(event)

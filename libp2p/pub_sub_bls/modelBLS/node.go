@@ -1,6 +1,7 @@
 package modelBLS
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
@@ -23,6 +24,9 @@ type Node struct {
 	SigMask      *sign.Mask
 	PrivateKey   kyber.Scalar // Private key of the node
 	Suite        *pairing.SuiteBn256
+	Participants []peer.ID
+	CurrentRendezvous string
+	Leader peer.ID
 }
 
 // CommunicationInterface is a interface used for communicating with transport layer.

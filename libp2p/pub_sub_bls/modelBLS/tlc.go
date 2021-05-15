@@ -165,9 +165,6 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					panic(err)
 				}
 				index := keyMask.IndexOfNthEnabled(0)
-				logrus.Printf("----------> INDEX %v", index)
-				logrus.Printf("----------> NODE ID %v", node.Id)
-				// Add signature to the list of signatures
 				node.Signatures[index] = msg.Signature
 
 				if node.Acks >= node.ThresholdAck {
@@ -320,13 +317,12 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		return
 	}
 
-	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
+	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
 
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
 		return
 	}
-	fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

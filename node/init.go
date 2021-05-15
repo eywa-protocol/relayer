@@ -25,7 +25,7 @@ import (
 	"unicode"
 )
 
-func LoadNodeConfig(path string) (err error) {
+func loadNodeConfig(path string) (err error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		logrus.Fatal(err)
@@ -50,7 +50,7 @@ func LoadNodeConfig(path string) (err error) {
 	})
 	nodeHostId, _ := strconv.Atoi(strNum)
 
-	c1, c2, err := GetEthClients()
+	c1, c2, err := getEthClients()
 	if err != nil {
 		logrus.Fatal(err)
 
@@ -96,7 +96,7 @@ func LoadNodeConfig(path string) (err error) {
 func NodeInit(path, name string) (err error) {
 	logrus.Print("nodeInit START")
 
-	err = LoadNodeConfig(path)
+	err = loadNodeConfig(path)
 	if err != nil {
 		return
 	}
@@ -119,7 +119,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 	nodeURL := libp2p.WriteHostAddrToConfig(h, "keys/"+name+"-peer.env")
-	c1, c2, err := GetEthClients()
+	c1, c2, err := getEthClients()
 
 	if err != nil {
 		return
@@ -166,7 +166,7 @@ func run(h host.Host, cancel func()) {
 
 func NewNode(path, name string, port int) (err error) {
 
-	err = LoadNodeConfig(path)
+	err = loadNodeConfig(path)
 	if err != nil {
 		return
 	}
@@ -187,7 +187,7 @@ func NewNode(path, name string, port int) (err error) {
 	n.Server = *server
 	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
 
-	n.EthClient_1, n.EthClient_2, err = GetEthClients()
+	n.EthClient_1, n.EthClient_2, err = getEthClients()
 	if err != nil {
 		return
 	}
@@ -249,7 +249,7 @@ func NewNode(path, name string, port int) (err error) {
 	return
 }
 
-func GetEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
+func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {

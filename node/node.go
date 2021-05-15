@@ -375,7 +375,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	auth.GasLimit = uint64(300000) // in units
 	auth.GasPrice = gasPrice
 
-	instance, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_2)
+	instance, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK2), n.EthClient_2)
 	if err != nil {
 		logrus.Error(err)
 	}

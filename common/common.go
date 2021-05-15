@@ -109,11 +109,10 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 	logrus.Printf("Register Node %x", blsAddr)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
-	logrus.Printf("res %t", res)
 	if res {
 		logrus.Printf("node %x allready exists", blsAddr)
 	} else {
-		logrus.Printf("cerating peer")
+		logrus.Printf("creating peer")
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		mychannel := make(chan bool)

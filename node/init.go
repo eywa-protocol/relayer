@@ -174,8 +174,7 @@ func NewNode(path, name string, port int) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	n := &Node{
-		Ctx:               ctx,
-
+		Ctx: ctx,
 	}
 	//n.PublicKeys = make([]kyber.Point,0)
 
@@ -223,22 +222,19 @@ func NewNode(path, name string, port int) (err error) {
 
 	//n.P2PPubSub = n.initNewPubSub()
 
-
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
 
-	logrus.Printf("---------- ListenNodeOracleRequest -------------")
 	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
-	logrus.Printf("---------- ListenReceiveRequest -------------")
 	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 	//n.ListenNodeAddedEventInFirstNetwork()
 
-	logrus.Print("newBLSNode STARTED /////////////////////////////////")
+	logrus.Print("bridge started")
 	/*err = n.runRPCService()
 	if err != nil {
 		return

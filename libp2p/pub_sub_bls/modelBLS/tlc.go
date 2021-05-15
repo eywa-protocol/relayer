@@ -21,8 +21,8 @@ func (node *Node) Advance(step int) {
 	node.Acks = 0
 	node.Wits = 0
 
-	fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
-	fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	//fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
+	//fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -294,13 +294,12 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 	}
 
 	// Verify message signature
-	fmt.Println("RCVD AggSig: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
 	err = bdn.Verify(node.Suite, aggPubKey, msgHash, sig)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<< Aggregated Signature VERIFIED ! ! ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 
 	return nil
 }
@@ -316,8 +315,6 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		logrus.Error(err)
 		return
 	}
-	logrus.Infof("keyMask.IndexOfNthEnabled %d", keyMask.IndexOfNthEnabled(0))
-	logrus.Infof("node.PublicKeys length %d", len(node.PublicKeys))
 
 	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
 

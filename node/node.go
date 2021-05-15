@@ -216,12 +216,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		if err != nil {
 			return nil, err
 		}
-
-		//fmt.Printf("HostId %v\n%v\n%v\n%v\n%v\n", node.BlsPointAddr, string(node.P2pAddress), node.NodeId, string(node.BlsPubKey), node.NodeWallet)
-		//fmt.Printf("---------------->NODE ID %d %v\n", node.NodeId, int(node.NodeId))
-
 		n.Dht.RefreshRoutingTable()
-		n.Dht.RoutingTable().Print()
 		blsNode = func() *modelBLS.Node {
 			ticker := time.NewTicker(5 * time.Second)
 			defer ticker.Stop()
@@ -229,20 +224,17 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 			for {
 				select {
 				case <-ticker.C:
-					//logrus.Print("discovering !")
 					n.initNewPubSub(topic)
 					go n.DiscoverWithEvtTopic(topic)
-					//go n.P2PPubSub.Reconnect(topic)
 					topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 					topicParticipants = append(topicParticipants, n.Host.ID())
 					if len(topicParticipants) > 6 {
-						logrus.Print("Starting Leader election !!! ")
-
+						logrus.Tracef("Starting Leader election !!!")
 						leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
 						if err != nil {
 							panic(err)
 						}
-						logrus.Printf("```````````` LEADER IS %v ```````````````````", leaderPeerId)
+						logrus.Warnf("LEADER IS %v", leaderPeerId)
 						blsNode = &modelBLS.Node{
 							Id:                int(node.NodeId),
 							TimeStep:          0,
@@ -303,8 +295,6 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 					logrus.Print(err)
 				}
 				if n.NodeBLS != nil {
-
-					//n.NodeBLS.CurrentRendezvous = common2.ToHex(event.Raw.TxHash) + n.NodeBLS.Leader.Pretty()
 					go n.DiscoverWithEvtTopic(n.NodeBLS.CurrentRendezvous)
 					go n.StartProtocolByOracleRequest(event)
 

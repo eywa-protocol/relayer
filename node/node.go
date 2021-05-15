@@ -71,7 +71,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	defer wg.Done()
 	wg.Add(1)
 
-	logrus.Printf("<<<<<<<<<<<---------- сurrentRendezvous %v LEADER %v ----------->>>>>>>>>>>>>>", n.NodeBLS.CurrentRendezvous, n.NodeBLS.Leader)
+	logrus.Tracef("сurrentRendezvous %v LEADER %v", n.NodeBLS.CurrentRendezvous, n.NodeBLS.Leader)
 	discovery.Advertise(n.Ctx, n.Discovery, n.NodeBLS.CurrentRendezvous)
 	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous)
 	wg.Add(1)
@@ -80,9 +80,9 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	executed := false
 	if consensus == true && executed == false {
 
-		logrus.Printf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
+		logrus.Tracef("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
 		if n.NodeBLS.Leader.Pretty() == n.Host.ID().Pretty() {
-			logrus.Println("< --------------------- LEADER going to Call external contract method test ------------------------ >")
+			logrus.Info("LEADER going to Call external chain contract method")
 			recept, err := n.ReceiveRequestV2(event)
 			if err != nil {
 				logrus.Errorf("%v", err)
@@ -150,7 +150,7 @@ func (n Node) initNewPubSub(topic string) (p2pPubSub *libp2p_pubsub.Libp2pPubSub
 
 func (n Node) nodeExiats(blsAddr common.Address) bool {
 	node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
-	logrus.Print(node.NodeWallet, node.BlsPubKey, node.NodeId, node.P2pAddress, node.BlsPointAddr)
+	logrus.Trace(node.NodeWallet, node.BlsPubKey, node.NodeId, node.P2pAddress, node.BlsPointAddr)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -206,7 +206,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		logrus.Errorf("node %x with keyFile %s does not exist", n.BLSAddress)
 
 	} else {
-		//logrus.Printf("BLS ADDRESS %v ", n.BLSAddress)
+		//logrus-Printf("BLS ADDRESS %v ", n.BLSAddress)
 		node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), n.BLSAddress)
 		if err != nil {
 			return nil, err
@@ -267,6 +267,43 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 	return
 }
 
+func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.Address) {
+
+	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork, clientNetwork)
+	if err != nil {
+		return
+	}
+	channel := make(chan *wrappers.BridgeReceiveRequest)
+	opt := &bind.WatchOpts{}
+
+	sub, err := bridgeFilterer.WatchReceiveRequest(opt, channel)
+	if err != nil {
+		return
+	}
+
+	go func() {
+		for {
+			select {
+			case _ = <-sub.Err():
+				break
+			case event := <-channel:
+				logrus.Tracef("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
+				if n.P2PPubSub != nil {
+					logrus.Infof("disconnecting from pubsub %s", n.NodeBLS.CurrentRendezvous)
+					n.P2PPubSub.Disconnect()
+				}
+
+				/** TODO:
+				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
+				*/
+
+			}
+		}
+	}()
+	return
+
+}
+
 func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
@@ -285,14 +322,14 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Println("OracleRequest error:", err)
+				logrus.Fatalf("OracleRequest: %v", err)
 			case event := <-channel:
 				currentRendezvous := common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub(currentRendezvous)
 
 				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
 				if err != nil {
-					logrus.Print(err)
+					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
 					go n.DiscoverWithEvtTopic(n.NodeBLS.CurrentRendezvous)
@@ -305,7 +342,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 	return
 }
 
-/*func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
+func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 	bridgeFilterer, err := wrappers.NewNodeList(common.HexToAddress(config.Config.NODELIST_NETWORK1), n.EthClient_1)
 	if err != nil {
 		return
@@ -325,15 +362,17 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, e
 				logrus.Println("WatchAddedNode error:", err)
 			case event := <-channel:
 				if event != nil {
-					//logrus.Printf("WatchAddedNode ID: %d p2pAddress %v BlsPubKey %v\n", event.NodeId, event.P2pAddress, string(event.BlsPubKey))
-					//n.AddPubkeyToNodeKeys(event.BlsPubKey)
+					peerAddrFromEvent, err := multiaddr.NewMultiaddr(string(event.P2pAddress[:]))
+					if err != nil {
+						n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+					}
 				}
 
 			}
 		}
 	}()
 	return
-}*/
+}
 
 //func (n Node)getProtocolResult(resultCh chan string)  {
 //	time.Sleep(2 * time.Second)
@@ -398,9 +437,6 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 }
 
 func (n Node) DiscoverWithEvtTopic(topic string) {
-
-	//logrus.Print("CurrentRendezvous ", n.NodeBLS.CurrentRendezvous)
-	//n.P2PPubSub.InitializePubSubWithTopic(n.Host, n.NodeBLS.CurrentRendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
 	discovery.Advertise(n.Ctx, routingDiscovery, topic)
 	ticker := time.NewTicker(config.Config.TickerInterval)
@@ -417,16 +453,13 @@ func (n Node) DiscoverWithEvtTopic(topic string) {
 
 			peerIds := n.P2PPubSub.ListPeersByTopic(topic)
 			for _, pID := range peerIds {
-				//logrus.Printf("Discover peerIds discovery.FindPeers PEER %v  - - - - - - - - - - - - - - >", pID.Pretty())
 				if pID == n.Host.ID() {
 					continue
 				}
 
-				//logrus.Printf("Peer %v Connectedness %v network.Connected %v  - - - - - - - - - - - - - - >", pID.Pretty(), n.Host.Network().Connectedness(pID), network.Connected)
-
 				if n.Host.Network().Connectedness(pID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, pID)
-					logrus.Printf("!!!!!!!!!!!!!!!!!!!!!! Connected to peer %s ! ! ! ! ! ! !\n", pID.Pretty())
+					logrus.Tracef("Connected to peer %s", pID.Pretty())
 
 					if err != nil {
 						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
@@ -436,13 +469,12 @@ func (n Node) DiscoverWithEvtTopic(topic string) {
 			}
 
 			for _, p := range peers {
-				//logrus.Printf("Discover discovery.FindPeers PEER %v  - - - - - - - - - - - - - - >", p.Addrs)
 				if p.ID == n.Host.ID() {
 					continue
 				}
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
-					logrus.Printf("!!!!!!!!!!!!!!!!!!!!!! Connected to peer %s !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111\n", p.ID.Pretty())
+					logrus.Infof("Connected to peer %s", p.ID.Pretty())
 					if err != nil {
 						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
 						continue

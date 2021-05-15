@@ -5,7 +5,6 @@ import (
 	"errors"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
-	"github.com/DigiU-Lab/p2p-bridge/helpers"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -31,7 +30,7 @@ func loadNodeConfig(path string) (err error) {
 		logrus.Fatal(err)
 		return
 	}
-	logrus.Printf("started in directory %s", dir)
+	logrus.Tracef("started in directory %s", dir)
 	err = config.LoadConfigAndArgs(path)
 	if err != nil {
 		logrus.Fatal(err)
@@ -88,13 +87,12 @@ func loadNodeConfig(path string) (err error) {
 		panic(errors.New("you need key to start node"))
 	}
 
-	logrus.Printf("hostName %s nodeHostId %v key1 %v key2 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
+	logrus.Tracef("hostName %s nodeHostId %v key1 %v key2 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
 
 	return
 }
 
 func NodeInit(path, name string) (err error) {
-	logrus.Print("nodeInit START")
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -106,14 +104,12 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	//logrus.Printf("pubkey %v", pub)
-
 	err = common2.GenECDSAKey(name)
 	if err != nil {
 		return
 	}
 
-	logrus.Printf("keyfile %v", "keys/"+name+"-ecdsa.key")
+	logrus.Tracef("keyfile %v", "keys/"+name+"-ecdsa.key")
 	h, err := libp2p.NewHostFromKeyFila(context.Background(), "keys/"+name+"-ecdsa.key", 0)
 	if err != nil {
 		return
@@ -125,7 +121,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("nodelist1 blsAddress: %v", blsAddr)
+	logrus.Infof("nodelist1 blsAddress: %v", blsAddr)
 	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
 		return
@@ -154,7 +150,7 @@ func run(h host.Host, cancel func()) {
 	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	<-c
 
-	logrus.Printf("\rExiting...\n")
+	logrus.Infof("\rExiting...\n")
 
 	cancel()
 
@@ -185,7 +181,7 @@ func NewNode(path, name string, port int) (err error) {
 
 	server := n.NewBridge()
 	n.Server = *server
-	logrus.Printf("n.Config.PORT_1 %d", config.Config.PORT_1)
+	logrus.Tracef("n.Config.PORT_1 %d", config.Config.PORT_1)
 
 	n.EthClient_1, n.EthClient_2, err = getEthClients()
 	if err != nil {
@@ -206,21 +202,18 @@ func NewNode(path, name string, port int) (err error) {
 	if err != nil {
 		logrus.Errorf("Caanot obtain port %d, %v", registeredPort, err)
 	}
-	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< PORT %d >>>>>>>>>>>>>>>>>>>>>>>>>>>>", registeredPort)
+	logrus.Infof("PORT %d", registeredPort)
 	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort)
 	if err != nil {
 		return
 	}
-	logrus.Printf(" <<<<<<<<<<<<<<<<<<<<<<< HOST ID %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>", n.Host.ID())
+	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
 
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
-	//discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
-
-	//n.P2PPubSub = n.initNewPubSub()
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
@@ -231,10 +224,10 @@ func NewNode(path, name string, port int) (err error) {
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
-	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 	//n.ListenNodeAddedEventInFirstNetwork()
 
-	logrus.Print("bridge started")
+	logrus.Info("bridge started")
 	/*err = n.runRPCService()
 	if err != nil {
 		return
@@ -250,7 +243,7 @@ func NewNode(path, name string, port int) (err error) {
 }
 
 func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
-	logrus.Printf("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
+	logrus.Tracef("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {
 		return
@@ -264,7 +257,6 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 }
 
 func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
-	var bootstrapPeers []multiaddr.Multiaddr
 	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
@@ -274,12 +266,15 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 		if err != nil {
 			return nil, err
 		}
-		bootstrapPeers = append(bootstrapPeers, peerMA)
+		n.DiscoveryPeers = append(n.DiscoveryPeers, peerMA)
 	}
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers)
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host, n.DiscoveryPeers)
 	if err != nil {
 		return
 	}
-	_ = dht.Bootstrap(n.Ctx)
+	err = dht.Bootstrap(n.Ctx)
+	if err != nil {
+		return
+	}
 	return
 }

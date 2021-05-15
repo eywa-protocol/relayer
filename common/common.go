@@ -106,13 +106,13 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Printf("Register Node %x", blsAddr)
+	logrus.Infof("Register Node %x", blsAddr)
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
 	if res {
-		logrus.Printf("node %x allready exists", blsAddr)
+		logrus.Infof("node %x allready exists", blsAddr)
 	} else {
-		logrus.Printf("creating peer")
+		logrus.Infof("creating peer")
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		mychannel := make(chan bool)
@@ -123,14 +123,14 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 				tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
 				if tx != nil {
 					if created, _ := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr); created {
-						logrus.Printf("Added Node %v txhash %x", blsAddr, tx.Hash())
+						logrus.Infof("Added Node %v txhash %x", blsAddr, tx.Hash())
 						ticker.Stop()
 						return nil
 					}
 
 				}
 				if err != nil {
-					logrus.Printf("AddNode ERROR: %v", err)
+					logrus.Errorf("AddNode ERROR: %v", err)
 				}
 			case <-mychannel:
 				return
@@ -143,7 +143,6 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 }
 
 func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeListNode, err error) {
-	//logrus.Printf("GetNodesFromContract: %v", nodeListContractAddress)
 	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
 		return
@@ -169,13 +168,12 @@ func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address
 		logrus.Fatal(err)
 	}
 	for _, node1 := range nodes {
-		logrus.Printf("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, string(node1.P2pAddress), node1.BlsPointAddr)
+		logrus.Tracef("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, string(node1.P2pAddress), node1.BlsPointAddr)
 	}
 
 }
 
 func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeListNode, err error) {
-	//logrus.Printf("GetNode : %v", nodeListContractAddress)
 	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	if err != nil {
 		return

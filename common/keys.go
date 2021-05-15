@@ -69,8 +69,6 @@ func GenPrivPubkey() ([]byte, []byte, error) {
 		return nil, nil, err
 
 	}
-	logrus.Print("pubkey", pubkey)
-	logrus.Print("privkey", privkey)
 	return privkey, pubkey, nil
 
 }
@@ -81,7 +79,7 @@ func WriteKey(priv crypto.PrivKey, name string) error {
 		logrus.Fatal(err)
 	}
 	filename := name + ".key"
-	logrus.Println("Exporting key to", filename)
+	logrus.Infof("Exporting key to %s", filename)
 	return ioutil.WriteFile("keys/"+filename, privBytes, 0644)
 }
 
@@ -115,7 +113,7 @@ func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err err
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 
 	if !fileExists(nodeKeyFile) {
-		logrus.Printf("CREATING KEYS")
+		logrus.Tracef("CREATING KEYS")
 
 		prvKey := suite.Scalar().Pick(suite.RandomStream())
 		pubKey := suite.Point().Mul(prvKey, nil)

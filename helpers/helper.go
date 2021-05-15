@@ -47,7 +47,7 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	}
 
 	for it.Next() {
-		logrus.Print("OracleRequest Event", it.Event.Raw)
+		logrus.Trace("OracleRequest Event", it.Event.Raw)
 		if it.Event != nil {
 			oracleRequest = OracleRequest{
 				RequestType:    it.Event.RequestType,
@@ -89,7 +89,7 @@ func ListenOracleRequest(
 			case _ = <-sub.Err():
 				break
 			case event := <-channel:
-				logrus.Printf("OracleRequest id: %v type: %v\n", event.RequestId, event.RequestType)
+				logrus.Tracef("OracleRequest id: %v type: %v\n", event.RequestId, event.RequestType)
 
 				privateKey, err := crypto.HexToECDSA("95472b385de2c871fb293f07e76a56e8e93ea4e743fe940afbd44c30730211dc")
 				if err != nil {
@@ -139,46 +139,12 @@ func ListenOracleRequest(
 					logrus.Fatal(err)
 				}
 
-				logrus.Printf("tx in first chain has been triggered :  %x", tx.Hash())
+				logrus.Tracef("tx in first chain has been triggered :  %x", tx.Hash())
 
 			}
 		}
 	}()
 	return
-}
-
-//TODO: sinchroniize between ListenOracleRequest
-func ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwork common.Address) {
-
-	bridgeFilterer, err := wrappers.NewBridge(proxyNetwork, clientNetwork)
-	if err != nil {
-		return
-	}
-	channel := make(chan *wrappers.BridgeReceiveRequest)
-	opt := &bind.WatchOpts{}
-
-	sub, err := bridgeFilterer.WatchReceiveRequest(opt, channel)
-	if err != nil {
-		return
-	}
-
-	go func() {
-		for {
-			select {
-			case _ = <-sub.Err():
-				break
-			case event := <-channel:
-				logrus.Printf("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, event.Tx)
-
-				/** TODO:
-				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
-				*/
-
-			}
-		}
-	}()
-	return
-
 }
 
 func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {

@@ -51,7 +51,7 @@ func (c *Libp2pPubSub) ListPeersByTopic(topic string) []peer.ID {
 
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
-	logrus.Printf("BROADCASTING MESSAGE !!!! TOPIC %v", c.topic)
+	//logrus.Printf("BROADCASTING MESSAGE !!!! TOPIC %v", c.topic)
 	// Broadcasting to a topic in PubSub
 	go func(msgBytes []byte, topic string, pubsub *pubsub.PubSub) {
 		// Send the message with a delay in order to prevent message loss in libp2p

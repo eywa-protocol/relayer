@@ -15,8 +15,7 @@ func (node *Node) AdvanceWithTopic(step int, topic string) {
 	node.Acks = 0
 	node.Wits = 0
 
-	fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
-	fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	//fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -43,7 +42,6 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 	msgChan := make(chan *[]byte, ChanLen)
 	nodeTimeStep := 0
 	stop := 1
-	logrus.Printf("FIRST STEP")
 	for nodeTimeStep <= stop {
 		// For now we assume that the underlying receive function is blocking
 
@@ -118,21 +116,18 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					return
 				}
 				mutex.Unlock()
-				fmt.Printf("received ACK. node %d %d\n", node.Id, msg.Source)
-
 				msgHash := calculateHash(*msg, node.ConvertMsg)
-				fmt.Print("calculated Hash\n")
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
 					logrus.Error(err)
 				}
-				fmt.Print("verified Ack Signature\n")
+				//fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
 					logrus.Error(err)
 				}
-				fmt.Print("node SigMask Merged\n")
+				//fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
 				node.Acks += 1
 
@@ -143,10 +138,12 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				}
 				index := keyMask.IndexOfNthEnabled(0)
 				// Add signature to the list of signatures
-				if index < len(node.Signatures) {
-					node.Signatures[index] = msg.Signature
+				if index == -1 {
+					logrus.Error("no such pubkey")
+					mutex.Unlock()
+					break
 				}
-
+				node.Signatures[index] = msg.Signature
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
 					msg.MsgType = Wit
@@ -170,10 +167,8 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					if err != nil {
 						logrus.Error(err)
 					}
-					fmt.Printf("AggregatePublicKeys")
 					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
 
-					fmt.Printf("Verify before sending message to others")
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
 						logrus.Error(err)
@@ -213,7 +208,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 				// Add mask for the signature
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
+				//logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
 					logrus.Error(err)

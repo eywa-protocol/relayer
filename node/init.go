@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 )
 
@@ -72,6 +73,7 @@ func loadNodeConfig(path string) (err error) {
 		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
 			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
 			//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+			rand.Seed(time.Now().UnixNano())
 			nodeHostId = rand.Intn(len(keys))
 			//}
 			getRandomKeyForTestIfNoFunds()
@@ -104,7 +106,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("pubkey %v", pub)
+	//logrus.Printf("pubkey %v", pub)
 
 	err = common2.GenECDSAKey(name)
 	if err != nil {
@@ -123,11 +125,12 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	logrus.Printf("nodelist 1 %v blsAddress %v", common.HexToAddress(config.Config.ECDSA_KEY_1), pub)
+	logrus.Printf("nodelist1 blsAddress: %v", blsAddr)
 	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
 		return
 	}
+
 	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
@@ -171,9 +174,9 @@ func NewNode(path, name string, port int) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	n := &Node{
-		Ctx:               ctx,
-		CurrentRendezvous: "Init",
+		Ctx: ctx,
 	}
+	//n.PublicKeys = make([]kyber.Point,0)
 
 	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
@@ -215,29 +218,23 @@ func NewNode(path, name string, port int) (err error) {
 	}
 
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
-	discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
+	//discovery.Advertise(n.Ctx, n.Discovery, n.CurrentRendezvous)
 
-	n.P2PPubSub = n.initNewPubSub()
-
-	n.PublicKeys, err = n.SetPublicKeys()
-	if err != nil {
-		return
-	}
+	//n.P2PPubSub = n.initNewPubSub()
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
 
-	logrus.Printf("---------- ListenNodeOracleRequest -------------")
 	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
-	logrus.Printf("---------- ListenReceiveRequest -------------")
 	helpers.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	//n.ListenNodeAddedEventInFirstNetwork()
 
-	logrus.Print("newBLSNode STARTED /////////////////////////////////")
+	logrus.Print("bridge started")
 	/*err = n.runRPCService()
 	if err != nil {
 		return
@@ -246,7 +243,7 @@ func NewNode(path, name string, port int) (err error) {
 	if port == 0 {
 		port = config.Config.PORT_1
 	}
-	n.Server.Start(port)
+	//n.Server.Start(port)
 
 	run(n.Host, cancel)
 	return

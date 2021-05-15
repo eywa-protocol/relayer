@@ -32,4 +32,5 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 )

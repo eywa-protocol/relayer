@@ -21,8 +21,8 @@ func (node *Node) Advance(step int) {
 	node.Acks = 0
 	node.Wits = 0
 
-	fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
-	fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	//fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
+	//fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -165,9 +165,6 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					panic(err)
 				}
 				index := keyMask.IndexOfNthEnabled(0)
-				logrus.Printf("----------> INDEX %v", index)
-				logrus.Printf("----------> NODE ID %v", node.Id)
-				// Add signature to the list of signatures
 				node.Signatures[index] = msg.Signature
 
 				if node.Acks >= node.ThresholdAck {
@@ -297,13 +294,12 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 	}
 
 	// Verify message signature
-	fmt.Println("RCVD AggSig: ", sig, "RCVD AggPub :", aggPubKey, "RCVD Hash :", msgHash)
 	err = bdn.Verify(node.Suite, aggPubKey, msgHash, sig)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<< Aggregated Signature VERIFIED ! ! ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 
 	return nil
 }
@@ -320,13 +316,13 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		return
 	}
 
-	PubKey := node.PublicKeys[keyMask.IndexOfNthEnabled(0)]
+	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
 
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
 		return
 	}
-	fmt.Println("signature VERIFIED !!!!!\n")
+	//fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

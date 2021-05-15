@@ -20,7 +20,7 @@ func (node *Node) Advance(step int) {
 	node.Acks = 0
 	node.Wits = 0
 
-	fmt.Printf("node %d , Broadcast in timeStep %d,%#v\n", node.Id, node.TimeStep, node.History)
+	//fmt.Printf("node %d , Broadcast in timeStep %d,%#v\n", node.Id, node.TimeStep, node.History)
 	Logger1.SetPrefix(strconv.FormatInt(time.Now().Unix(), 10) + " ")
 
 	Logger1.Printf("NODE ID %d, TIME STEP %d\n", node.Id, node.TimeStep)

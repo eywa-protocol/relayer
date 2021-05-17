@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
 package main
 
 import (
@@ -30,10 +19,10 @@ func main() {
 	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
 	flag.UintVar(&port, "port", 0, "ws port")
 	flag.Parse()
-	logrus.Printf("mode %v path %v", mode, path)
+	logrus.Tracef("mode %v path %v", mode, path)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
-	logrus.Println("FILE", fname)
+	logrus.Tracef("FILE", fname)
 	err := common2.GenECDSAKey(fname)
 	if err != nil {
 		panic(err)

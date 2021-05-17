@@ -64,11 +64,8 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 			msgBytes := <-msgChan
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
-			//logrus.Printf("node %d in nodeTimeStep %d Received MSG with msg.Step %d MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
-
-			// Used for stopping the execution after some timesteps
 			if nodeTimeStep == stop {
-				logrus.Printf("<<<<<<<<<<<<<<<<<<<<<<<< Consensus achieved by node %v >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", node.Id)
+				logrus.Infof(" Consensus achieved by node %v", node.Id)
 				mutex.Lock()
 				end = true
 				node.TimeStep++
@@ -102,7 +99,6 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 					return
 				}
 				mutex.Lock()
-				fmt.Printf("WITS: node %d , %d\n", node.Id, node.Wits)
 				node.Wits += 1
 				node.TimeStep += 1
 				node.Advance(nodeTimeStep + 1)
@@ -208,7 +204,6 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 
 				// Add mask for the signature
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				//logrus.Printf("NODE ID before keyMask.SetBit %d", node.Id)
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
 					logrus.Error(err)

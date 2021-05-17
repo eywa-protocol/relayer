@@ -77,8 +77,8 @@ func NewSingleNode(path string) (err error) {
 		for {
 			_resolvedTx := <-pendingTxFromNetwork2
 			pendingListWaitRecieptFromNetwork2[_resolvedTx.Tx.Hash()] = *_resolvedTx
-			logrus.Printf("Tx: %s was added in pending list network2, receipt status: %v, sender: %s", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status, _resolvedTx.From)
-			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
+			logrus.Tracef("Tx: %s was added in pending list network2, receipt status: %v, sender: %s", _resolvedTx.Tx.Hash(), _resolvedTx.Reciept.Status, _resolvedTx.From)
+			logrus.Tracef("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork2))
 		}
 	}()
 
@@ -99,8 +99,8 @@ func NewSingleNode(path string) (err error) {
 		for {
 			__resolvedTx := <-pendingTxFromNetwork1
 			pendingListWaitRecieptFromNetwork1[__resolvedTx.Tx.Hash()] = *__resolvedTx
-			logrus.Printf("Tx: %s was added in pending list network1, receipt status: %v, sender %s", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status, __resolvedTx.From)
-			logrus.Printf("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
+			logrus.Tracef("Tx: %s was added in pending list network1, receipt status: %v, sender %s", __resolvedTx.Tx.Hash(), __resolvedTx.Reciept.Status, __resolvedTx.From)
+			logrus.Tracef("The count of pending network2 store tx is: %d ", len(pendingListWaitRecieptFromNetwork1))
 		}
 	}()
 
@@ -137,9 +137,9 @@ func subscNodeOracleRequest(
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Println("OracleRequest error:", err)
+				logrus.Errorf("OracleRequest error:", err)
 			case event := <-channel:
-				logrus.Printf("================== Catching OracleRequest event ===================\n")
+				logrus.Trace("Catching OracleRequest event")
 
 				privateKey, err := crypto.HexToECDSA(sender[2:])
 				if err != nil {

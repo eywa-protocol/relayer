@@ -9,7 +9,7 @@ import (
 func IdentityFromKey(keyFile string) (identity libp2p.Option, err error) {
 	privKey, err := common.ReadHostKey(keyFile)
 	if err != nil {
-		logrus.Printf("ERROR GETTING CERT %v", err)
+		logrus.Errorf("ERROR GETTING CERT %v", err)
 		return
 	}
 	identity = libp2p.Identity(privKey)

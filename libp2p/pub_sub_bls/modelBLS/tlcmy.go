@@ -69,7 +69,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				mutex.Lock()
 				end = true
 				node.TimeStep++
-				node.Advance(nodeTimeStep)
+				node.Advance(node.TimeStep)
 				mutex.Unlock()
 				consensusAgreed <- true
 			}

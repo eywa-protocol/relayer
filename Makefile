@@ -11,7 +11,7 @@ build:
 	go build -o bridge  cmd/main.go
 
 clean:
-	rm -f ./bridge keys/*.key
+	rm -f ./bridge keys/*.key keys/*.env
 
 all: deps build
 

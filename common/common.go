@@ -15,6 +15,7 @@ import (
 	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -195,4 +196,12 @@ func ChainlinkData(helper *bridges.Helper) (o *Output, err error) {
 	fmt.Print(helper.Data)
 	o.Data2 = *helper.Data
 	return
+}
+
+func FileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

@@ -45,8 +45,11 @@ func NewHost(ctx context.Context, seed int64, keyFile string, port int) (host ho
 
 }
 
-func NewHostFromKeyFila(ctx context.Context, keyFile string, port int) (host host.Host, err error) {
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
+func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address string) (host host.Host, err error) {
+	if address == "" {
+		address = "0.0.0.0"
+	}
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", address, port))
 	if err != nil {
 		return
 	}

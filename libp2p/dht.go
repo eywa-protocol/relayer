@@ -39,7 +39,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 				if err := host.Connect(ctx, *peerinfo); err != nil {
 					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
 				} else {
-					logrus.Tracef("Connection established with bootstrap node: %q", *peerinfo)
+					logrus.Infof("Connection established with node: %q", peerinfo)
 				}
 			}()
 		}
@@ -53,11 +53,10 @@ func WriteHostAddrToConfig(host2 host.Host, filename string) (nodeURL string) {
 	for i, addr := range host2.Addrs() {
 		if i == 0 {
 			nodeURL = fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
-			logrus.Tracef("Node Address: %s\n", nodeURL)
+			logrus.Infof("WriteHostAddrToConfig Node Address: %s", nodeURL)
 			err := ioutil.WriteFile(filename, []byte(nodeURL), 0644)
 			if err != nil {
 				logrus.Fatal(err)
-				panic(err)
 			}
 		}
 	}

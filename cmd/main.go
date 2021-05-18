@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/node"
 	"github.com/sirupsen/logrus"
 )
@@ -23,34 +22,25 @@ func main() {
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
 	logrus.Tracef("FILE", fname)
-	err := common2.GenECDSAKey(fname)
-	if err != nil {
-		panic(err)
-	}
-	_, _, err = common2.CreateBN256Key(fname)
-	if err != nil {
-		panic(err)
-	}
+
 	if mode == "init" {
-		err = node.NodeInit(path, fname)
+		err := node.NodeInit(path, fname)
 		if err != nil {
-			logrus.Fatalf("nodeInit %v", err)
-			panic(err)
+			logrus.Errorf("nodeInit %v", err)
 		}
 
 	} else if mode == "singlenode" {
 		logrus.Info("Enabled single node mode")
-		err = node.NewSingleNode(path)
+		err := node.NewSingleNode(path)
 		if err != nil {
 			logrus.Fatalf("NewSingleNode %v", err)
 			panic(err)
 		}
 
 	} else {
-		err = node.NewNode(path, fname, int(port))
+		err := node.NewNode(path, fname)
 		if err != nil {
-			logrus.Fatalf("NewNode %v", err)
-			panic(err)
+			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}
 
 	}

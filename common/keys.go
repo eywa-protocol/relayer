@@ -96,23 +96,15 @@ func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
 	return
 }
 
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
-func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err error) {
-	if !fileExists("keys/") {
+func GenAndSaveBN256Key(name string) (blsAddr common.Address, strPub string, err error) {
+	if !FileExists("keys/") {
 		os.MkdirAll("keys", os.ModePerm)
 	}
 	suite := pairing.NewSuiteBn256()
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 
-	if !fileExists(nodeKeyFile) {
+	if !FileExists(nodeKeyFile) {
 		logrus.Tracef("CREATING KEYS")
 
 		prvKey := suite.Scalar().Pick(suite.RandomStream())
@@ -148,22 +140,27 @@ func CreateBN256Key(name string) (blsAddr common.Address, strPub string, err err
 		}
 
 	}
-	blsAddr = BLSAddrFromKeyFile(nodeKeyFile)
+	blsAddr, err = BLSAddrFromKeyFile(nodeKeyFile)
+	if err != nil {
+		panic(err)
+	}
+
 	return
 }
 
-func BLSAddrFromKeyFile(nodeKeyFile string) (blsAddr common.Address) {
+func BLSAddrFromKeyFile(nodeKeyFile string) (blsAddr common.Address, err error) {
 	suite := pairing.NewSuiteBn256()
 	p, err := ReadScalarFromFile(nodeKeyFile)
 	if err != nil {
-		panic(err)
+		return
 	}
 	pubKey := suite.Point().Mul(p, nil)
 	strPub, err := encoding.PointToStringHex(suite, pubKey)
 	if err != nil {
-		panic(err)
+		return
 	}
-	return common.BytesToAddress(Keccak256([]byte(strPub)))
+	blsAddr = common.BytesToAddress(Keccak256([]byte(strPub)))
+	return
 }
 
 func CreateRSAKey(name string) (err error) {
@@ -185,9 +182,9 @@ func Keccak256(data ...[]byte) []byte {
 	return d.Sum(nil)
 }
 
-func GenECDSAKey(prefix string) (err error) {
+func GenAndSaveECDSAKey(prefix string) (err error) {
 	nodeKeyFile := "keys/" + prefix + "-ecdsa.key"
-	if !fileExists(nodeKeyFile) {
+	if !FileExists(nodeKeyFile) {
 		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
 		if err != nil {
 			return err

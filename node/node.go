@@ -192,7 +192,10 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAd
 	if err != nil {
 		return
 	}
-	blsAddr = common2.BLSAddrFromKeyFile(nodeKeyFile)
+	blsAddr, err = common2.BLSAddrFromKeyFile(nodeKeyFile)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -289,7 +292,6 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			case event := <-channel:
 				logrus.Tracef("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
 				if n.P2PPubSub != nil {
-					logrus.Infof("disconnecting from pubsub %s", n.NodeBLS.CurrentRendezvous)
 					n.P2PPubSub.Disconnect()
 				}
 
@@ -304,7 +306,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 }
 
-func (n *Node) ListenNodeOracleRequest() (oracleRequest helpers.OracleRequest, err error) {
+func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, err error) {
 
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
 	if err != nil {

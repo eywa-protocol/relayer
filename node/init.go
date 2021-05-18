@@ -13,6 +13,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
@@ -99,20 +100,35 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	blsAddr, pub, err := common2.CreateBN256Key(name)
+	if common2.FileExists("keys/" + name + "-ecdsa.key") {
+		return errors.New("node allready registered! ")
+	}
+
+	err = common2.GenAndSaveECDSAKey(name)
+	if err != nil {
+		panic(err)
+	}
+
+	_, _, err = common2.GenAndSaveBN256Key(name)
+	if err != nil {
+		panic(err)
+	}
+
+	blsAddr, pub, err := common2.GenAndSaveBN256Key(name)
 	if err != nil {
 		return
 	}
 
-	err = common2.GenECDSAKey(name)
+	err = common2.GenAndSaveECDSAKey(name)
 	if err != nil {
 		return
 	}
 
 	logrus.Tracef("keyfile %v", "keys/"+name+"-ecdsa.key")
-	h, err := libp2p.NewHostFromKeyFila(context.Background(), "keys/"+name+"-ecdsa.key", 0)
+
+	h, err := libp2p.NewHostFromKeyFila(context.Background(), "keys/"+name+"-ecdsa.key", 0, "")
 	if err != nil {
-		return
+		panic(err)
 	}
 	nodeURL := libp2p.WriteHostAddrToConfig(h, "keys/"+name+"-peer.env")
 	c1, c2, err := getEthClients()
@@ -160,7 +176,7 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
-func NewNode(path, name string, port int) (err error) {
+func NewNode(path, name string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -190,7 +206,12 @@ func NewNode(path, name string, port int) (err error) {
 
 	key_file := "keys/" + name + "-ecdsa.key"
 	bls_key_file := "keys/" + name + "-bn256.key"
-	blsAddr := common2.BLSAddrFromKeyFile(bls_key_file)
+
+	blsAddr, err := common2.BLSAddrFromKeyFile(bls_key_file)
+	if err != nil {
+		return
+	}
+
 	q, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
 	if err != nil {
 		return
@@ -200,12 +221,24 @@ func NewNode(path, name string, port int) (err error) {
 
 	registeredPort, err := strconv.Atoi(words[4])
 	if err != nil {
-		logrus.Errorf("Caanot obtain port %d, %v", registeredPort, err)
+		logrus.Fatalf("Can't obtain port %d, %v", registeredPort, err)
 	}
 	logrus.Infof("PORT %d", registeredPort)
-	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort)
+
+	registeredAddress := words[2]
+
+	registeredPeer, err := ioutil.ReadFile("keys/" + name + "-peer.env")
 	if err != nil {
-		return
+		logrus.Fatalf("File %s reading error: %v", "keys/"+name+"-peer.env", err)
+	}
+	logrus.Infof("Node address: %s nodeAddress from contract: %s", string(registeredPeer), string(q.P2pAddress))
+
+	if string(registeredPeer) != string(q.P2pAddress) {
+		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", string(registeredPeer), string(q.P2pAddress))
+	}
+	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort, registeredAddress)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
 	n.Dht, err = n.initDHT()
@@ -223,7 +256,9 @@ func NewNode(path, name string, port int) (err error) {
 	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
+		panic(err)
 	}
+
 	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 	//n.ListenNodeAddedEventInFirstNetwork()
 
@@ -233,9 +268,6 @@ func NewNode(path, name string, port int) (err error) {
 		return
 	}*/
 
-	if port == 0 {
-		port = config.Config.PORT_1
-	}
 	//n.Server.Start(port)
 
 	run(n.Host, cancel)

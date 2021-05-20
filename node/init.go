@@ -3,6 +3,13 @@ package node
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
@@ -13,16 +20,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
-	"unicode"
 )
 
 func loadNodeConfig(path string) (err error) {
@@ -44,45 +41,45 @@ func loadNodeConfig(path string) (err error) {
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
 
-	strNum := strings.TrimPrefix(hostName, "p2p-bridge_node_")
-	strNum = strings.TrimRightFunc(strNum, func(r rune) bool {
-		return !unicode.IsNumber(r)
-	})
-	nodeHostId, _ := strconv.Atoi(strNum)
-
-	c1, c2, err := getEthClients()
+	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
+	nodeHostId, err := strconv.Atoi(strNum)
 	if err != nil {
-		logrus.Fatal(err)
-
+		panic(err)
 	}
 
-	var getRandomKeyForTestIfNoFunds func()
-	getRandomKeyForTestIfNoFunds = func() {
-		config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-		config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
-		balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
+	// c1, c2, err := getEthClients()
+	// if err != nil {
+	// 	logrus.Fatal(err)
 
-		balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
+	// }
 
-		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
-			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
-			//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
-			rand.Seed(time.Now().UnixNano())
-			nodeHostId = rand.Intn(len(keys))
-			//}
-			getRandomKeyForTestIfNoFunds()
-		}
+	// var getRandomKeyForTestIfNoFunds func()
+	// getRandomKeyForTestIfNoFunds = func() {
+	// 	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
+	// 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
+	// 	balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
+	// 	if err != nil {
+	// 		logrus.Fatal(err)
+	// 	}
 
-	}
+	// 	balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
+	// 	if err != nil {
+	// 		logrus.Fatal(err)
+	// 	}
 
-	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
+	// 	if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
+	// 		logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
+	// 		//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+	// 		rand.Seed(time.Now().UnixNano())
+	// 		nodeHostId = rand.Intn(len(keys))
+	// 		//}
+	// 		getRandomKeyForTestIfNoFunds()
+	// 	}
+
+	// }
+
+	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
+	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
 
 	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" {
 		panic(errors.New("you need key to start node"))
@@ -143,7 +140,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
@@ -152,7 +149,7 @@ func NodeInit(path, name string) (err error) {
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}

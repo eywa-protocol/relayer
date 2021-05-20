@@ -5,6 +5,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
+
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -32,10 +37,6 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
-	"math/big"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Node struct {
@@ -258,6 +259,13 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						}
 						ticker.Stop()
 						return blsNode
+					} else {
+						//TODO:
+						//this place leaks after at least one e2e test. If test was executed twice the leaks double
+						// top -o RES # the pid of most active node
+						// docker ps -q | xargs docker inspect --format '{{.State.Pid}}, {{.Name}}'
+						// checks out the names of docker nodes through commands above.
+						logrus.Info("topicParticipants: ", topicParticipants)
 					}
 
 				case <-mychannel:

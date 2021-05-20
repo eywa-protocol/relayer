@@ -40,7 +40,7 @@ func loadNodeConfig(path string) (err error) {
 	keys := strings.Split(keysList, ",")
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
-
+	//TODO: if(file_with_nodeHostId_exist_in_file) then use it,  else { see line below }
 	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
 	nodeHostId, err := strconv.Atoi(strNum)
 	if err != nil {

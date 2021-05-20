@@ -10,7 +10,7 @@ services:
       - ganache_net1
       - ganache_net2
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock        
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
     environment:
         - MODE=${MODE}
         - PORT=0

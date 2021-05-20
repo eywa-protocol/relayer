@@ -9,6 +9,8 @@ services:
     depends_on:
       - ganache_net1
       - ganache_net2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock        
     environment:
         - MODE=${MODE}
         - PORT=0
@@ -19,6 +21,7 @@ services:
         - NETWORK_RPC_2=${NETWORK_RPC_2}
     networks:
       - static-network
+    
 
   # dev-adapter:
   #   build:

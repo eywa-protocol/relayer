@@ -272,6 +272,9 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 					return nil
 				}
 			}
+			time.Sleep(time.Minute)
+			ticker.Stop()
+			return nil
 		}()
 
 	}

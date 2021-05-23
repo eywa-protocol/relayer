@@ -377,9 +377,11 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 				if event != nil {
 					peerAddrFromEvent, err := multiaddr.NewMultiaddr(string(event.P2pAddress[:]))
 					if err != nil {
-						logrus.Println("Catched event from ListNode:", peerAddrFromEvent)
-						n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+						logrus.Error("WatchAddedNode error during prepare event into NewMultiaddr: ", err)
 					}
+					_ = peerAddrFromEvent
+					logrus.Info("WatchAddedNode. Peer has been added: ", string(event.P2pAddress[:]))
+					n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
 				}
 
 			}

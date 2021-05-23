@@ -38,7 +38,13 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				n := 0
 				for {
+					if n == 10 {
+						break
+					}
+					n++
+
 					if err := host.Connect(ctx, *peerinfo); err != nil {
 						logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
 					} else {

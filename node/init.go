@@ -88,7 +88,6 @@ func loadNodeConfig(path string) (err error) {
 	// 	}
 
 	// }
-
 	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
 

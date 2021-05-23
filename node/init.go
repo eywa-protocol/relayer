@@ -40,24 +40,19 @@ func loadNodeConfig(path string) (err error) {
 	keys := strings.Split(keysList, ",")
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
-	//TODO: if(file_with_nodeHostId_exist_in_file) then use it,  else { see line below }
 
+	//TODO: SCALED_NUM приходит ""
 	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
-	nodeHostId, err := strconv.Atoi(strNum)
-	if err != nil {
-		panic(err)
-	}
+	nodeHostId, _ := strconv.Atoi(strNum)
 	if common2.FileExists("keys/scaled-num-peer.log") {
 		nodeHostIdB, err := ioutil.ReadFile("keys/scaled-num-peer.log")
 		if err != nil {
 			panic(err)
 		}
-		nodeHostId, err = strconv.Atoi(string(nodeHostIdB))
-		if err != nil {
-			panic(err)
-		}
+		nodeHostId, _ = strconv.Atoi(string(nodeHostIdB))
 	} else {
-		err := ioutil.WriteFile("keys/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
+
+		err = ioutil.WriteFile("keys/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -93,7 +88,7 @@ func loadNodeConfig(path string) (err error) {
 	// 	}
 
 	// }
-
+	logrus.Printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$ ", nodeHostId)
 	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
 
@@ -254,11 +249,13 @@ func NewNode(path, name string) (err error) {
 		logrus.Fatal(err)
 	}
 	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
+	n.ListenNodeAddedEventInFirstNetwork()
+
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
-
+	//QEST: what does it do?
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
@@ -273,7 +270,6 @@ func NewNode(path, name string) (err error) {
 	}
 
 	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
-	//n.ListenNodeAddedEventInFirstNetwork()
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()

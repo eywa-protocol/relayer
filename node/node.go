@@ -5,6 +5,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
+
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -21,6 +26,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	//"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -32,10 +39,6 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
-	"math/big"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Node struct {
@@ -199,7 +202,30 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAd
 	return
 }
 
-func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
+func (n Node) getTopicParticiapnts(topic string) (topicParticipants []peer.ID) {
+	topicParticipants = n.P2PPubSub.ListPeersByTopic(topic)
+	topicParticipants = append(topicParticipants, n.Host.ID())
+	return
+}
+
+func (n Node) PrepareParticiapntsForNewBLSSession(topic string) (topicParticipants []peer.ID) {
+	participantsThreshold := len(n.DiscoveryPeers)/2 + 1
+	ctx, cancel := context.WithTimeout(n.Ctx, 30*time.Second)
+	defer cancel()
+	for {
+		topicParticipants = n.getTopicParticiapnts(topic)
+		discovery.Advertise(n.Ctx, n.Discovery, topic)
+		go n.DiscoverWithEvtTopic(topic)
+		if len(topicParticipants) >= participantsThreshold || ctx.Err() != nil {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+	logrus.Warnf("Found %d topicParticipants:\n %v", len(topicParticipants), topicParticipants)
+	return
+}
+
+func (n Node) NewBLSSession(topic string, topicParticipants []peer.ID) (blsNode *modelBLS.Node, err error) {
 	publicKeys, err := n.GetPubKeysFromContract()
 	if err != nil {
 		return
@@ -219,50 +245,40 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		if err != nil {
 			return nil, err
 		}
-		n.Dht.RefreshRoutingTable()
-		blsNode = func() *modelBLS.Node {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			mychannel := make(chan bool)
-			for {
-				select {
-				case <-ticker.C:
-					n.initNewPubSub(topic)
-					go n.DiscoverWithEvtTopic(topic)
-					topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
-					topicParticipants = append(topicParticipants, n.Host.ID())
-					if len(topicParticipants) > 6 {
-						logrus.Tracef("Starting Leader election !!!")
-						leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
-						if err != nil {
-							panic(err)
-						}
-						logrus.Warnf("LEADER IS %v", leaderPeerId)
-						blsNode = &modelBLS.Node{
-							Id:                int(node.NodeId),
-							TimeStep:          0,
-							ThresholdWit:      len(topicParticipants)/2 + 1,
-							ThresholdAck:      len(topicParticipants)/2 + 1,
-							Acks:              0,
-							ConvertMsg:        &messageSigpb.Convert{},
-							Comm:              n.P2PPubSub,
-							History:           make([]modelBLS.MessageWithSig, 0),
-							Signatures:        make([][]byte, len(publicKeys)),
-							SigMask:           mask,
-							PublicKeys:        publicKeys,
-							PrivateKey:        n.PrivKey,
-							Suite:             suite,
-							Participants:      topicParticipants,
-							CurrentRendezvous: topic,
-							Leader:            leaderPeerId,
-						}
-						ticker.Stop()
-						return blsNode
-					}
 
-				case <-mychannel:
-					return nil
+		blsNode = func() (blsNode *modelBLS.Node) {
+
+			if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 {
+				logrus.Infof("Starting Leader election !!!")
+				logrus.Infof("Found participants %d. Needed %d", len(n.P2PPubSub.ListPeersByTopic(topic))+1, len(n.DiscoveryPeers)/2+1)
+				leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
+				if err != nil {
+					panic(err)
 				}
+				logrus.Warnf("LEADER IS %v", leaderPeerId)
+
+				blsNode = &modelBLS.Node{
+					Id:                int(node.NodeId),
+					TimeStep:          0,
+					ThresholdWit:      len(topicParticipants)/2 + 1,
+					ThresholdAck:      len(topicParticipants)/2 + 1,
+					Acks:              0,
+					ConvertMsg:        &messageSigpb.Convert{},
+					Comm:              n.P2PPubSub,
+					History:           make([]modelBLS.MessageWithSig, 0),
+					Signatures:        make([][]byte, len(publicKeys)),
+					SigMask:           mask,
+					PublicKeys:        publicKeys,
+					PrivateKey:        n.PrivKey,
+					Suite:             suite,
+					Participants:      topicParticipants,
+					CurrentRendezvous: topic,
+					Leader:            leaderPeerId,
+				}
+				return
+			} else {
+				logrus.Errorf("%d PARTICIPANTS is NOT ENough %v", len(topicParticipants), topicParticipants)
+				return nil
 			}
 		}()
 
@@ -326,10 +342,19 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 			case err := <-sub.Err():
 				logrus.Fatalf("OracleRequest: %v", err)
 			case event := <-channel:
+				logrus.Infof("ListenNodeOracleRequest: %v", event)
 				currentRendezvous := common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.initNewPubSub(currentRendezvous)
+				pats := n.PrepareParticiapntsForNewBLSSession(currentRendezvous)
+				logrus.Infof("prts LENGTH %d len(n.DiscoveryPeers) %d", len(pats), len(n.DiscoveryPeers))
+				n.Dht, err = n.initDHT()
+				if err != nil {
+					logrus.Fatal(err)
+				}
 
-				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
+				n.NodeBLS, err = n.NewBLSSession(currentRendezvous, pats)
+				//n.NodeBLS, err = n.NewBLSNodeNOWORL(currentRendezvous)
+
 				if err != nil {
 					logrus.Fatal(err)
 				}
@@ -366,8 +391,11 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 				if event != nil {
 					peerAddrFromEvent, err := multiaddr.NewMultiaddr(string(event.P2pAddress[:]))
 					if err != nil {
-						n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+						logrus.Error("WatchAddedNode error during prepare event into NewMultiaddr: ", err)
 					}
+					_ = peerAddrFromEvent
+					logrus.Info("WatchAddedNode. Peer has been added: ", string(event.P2pAddress[:]))
+					n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
 				}
 
 			}

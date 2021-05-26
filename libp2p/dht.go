@@ -39,7 +39,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 				if err := host.Connect(ctx, *peerinfo); err != nil {
 					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
 				} else {
-					logrus.Infof("Connection established with node: %q", peerinfo)
+					logrus.Tracef("Connection established with node: %q", peerinfo)
 				}
 			}()
 		}

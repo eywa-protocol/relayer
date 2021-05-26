@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
@@ -20,6 +22,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -240,19 +243,27 @@ func NewNode(path, name string) (err error) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
 	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
+	n.DiscoveryPeers = make(addrList, 0)
+	n.DiscoveryPeers, err = n.AddActiveDiscoveryPeersFromContract(n.DiscoveryPeers)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
+	logrus.Infof("DiscoveryPeers %d", len(n.DiscoveryPeers))
 
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
+	_ = n.ListenAndAddNodeToPeersFromEvent()
+	//go n.InitNodeDiscoveryPeers()
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
-
 	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
@@ -288,18 +299,104 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	return
 }
 
-func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
+func (n Node) AddActiveDiscoveryPeersFromContract(peers addrList) (peers2 addrList, err error) {
 	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}
+	logrus.Infof("found %d peers in contract", len(nodes))
 	for _, node := range nodes {
 		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
-		n.DiscoveryPeers = append(n.DiscoveryPeers, peerMA)
+		peers = append(peers, peerMA)
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerMA)
+
+		var wg sync.WaitGroup
+		if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
+					logrus.Tracef("Error while connecting to node %q: %-v\n not going to add", peerinfo, err)
+
+				} else {
+					logrus.Infof("Adding to DiscoveryPeers connected node: %q\n", peerinfo)
+
+				}
+			}()
+		}
 	}
+	peers2 = peers
+	return
+}
+
+func (n Node) AddPeer(peerAddr string, peers addrList) (peers2 addrList, err error) {
+	peerMA, err := multiaddr.NewMultiaddr(peerAddr)
+	if err != nil {
+		panic(err)
+	}
+	peers = append(peers, peerMA)
+	peerinfo, _ := peer.AddrInfoFromP2pAddr(peerMA)
+	var wg sync.WaitGroup
+	if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
+				logrus.Tracef("Error while connecting to node %q: %-v\n not going to add", peerinfo, err)
+
+			} else {
+				logrus.Infof("Adding to DiscoveryPeers connected node: %q\n", peerinfo)
+
+			}
+		}()
+	}
+
+	peers2 = peers
+	return
+}
+
+/*func(n Node) InitNodeDiscoveryPeers() {
+	for _, addr := range n.DiscoveryPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(addr)
+		logrus.Trace("addr", addr.String())
+		logrus.Tracef("self ID %s host ID %s", n.Host.ID().Pretty(), peerinfo.ID.Pretty())
+		var wg sync.WaitGroup
+		for _, peerAddr := range n.DiscoveryPeers {
+			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+			if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
+						logrus.Errorf("InitNodeDiscoveryPeers Error while connecting to node %q: %-v", peerinfo, err)
+					} else {
+						logrus.Tracef("InitNodeDiscoveryPeers Connection established with node: %q", peerinfo)
+					}
+				}()
+			}
+		}
+		wg.Wait()
+
+		//if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
+		//	_, err := n.Host.Network().DialPeer(n.Ctx, peerinfo.ID)
+		//	if err != nil {
+		//		logrus.Errorf("InitNodeDiscoveryPeers Host.Network().Connectedness PROBLEM: %v", err)
+		//		continue
+		//	 } else {
+		//		logrus.Infof("InitNodeDiscoveryPeers Connected to peer %s", peerinfo.ID)
+		//	}
+		//}
+
+
+
+	}
+}
+*/
+
+func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	dht, err = libp2p.NewDHT(n.Ctx, n.Host, n.DiscoveryPeers)
 	if err != nil {
 		return

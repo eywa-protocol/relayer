@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"strings"
 	"sync"
@@ -145,7 +146,20 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 func (n Node) initNewPubSub(topic string) (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
 	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	p2pPubSub.InitializePubSubWithTopic(n.Host, topic)
+	var infos []peer.AddrInfo
+	for _, peerAddr := range n.DiscoveryPeers {
+		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+		if err != nil {
+			panic(err)
+		}
+		if n.Host.ID() != peerinfo.ID {
+			if err = libp2p_pubsub.ConnectHostToPeerWithError(n.Host, peerAddr.String()); err != nil {
+				logrus.Errorf("ConnectHostToPeerWithError %v", err)
+			}
+		}
+		infos = append(infos, *peerinfo)
+	}
+	p2pPubSub.InitializePubSubWithTopicAndPeers(n.Host, topic, infos)
 	return
 }
 

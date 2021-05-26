@@ -5,6 +5,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -14,10 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
-	"log"
-	"os"
-	"strings"
-	"time"
 )
 
 func Connect(string2 string) (*ethclient.Client, error) {
@@ -106,8 +107,9 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 	}
 }
 
-func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, nodeWallet common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
+func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
 	logrus.Infof("Register Node %x", blsAddr)
+	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
 	if res {
@@ -121,10 +123,10 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 			select {
 			case <-ticker.C:
 				txOpts1 := CustomAuth(client, pk)
-				tx, err := nodeListContract1.AddNode(txOpts1, nodeWallet, p2pAddress, blsAddr, blsPubkey, true)
+				tx, err := nodeListContract1.AddNode(txOpts1, fromAddress, p2pAddress, blsAddr, blsPubkey, true)
 				if tx != nil {
 					if created, _ := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr); created {
-						logrus.Infof("Added Node %v txhash %x", blsAddr, tx.Hash())
+						logrus.Infof("Added Node: %x blsAddR: %v txhash %x", fromAddress, blsAddr, tx.Hash())
 						ticker.Stop()
 						return nil
 					}

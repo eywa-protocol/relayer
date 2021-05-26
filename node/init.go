@@ -3,29 +3,23 @@ package node
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
 	"github.com/DigiU-Lab/p2p-bridge/libp2p"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
-	"unicode"
 )
 
 func loadNodeConfig(path string) (err error) {
@@ -47,45 +41,55 @@ func loadNodeConfig(path string) (err error) {
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
 
-	strNum := strings.TrimPrefix(hostName, "p2p-bridge_node_")
-	strNum = strings.TrimRightFunc(strNum, func(r rune) bool {
-		return !unicode.IsNumber(r)
-	})
+	//TODO: SCALED_NUM приходит ""
+	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
 	nodeHostId, _ := strconv.Atoi(strNum)
+	if common2.FileExists("keys/scaled-num-peer.log") {
+		nodeHostIdB, err := ioutil.ReadFile("keys/scaled-num-peer.log")
+		if err != nil {
+			panic(err)
+		}
+		nodeHostId, _ = strconv.Atoi(string(nodeHostIdB))
+	} else {
 
-	c1, c2, err := getEthClients()
-	if err != nil {
-		logrus.Fatal(err)
-
+		err = ioutil.WriteFile("keys/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	var getRandomKeyForTestIfNoFunds func()
-	getRandomKeyForTestIfNoFunds = func() {
-		config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-		config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
-		balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
+	// c1, c2, err := getEthClients()
+	// if err != nil {
+	// 	logrus.Fatal(err)
 
-		balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
+	// }
 
-		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
-			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
-			//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
-			rand.Seed(time.Now().UnixNano())
-			nodeHostId = rand.Intn(len(keys))
-			//}
-			getRandomKeyForTestIfNoFunds()
-		}
+	// var getRandomKeyForTestIfNoFunds func()
+	// getRandomKeyForTestIfNoFunds = func() {
+	// 	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
+	// 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
+	// 	balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
+	// 	if err != nil {
+	// 		logrus.Fatal(err)
+	// 	}
 
-	}
+	// 	balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
+	// 	if err != nil {
+	// 		logrus.Fatal(err)
+	// 	}
 
-	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
+	// 	if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
+	// 		logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
+	// 		//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+	// 		rand.Seed(time.Now().UnixNano())
+	// 		nodeHostId = rand.Intn(len(keys))
+	// 		//}
+	// 		getRandomKeyForTestIfNoFunds()
+	// 	}
+
+	// }
+	config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
+	config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
 
 	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" {
 		panic(errors.New("you need key to start node"))
@@ -146,7 +150,7 @@ func NodeInit(path, name string) (err error) {
 		return
 	}
 
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), common.HexToAddress(config.Config.ECDSA_KEY_1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
@@ -155,7 +159,7 @@ func NodeInit(path, name string) (err error) {
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), common.HexToAddress(config.Config.ECDSA_KEY_2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
 	}
@@ -243,27 +247,21 @@ func NewNode(path, name string) (err error) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-
 	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
-	n.DiscoveryPeers = make(addrList, 0)
-	n.DiscoveryPeers, err = n.AddActiveDiscoveryPeersFromContract(n.DiscoveryPeers)
-	if err != nil {
-		logrus.Fatal(err)
-	}
+	n.ListenNodeAddedEventInFirstNetwork()
+
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
-	logrus.Infof("DiscoveryPeers %d", len(n.DiscoveryPeers))
-
+	//QEST: what does it do?
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
-	_ = n.ListenAndAddNodeToPeersFromEvent()
-	//go n.InitNodeDiscoveryPeers()
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
+
 	_, err = n.ListenNodeOracleRequest()
 	if err != nil {
 		logrus.Errorf(err.Error())
@@ -298,104 +296,18 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	return
 }
 
-func (n Node) AddActiveDiscoveryPeersFromContract(peers addrList) (peers2 addrList, err error) {
+func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}
-	logrus.Infof("found %d peers in contract", len(nodes))
 	for _, node := range nodes {
 		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		peers = append(peers, peerMA)
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerMA)
-
-		var wg sync.WaitGroup
-		if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
-					logrus.Tracef("Error while connecting to node %q: %-v\n not going to add", peerinfo, err)
-
-				} else {
-					logrus.Infof("Adding to DiscoveryPeers connected node: %q\n", peerinfo)
-
-				}
-			}()
-		}
+		n.DiscoveryPeers = append(n.DiscoveryPeers, peerMA)
 	}
-	peers2 = peers
-	return
-}
-
-func (n Node) AddPeer(peerAddr string, peers addrList) (peers2 addrList, err error) {
-	peerMA, err := multiaddr.NewMultiaddr(peerAddr)
-	if err != nil {
-		panic(err)
-	}
-	peers = append(peers, peerMA)
-	peerinfo, _ := peer.AddrInfoFromP2pAddr(peerMA)
-	var wg sync.WaitGroup
-	if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
-				logrus.Tracef("Error while connecting to node %q: %-v\n not going to add", peerinfo, err)
-
-			} else {
-				logrus.Infof("Adding to DiscoveryPeers connected node: %q\n", peerinfo)
-
-			}
-		}()
-	}
-
-	peers2 = peers
-	return
-}
-
-/*func(n Node) InitNodeDiscoveryPeers() {
-	for _, addr := range n.DiscoveryPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(addr)
-		logrus.Trace("addr", addr.String())
-		logrus.Tracef("self ID %s host ID %s", n.Host.ID().Pretty(), peerinfo.ID.Pretty())
-		var wg sync.WaitGroup
-		for _, peerAddr := range n.DiscoveryPeers {
-			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-			if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					if err := n.Host.Connect(n.Ctx, *peerinfo); err != nil {
-						logrus.Errorf("InitNodeDiscoveryPeers Error while connecting to node %q: %-v", peerinfo, err)
-					} else {
-						logrus.Tracef("InitNodeDiscoveryPeers Connection established with node: %q", peerinfo)
-					}
-				}()
-			}
-		}
-		wg.Wait()
-
-		//if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
-		//	_, err := n.Host.Network().DialPeer(n.Ctx, peerinfo.ID)
-		//	if err != nil {
-		//		logrus.Errorf("InitNodeDiscoveryPeers Host.Network().Connectedness PROBLEM: %v", err)
-		//		continue
-		//	 } else {
-		//		logrus.Infof("InitNodeDiscoveryPeers Connected to peer %s", peerinfo.ID)
-		//	}
-		//}
-
-
-
-	}
-}
-*/
-
-func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	dht, err = libp2p.NewDHT(n.Ctx, n.Host, n.DiscoveryPeers)
 	if err != nil {
 		return

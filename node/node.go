@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"strings"
 	"sync"
@@ -237,59 +236,46 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		n.Dht.RefreshRoutingTable()
 		blsNode = func() *modelBLS.Node {
 
-			ctx, cancel := context.WithTimeout(n.Ctx, 15 * time.Second)
+			ctx, cancel := context.WithTimeout(n.Ctx, 15*time.Second)
 			defer cancel()
 
 			for {
-				select {
-				case <-ticker.C:
-					n.initNewPubSub(topic)
-					go n.DiscoverWithEvtTopic(topic)
-					topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
-					topicParticipants = append(topicParticipants, n.Host.ID())
-					if len(topicParticipants) > 6 {
-						logrus.Tracef("Starting Leader election !!!")
-						leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
-						if err != nil {
-							panic(err)
-						}
-						logrus.Warnf("LEADER IS %v", leaderPeerId)
-						blsNode = &modelBLS.Node{
-							Id:                int(node.NodeId),
-							TimeStep:          0,
-							ThresholdWit:      len(topicParticipants)/2 + 1,
-							ThresholdAck:      len(topicParticipants)/2 + 1,
-							Acks:              0,
-							ConvertMsg:        &messageSigpb.Convert{},
-							Comm:              n.P2PPubSub,
-							History:           make([]modelBLS.MessageWithSig, 0),
-							Signatures:        make([][]byte, len(publicKeys)),
-							SigMask:           mask,
-							PublicKeys:        publicKeys,
-							PrivateKey:        n.PrivKey,
-							Suite:             suite,
-							Participants:      topicParticipants,
-							CurrentRendezvous: topic,
-							Leader:            leaderPeerId,
-						}
-						ticker.Stop()
-						return blsNode
-					} else {
-						//TODO:
-						//this place leaks after at least one e2e test. If test was executed twice the leaks double
-						// top -o RES # the pid of most active node
-						// docker ps -q | xargs docker inspect --format '{{.State.Pid}}, {{.Name}}'
-						// checks out the names of docker nodes through commands above.
-						logrus.Info("topicParticipants: ", topicParticipants)
+				n.initNewPubSub(topic)
+				go n.DiscoverWithEvtTopic(topic)
+				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
+				topicParticipants = append(topicParticipants, n.Host.ID())
+				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 || ctx.Err() != nil {
+					logrus.Tracef("Starting Leader election !!!")
+					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
+					if err != nil {
+						panic(err)
+					}
+					logrus.Warnf("LEADER IS %v", leaderPeerId)
+					blsNode = &modelBLS.Node{
+						Id:                int(node.NodeId),
+						TimeStep:          0,
+						ThresholdWit:      len(topicParticipants)/2 + 1,
+						ThresholdAck:      len(topicParticipants)/2 + 1,
+						Acks:              0,
+						ConvertMsg:        &messageSigpb.Convert{},
+						Comm:              n.P2PPubSub,
+						History:           make([]modelBLS.MessageWithSig, 0),
+						Signatures:        make([][]byte, len(publicKeys)),
+						SigMask:           mask,
+						PublicKeys:        publicKeys,
+						PrivateKey:        n.PrivKey,
+						Suite:             suite,
+						Participants:      topicParticipants,
+						CurrentRendezvous: topic,
+						Leader:            leaderPeerId,
 					}
 
-				case <-mychannel:
-					return nil
+					break
+
 				}
 			}
-			time.Sleep(time.Minute)
-			ticker.Stop()
-			return nil
+
+			return blsNode
 		}()
 
 	}

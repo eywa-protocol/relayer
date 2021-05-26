@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -241,7 +240,8 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 
 			for {
 				n.initNewPubSub(topic)
-				go n.DiscoverWithEvtTopic(topic)
+				var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+				discovery.Advertise(n.Ctx, routingDiscovery, topic)
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 || ctx.Err() != nil {
@@ -346,7 +346,8 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					go n.DiscoverWithEvtTopic(n.NodeBLS.CurrentRendezvous)
+					var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+					discovery.Advertise(n.Ctx, routingDiscovery, n.NodeBLS.CurrentRendezvous)
 					go n.StartProtocolByOracleRequest(event)
 
 				}
@@ -451,55 +452,4 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 
 	return
 
-}
-
-func (n Node) DiscoverWithEvtTopic(topic string) {
-	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
-	discovery.Advertise(n.Ctx, routingDiscovery, topic)
-	ticker := time.NewTicker(config.Config.TickerInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			//n.FindPeers()
-			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, topic)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-
-			peerIds := n.P2PPubSub.ListPeersByTopic(topic)
-			for _, pID := range peerIds {
-				if pID == n.Host.ID() {
-					continue
-				}
-
-				if n.Host.Network().Connectedness(pID) != network.Connected {
-					_, err = n.Host.Network().DialPeer(n.Ctx, pID)
-					logrus.Tracef("Connected to peer %s", pID.Pretty())
-
-					if err != nil {
-						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
-						continue
-					}
-				}
-			}
-
-			for _, p := range peers {
-				if p.ID == n.Host.ID() {
-					continue
-				}
-				if n.Host.Network().Connectedness(p.ID) != network.Connected {
-					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
-					logrus.Infof("Connected to peer %s", p.ID.Pretty())
-					if err != nil {
-						logrus.Errorf("Host.Network().Connectedness PROBLEM: %v", err)
-						continue
-					}
-				}
-			}
-		case <-n.Ctx.Done():
-			return
-		}
-	}
 }

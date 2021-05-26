@@ -5,7 +5,7 @@ export ECDSA_KEY_2=0x72a21bf9881eff3ab6e4bd245074cdbb6631388e22318bd4f5df2752b69
 export NETWORK_RPC_1=ws://172.20.128.11:7545
 export NETWORK_RPC_2=ws://172.20.128.12:8545
 docker-compose up -d --build --no-deps node
-docker-compose up -d --scale node=15
+docker-compose up -d --scale node=7
 #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
 docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
 docker-compose logs -f -t | grep -v ganache

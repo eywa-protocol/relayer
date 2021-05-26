@@ -146,20 +146,20 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 
 func (n Node) initNewPubSub(topic string) (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
 	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	var infos []peer.AddrInfo
-	for _, peerAddr := range n.DiscoveryPeers {
-		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
-		if err != nil {
-			panic(err)
-		}
-		if n.Host.ID() != peerinfo.ID {
-			if err = libp2p_pubsub.ConnectHostToPeerWithError(n.Host, peerAddr.String()); err != nil {
-				logrus.Errorf("ConnectHostToPeerWithError %v", err)
-			}
-		}
-		infos = append(infos, *peerinfo)
-	}
-	p2pPubSub.InitializePubSubWithTopicAndPeers(n.Host, topic, infos)
+	//var infos []peer.AddrInfo
+	//for _, peerAddr := range n.DiscoveryPeers {
+	//	peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	if n.Host.ID() != peerinfo.ID {
+	//		if err = libp2p_pubsub.ConnectHostToPeerWithError(n.Host, peerAddr.String()); err != nil {
+	//			logrus.Errorf("ConnectHostToPeerWithError %v", err)
+	//		}
+	//	}
+	//	infos = append(infos, *peerinfo)
+	//}
+	p2pPubSub.InitializePubSubWithTopic(n.Host, topic)
 	return
 }
 
@@ -236,9 +236,10 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		}
 		n.Dht.RefreshRoutingTable()
 		blsNode = func() *modelBLS.Node {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			mychannel := make(chan bool)
+
+			ctx, cancel := context.WithTimeout(n.Ctx, 15 * time.Second)
+			defer cancel()
+
 			for {
 				select {
 				case <-ticker.C:
@@ -315,7 +316,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			case _ = <-sub.Err():
 				break
 			case event := <-channel:
-				logrus.Tracef("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
+				logrus.Infof("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
 				if n.P2PPubSub != nil {
 					n.P2PPubSub.Disconnect()
 				}

@@ -14,15 +14,17 @@ func main() {
 	var mode string
 	var path string
 	var port uint
+	var logLevel int
 	flag.StringVar(&mode, "mode", "serve", "relayer mode. Default is serve")
 	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
 	flag.UintVar(&port, "port", 0, "ws port")
+	flag.IntVar(&logLevel,"v", int(logrus.InfoLevel), "loglevel logrus.Tracelevel" )
 	flag.Parse()
 	logrus.Tracef("mode %v path %v", mode, path)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
 	logrus.Tracef("FILE", fname)
-
+	logrus.SetLevel(logrus.Level(logLevel))
 	if mode == "init" {
 		err := node.NodeInit(path, fname)
 		if err != nil {

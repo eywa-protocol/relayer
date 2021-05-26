@@ -271,7 +271,6 @@ func NewNode(path, name string) (err error) {
 	}
 
 	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
-	//n.ListenNodeAddedEventInFirstNetwork()
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()

@@ -199,12 +199,12 @@ func (c *Libp2pPubSub) InitializePubSub(h core.Host) {
 
 }
 
-// initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Libp2pPubSub) InitializePubSubWithTopic(h core.Host, topic string) {
+// InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
+func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
 	var err error
 	// Creating pubsub
 	// every peer has its own PubSub
-	c.pubsub, err = applyPubSub(h)
+	c.pubsub, err = applyPubSubDeatiled(h, peerAddrs)
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
 		return
@@ -398,6 +398,22 @@ func applyPubSub(h core.Host) (*pubsub.PubSub, error) {
 	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
 }
 
+// applyPubSubDetailed creates a new GossipSub with message signing
+func applyPubSubDeatiled(h core.Host, addrInfos []peer.AddrInfo) (*pubsub.PubSub, error) {
+	optsPS := []pubsub.Option{
+		pubsub.WithMessageSigning(true),
+		pubsub.WithPeerExchange(true),
+		//pubsub.WithMessageIdFn(func(pmsg *pubsubpb.Message) string {
+		//	hash := blake2b.Sum256(pmsg.Data)
+		//	return string(hash[:])
+		//}),
+		pubsub.WithDirectPeers(addrInfos),
+		pubsub.WithFloodPublish(true),
+		pubsub.WithDirectConnectTicks(7),
+	}
+	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
+}
+
 // connectHostToPeer is used for connecting a host to another peer
 func connectHostToPeer(h core.Host, connectToAddress string) {
 	// Creating multi address
@@ -420,7 +436,7 @@ func connectHostToPeer(h core.Host, connectToAddress string) {
 	}
 }
 
-func connectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
+func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
 	// Creating multi address
 	multiAddr, err := multiaddr.NewMultiaddr(connectToAddress)
 	if err != nil {

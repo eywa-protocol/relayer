@@ -235,7 +235,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		n.Dht.RefreshRoutingTable()
 		blsNode = func() *modelBLS.Node {
 
-			ctx, cancel := context.WithTimeout(n.Ctx, 15*time.Second)
+			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(time.Minute))
 			defer cancel()
 
 			for {
@@ -273,6 +273,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 					break
 
 				}
+				time.Sleep(5 * time.Second)
 			}
 
 			return blsNode

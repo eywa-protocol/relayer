@@ -144,25 +144,6 @@ func (n Node) NewBridge() (srv *bridges.Server) {
 	return
 }
 
-func (n Node) initNewPubSub(topic string) (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
-	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	//var infos []peer.AddrInfo
-	//for _, peerAddr := range n.DiscoveryPeers {
-	//	peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	if n.Host.ID() != peerinfo.ID {
-	//		if err = libp2p_pubsub.ConnectHostToPeerWithError(n.Host, peerAddr.String()); err != nil {
-	//			logrus.Errorf("ConnectHostToPeerWithError %v", err)
-	//		}
-	//	}
-	//	infos = append(infos, *peerinfo)
-	//}
-	p2pPubSub.InitializePubSubWithTopic(n.Host, topic)
-	return
-}
-
 func (n Node) nodeExiats(blsAddr common.Address) bool {
 	node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
 	logrus.Trace(node.NodeWallet, node.BlsPubKey, node.NodeId, node.P2pAddress, node.BlsPointAddr)
@@ -234,17 +215,14 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		if err != nil {
 			return nil, err
 		}
-		n.Dht.RefreshRoutingTable()
 		blsNode = func() *modelBLS.Node {
 			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(time.Minute))
 			defer cancel()
 			for {
-				var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
-				discovery.Advertise(n.Ctx, routingDiscovery, topic)
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				logrus.Debugf("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) > len(n.Dht.RoutingTable().ListPeers())/2+1 {
+				if len(topicParticipants) >= len(n.Dht.RoutingTable().ListPeers())/2+1 {
 					logrus.Tracef("Starting Leader election !!!")
 					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
 					if err != nil {
@@ -270,9 +248,8 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						Leader:            leaderPeerId,
 					}
 					break
-				}
-				if len(topicParticipants) == 1 {
-					logrus.Warn("This node can not participate")
+				} else {
+					logrus.Warnf("This node can not participate %d", len(topicParticipants))
 					break
 				}
 				if ctx.Err() != nil {
@@ -346,8 +323,8 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 				logrus.Fatalf("OracleRequest: %v", err)
 			case event := <-channel:
 				currentRendezvous := common2.ToHex(event.Raw.TxHash)
-				n.P2PPubSub = n.initNewPubSub(currentRendezvous)
-
+				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentRendezvous, n.DiscoveryPeers)
+				n.Discover(currentRendezvous)
 				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
 				if err != nil {
 					logrus.Fatal(err)
@@ -485,4 +462,19 @@ func (n Node) Reconnect(bootstrapPeers []multiaddr.Multiaddr) {
 			}
 		}
 	}
+}
+
+func (n Node) Discover(topic string) {
+	go libp2p.Discover(n.Ctx, n.Host, n.Dht, topic, 3*time.Second)
+}
+
+func (n Node) InitializePubSubWithTopicAndPeers(topic string, peerAddrs []multiaddr.Multiaddr) (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
+	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
+	peerInfos := make([]peer.AddrInfo, 0)
+	for _, peerAddr := range peerAddrs {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		peerInfos = append(peerInfos, *peerinfo)
+	}
+	p2pPubSub.InitializePubSubWithTopicAndPeers(n.Host, topic, peerInfos)
+	return
 }

@@ -324,7 +324,6 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 			case event := <-channel:
 				currentRendezvous := common2.ToHex(event.Raw.TxHash)
 				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentRendezvous, n.DiscoveryPeers)
-				n.Discover(currentRendezvous)
 				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
 				if err != nil {
 					logrus.Fatal(err)

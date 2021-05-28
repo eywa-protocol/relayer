@@ -3,24 +3,14 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"sync"
-	"time"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 )
 
-func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
+func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
 	var options []dht.Option
-
-	if len(bootstrapPeers) == 0 {
-		options = append(options, dht.Mode(dht.ModeServer))
-	}
 
 	kdht, err := dht.New(ctx, host, options...)
 	if err != nil {
@@ -30,35 +20,6 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	if err = kdht.Bootstrap(ctx); err != nil {
 		return nil, err
 	}
-
-	var wg sync.WaitGroup
-	for _, peerAddr := range bootstrapPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		if host.ID().Pretty() != peerinfo.ID.Pretty() {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				n := 0
-				for {
-					if n == 10 {
-						break
-					}
-					n++
-
-					if err := host.Connect(ctx, *peerinfo); err != nil {
-						logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
-					} else {
-						logrus.Infof("Connection established with node: %q", peerinfo)
-						break
-					}
-					time.Sleep(10 * time.Second)
-					fmt.Println("Trying to connect after unsuccessful connect...")
-				}
-			}()
-		}
-	}
-	wg.Wait()
-
 	return kdht, nil
 }
 

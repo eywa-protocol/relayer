@@ -141,6 +141,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 		}
 		time.Sleep(15 * time.Second)
 		ticker.Stop()
+		mychannel <- true
 	}
 	return
 }

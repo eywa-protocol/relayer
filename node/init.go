@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -21,7 +22,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
 
@@ -250,14 +250,22 @@ func NewNode(path, name string) (err error) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
 	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
+
+	n.DiscoveryPeers, err = n.setDiscoveryPeers()
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	logrus.Printf("setDiscoveryPeers len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
+
 	n.ListenNodeAddedEventInFirstNetwork()
 
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
-	//QEST: what does it do?
+
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
@@ -299,7 +307,8 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	return
 }
 
-func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
+func (n Node) setDiscoveryPeers() (discoveryPeers []multiaddr.Multiaddr, err error) {
+	discoveryPeers = make([]multiaddr.Multiaddr, 0)
 	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
@@ -307,11 +316,16 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	for _, node := range nodes {
 		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
 		if err != nil {
-			return nil, err
+			logrus.Error("setDiscoveryPeers %v", err)
 		}
-		n.DiscoveryPeers = append(n.DiscoveryPeers, peerMA)
+		discoveryPeers = append(discoveryPeers, peerMA)
 	}
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host, n.DiscoveryPeers)
+	return
+}
+
+func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
+
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host)
 	if err != nil {
 		return
 	}
@@ -319,5 +333,13 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	if err != nil {
 		return
 	}
+	logrus.Printf("len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
+	//go func() {
+	//	for true {
+	//		logrus.Println("try reconnect every minute")
+	n.Reconnect(n.DiscoveryPeers)
+	//		time.Sleep(time.Minute)
+	//	}
+	//}()
 	return
 }

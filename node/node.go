@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"strings"
 	"sync"
@@ -234,23 +236,21 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 		}
 		n.Dht.RefreshRoutingTable()
 		blsNode = func() *modelBLS.Node {
-
 			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(time.Minute))
 			defer cancel()
-
 			for {
-				n.initNewPubSub(topic)
 				var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
 				discovery.Advertise(n.Ctx, routingDiscovery, topic)
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
-				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 || ctx.Err() != nil {
+				logrus.Debugf("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
+				if len(topicParticipants) > len(n.Dht.RoutingTable().ListPeers())/2+1 {
 					logrus.Tracef("Starting Leader election !!!")
 					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
 					if err != nil {
 						panic(err)
 					}
-					logrus.Warnf("LEADER IS %v", leaderPeerId)
+					logrus.Infof("LEADER IS %v", leaderPeerId)
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
@@ -269,9 +269,15 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						CurrentRendezvous: topic,
 						Leader:            leaderPeerId,
 					}
-
 					break
-
+				}
+				if len(topicParticipants) == 1 {
+					logrus.Warn("This node can not participate")
+					break
+				}
+				if ctx.Err() != nil {
+					logrus.Warnf("Not enaugh participants %d , %v", len(topicParticipants), ctx.Err())
+					break
 				}
 				time.Sleep(5 * time.Second)
 			}
@@ -347,8 +353,6 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
-					discovery.Advertise(n.Ctx, routingDiscovery, n.NodeBLS.CurrentRendezvous)
 					go n.StartProtocolByOracleRequest(event)
 
 				}
@@ -370,7 +374,7 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 	if err != nil {
 		return
 	}
-
+	//wg := new(sync.WaitGroup)
 	go func() {
 		for {
 			select {
@@ -384,7 +388,10 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 					}
 					_ = peerAddrFromEvent
 					logrus.Info("WatchAddedNode. Peer has been added: ", string(event.P2pAddress[:]))
-					n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+					logrus.Printf("len(n.DiscoveryPeers) 1 =%d", len(n.DiscoveryPeers))
+					//n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+					logrus.Printf("len(n.DiscoveryPeers) 2 =%d", len(n.DiscoveryPeers))
+					n.Reconnect(n.DiscoveryPeers)
 				}
 
 			}
@@ -453,4 +460,29 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 
 	return
 
+}
+
+func (n Node) Reconnect(bootstrapPeers []multiaddr.Multiaddr) {
+	for _, peerAddr := range bootstrapPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		if n.Host.ID().Pretty() != peerinfo.ID.Pretty() && n.Host.Network().Connectedness(peerinfo.ID) != network.Connected {
+			ctx, cancel := context.WithTimeout(n.Ctx, time.Second*10)
+			defer cancel()
+			for {
+				err := n.Host.Connect(ctx, *peerinfo)
+				if err != nil {
+					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
+				} else {
+					logrus.Infof("Connection established with node: %q", peerinfo)
+					break
+				}
+				if ctx.Err() != nil {
+					logrus.Error(ctx.Err())
+					break
+				}
+				time.Sleep(2 * time.Second)
+				fmt.Println("Trying to connect after unsuccessful connect...")
+			}
+		}
+	}
 }

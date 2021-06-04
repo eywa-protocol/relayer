@@ -6,8 +6,8 @@
 ```bash
 mkdir digiu
 cd digiu
-git clone git@github.com:DigiU-Lab/p2p-bridge.git
-git clone git@github.com:DigiU-Lab/eth-contracts.git
+git clone git@github.com:digiu-ai/p2p-bridge.git
+git clone git@github.com:digiu-ai/eth-contracts.git
 cd p2p-bridge
 ./deploy.sh
 ```

@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -268,15 +270,18 @@ func NewNode(path, name string) (err error) {
 
 	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
 
+	discovery.Advertise(n.Ctx, n.Discovery, "cross-chain-bridges-cohort")
+
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
-
-	_, err = n.ListenNodeOracleRequest()
+	eventChan := make(chan *wrappers.BridgeOracleRequest)
+	wg := &sync.WaitGroup{}
+	defer wg.Done()
+	err = n.ListenNodeOracleRequest(eventChan, wg)
 	if err != nil {
-		logrus.Errorf(err.Error())
-		panic(err)
+		logrus.Fatalf(err.Error())
 	}
 
 	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))

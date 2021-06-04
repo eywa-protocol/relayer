@@ -35,6 +35,11 @@ func (node *Node) AdvanceWithTopic(step int, topic string) {
 	node.Comm.Broadcast(*msgBytes)
 }
 
+func (node *Node) DisconnectPubSub() {
+	node.Comm.Disconnect()
+
+}
+
 // waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
 func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 	mutex := &sync.Mutex{}
@@ -54,8 +59,10 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 		mutex.Unlock()
 
 		rcvdMsg := node.Comm.Receive()
+		logrus.Trace("rcvdMsg:", rcvdMsg)
 		if rcvdMsg == nil {
-			continue
+			node.DisconnectPubSub()
+			break
 		}
 		msgChan <- rcvdMsg
 

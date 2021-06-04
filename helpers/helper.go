@@ -79,6 +79,7 @@ func ListenOracleRequest(
 	opt := &bind.WatchOpts{}
 
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
+	defer sub.Unsubscribe()
 	if err != nil {
 		return
 	}

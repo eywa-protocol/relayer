@@ -80,7 +80,7 @@ func (c *Libp2pPubSub) Receive() *[]byte {
 		case msgFromBuffer := <-c.buffer:
 			return &msgFromBuffer
 		default:
-
+			break
 		}
 	}
 
@@ -125,6 +125,7 @@ func (c *Libp2pPubSub) Receive() *[]byte {
 
 func (c *Libp2pPubSub) Disconnect() {
 	c.subscription.Cancel()
+	c.pubsub.UnregisterTopicValidator(c.topic)
 }
 
 func (c *Libp2pPubSub) Reconnect(topic string) {
@@ -225,8 +226,6 @@ func (c *Libp2pPubSub) InitializePubSubWithTopic(h core.Host, topic string) {
 	}
 
 }
-
-
 
 // InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
 func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
@@ -511,4 +510,8 @@ func runBLSNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 func runNode(node *model.Node, stop int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	node.WaitForMsg(stop)
+}
+
+func (c *Libp2pPubSub) UnregisterTopicValidator() {
+	c.pubsub.UnregisterTopicValidator(c.topic)
 }

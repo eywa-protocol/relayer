@@ -74,7 +74,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	wg.Add(1)
 
 	logrus.Tracef("сurrentRendezvous %v LEADER %v", n.NodeBLS.CurrentRendezvous, n.NodeBLS.Leader)
-	discovery.Advertise(n.Ctx, n.Discovery, n.NodeBLS.CurrentRendezvous)
+
 	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous)
 	wg.Add(1)
 	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
@@ -94,7 +94,6 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 			}
 		}
 	}
-	wg.Wait()
 	logrus.Println("The END of Protocol")
 }
 
@@ -216,12 +215,12 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 			return nil, err
 		}
 		blsNode = func() *modelBLS.Node {
-			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(time.Minute))
+			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(3*time.Second))
 			defer cancel()
 			for {
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
-				logrus.Debugf("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
+				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) >= len(n.Dht.RoutingTable().ListPeers())/2+1 {
 					logrus.Tracef("Starting Leader election !!!")
 					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
@@ -248,15 +247,13 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						Leader:            leaderPeerId,
 					}
 					break
-				} else {
-					logrus.Warnf("This node can not participate %d", len(topicParticipants))
-					break
 				}
 				if ctx.Err() != nil {
 					logrus.Warnf("Not enaugh participants %d , %v", len(topicParticipants), ctx.Err())
+					n.P2PPubSub.Disconnect()
 					break
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(300 * time.Millisecond)
 			}
 
 			return blsNode
@@ -302,27 +299,28 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 }
 
-func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, err error) {
-
+func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) (err error) {
+	//defer wg.Done()
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
 	if err != nil {
 		return
 	}
-	channel := make(chan *wrappers.BridgeOracleRequest)
 	opt := &bind.WatchOpts{}
 
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
 		return
 	}
-
+	wg.Add(1)
 	go func() {
 		for {
 			select {
 			case err := <-sub.Err():
 				logrus.Fatalf("OracleRequest: %v", err)
 			case event := <-channel:
+				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
 				currentRendezvous := common2.ToHex(event.Raw.TxHash)
+				logrus.Debugf("currentRendezvous %s", currentRendezvous)
 				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentRendezvous, n.DiscoveryPeers)
 				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
 				if err != nil {
@@ -335,6 +333,7 @@ func (n *Node) ListenNodeOracleRequest() (oracleRequest *helpers.OracleRequest, 
 			}
 		}
 	}()
+	wg.Add(-1)
 	return
 }
 
@@ -350,12 +349,12 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 	if err != nil {
 		return
 	}
-	//wg := new(sync.WaitGroup)
 	go func() {
 		for {
 			select {
 			case err := <-sub.Err():
 				logrus.Println("WatchAddedNode error:", err)
+				break
 			case event := <-channel:
 				if event != nil {
 					peerAddrFromEvent, err := multiaddr.NewMultiaddr(string(event.P2pAddress[:]))
@@ -365,7 +364,7 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 					_ = peerAddrFromEvent
 					logrus.Info("WatchAddedNode. Peer has been added: ", string(event.P2pAddress[:]))
 					logrus.Printf("len(n.DiscoveryPeers) 1 =%d", len(n.DiscoveryPeers))
-					//n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
+					n.DiscoveryPeers = append(n.DiscoveryPeers, peerAddrFromEvent)
 					logrus.Printf("len(n.DiscoveryPeers) 2 =%d", len(n.DiscoveryPeers))
 					n.Reconnect(n.DiscoveryPeers)
 				}

@@ -72,6 +72,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 				node.Advance(node.TimeStep)
 				mutex.Unlock()
 				consensusAgreed <- true
+				return
 			}
 
 			// If the received message is from a lower step, send history to the node to catch up

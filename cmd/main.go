@@ -6,39 +6,33 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	p "path"
 	"path/filepath"
-	"runtime/pprof"
 	"strings"
 )
 
 func initPprof() {
-	f, err := os.Create("go-pprof.log")
-	if err != nil {
-		logrus.Fatal("could not create CPU profile: ", err)
-	}
-	defer f.Close() // error handling omitted for example./
-	if err := pprof.StartCPUProfile(f); err != nil {
-		logrus.Fatal("could not start CPU profile: ", err)
-	}
-	defer pprof.StopCPUProfile()
+
 	go func() {
 		http.ListenAndServe(":1234", nil)
 	}()
 }
 
 func main() {
-	initPprof()
 	var mode string
 	var path string
 	var port uint
 	var logLevel int
-	flag.StringVar(&mode, "mode", "serve", "relayer mode. Default is serve")
+	var pprofFlag bool
+	flag.StringVar(&mode, "mode", "serve", "run \"./bridge -mode init\" to init node")
 	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
-	flag.UintVar(&port, "port", 0, "ws port")
-	flag.IntVar(&logLevel, "v", int(logrus.InfoLevel), "loglevel logrus.Tracelevel")
+	flag.UintVar(&port, "port", 0, "-port")
+	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
+	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler")
 	flag.Parse()
+	if pprofFlag == true {
+		initPprof()
+	}
 	logrus.Tracef("mode %v path %v", mode, path)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))

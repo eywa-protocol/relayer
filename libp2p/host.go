@@ -61,16 +61,14 @@ func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address s
 	if err != nil {
 		return
 	}
-	routing := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-		dualDHT, err := ddht.New(ctx, h, ddht.DHTOption(dht.Mode(dht.ModeServer))) //в качестве dhtServer
-		_ = dualDHT.Bootstrap(ctx)
-		return dualDHT, err
-	})
+	// routing := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+	// 	dualDHT, err := ddht.New(ctx, h, ddht.DHTOption(dht.Mode(dht.ModeServer))) //в качестве dhtServer
+	// 	_ = dualDHT.Bootstrap(ctx)
+	// 	return dualDHT, err
+	// })
 
 	host2, err = libp2p.New(ctx,
 		libp2p.ListenAddrs(addr),
-		id,
-		routing,
-	)
+		id)
 	return
 }

@@ -261,7 +261,6 @@ func NewNode(path, name string) (err error) {
 	}
 	logrus.Printf("setDiscoveryPeers len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
 
-	n.ListenNodeAddedEventInFirstNetwork()
 
 	n.Dht, err = n.initDHT()
 	if err != nil {

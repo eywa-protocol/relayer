@@ -3,8 +3,11 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/libp2p/go-libp2p-core/host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 )
@@ -20,6 +23,28 @@ func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
 	if err = kdht.Bootstrap(ctx); err != nil {
 		return nil, err
 	}
+
+	bootstrapPeers := dht.DefaultBootstrapPeers
+
+	var wg sync.WaitGroup
+	for _, peerAddr := range bootstrapPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		logrus.Printf("Bootstrap peer from DHT table: %s", peerinfo)
+		if host.ID().Pretty() != peerinfo.ID.Pretty() {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := host.Connect(ctx, *peerinfo); err != nil {
+					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
+				} else {
+					logrus.Infof("Connection established with node: %q", peerinfo)
+
+				}
+			}()
+		}
+	}
+	wg.Wait()
+
 	return kdht, nil
 }
 

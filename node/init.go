@@ -333,17 +333,6 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	if err != nil {
 		return
 	}
-	err = dht.Bootstrap(n.Ctx)
-	if err != nil {
-		return
-	}
-	logrus.Printf("len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
-	//go func() {
-	//	for true {
-	//		logrus.Println("try reconnect every minute")
-	n.Reconnect(n.DiscoveryPeers)
-	//		time.Sleep(time.Minute)
-	//	}
-	//}()
+
 	return
 }

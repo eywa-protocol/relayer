@@ -7,9 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	ddht "github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/multiformats/go-multiaddr"
 	"io"
 	mrand "math/rand"
@@ -61,16 +58,9 @@ func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address s
 	if err != nil {
 		return
 	}
-	routing := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-		dualDHT, err := ddht.New(ctx, h, ddht.DHTOption(dht.Mode(dht.ModeServer))) //в качестве dhtServer
-		_ = dualDHT.Bootstrap(ctx)
-		return dualDHT, err
-	})
 
 	host2, err = libp2p.New(ctx,
 		libp2p.ListenAddrs(addr),
-		id,
-		routing,
-	)
+		id)
 	return
 }

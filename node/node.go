@@ -226,12 +226,12 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) >= 2*len(n.Dht.RoutingTable().ListPeers())/3 {
+				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 {
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
-						ThresholdWit:      2 * len(topicParticipants) / 3,
-						ThresholdAck:      2 * len(topicParticipants) / 3,
+						ThresholdWit:      len(topicParticipants)/2 + 1,
+						ThresholdAck:      len(topicParticipants)/2 + 1,
 						Acks:              0,
 						ConvertMsg:        &messageSigpb.Convert{},
 						Comm:              n.P2PPubSub,
@@ -318,10 +318,10 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Fatalf("OracleRequest: %v", err)
 			case event := <-channel:
 				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
-				currentRendezvous := common2.ToHex(event.Raw.TxHash)
-				logrus.Debugf("currentRendezvous %s", currentRendezvous)
-				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentRendezvous, n.DiscoveryPeers)
-				n.NodeBLS, err = n.NewBLSNode(currentRendezvous)
+				currentTopic := common2.ToHex(event.Raw.TxHash)
+				logrus.Debugf("currentTopic %s", currentTopic)
+				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentTopic, n.DiscoveryPeers)
+				n.NodeBLS, err = n.NewBLSNode(currentTopic)
 				if err != nil {
 					logrus.Fatal(err)
 				}
@@ -474,4 +474,66 @@ func (n Node) InitializePubSubWithTopicAndPeers(topic string, peerAddrs []multia
 	}
 	p2pPubSub.InitializePubSubWithTopicAndPeers(n.Host, topic, peerInfos)
 	return
+}
+
+/**
+* 	Announce your presence in network using a rendezvous point
+*	With the DHT set up, it’s time to discover other peers
+*
+*	The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
+*	It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
+*	routingDiscovery.Advertise makes this node announce that it can provide a value for the given key.
+*	Where a key in this case is rendezvousString. Other peers will hit the same key to find other peers.
+ */
+func (n Node) DiscoverByRendezvous(rendezvous string) {
+
+	//	The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
+	//	It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
+
+	// TODO: When TTL elapsed should check precense in network
+	// QEST: What's happening with presence in network when node goes down (in DHT table, in while other nodes is trying to connect)
+	logrus.Printf("Announcing ourselves...")
+	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
+	logrus.Printf("Successfully announced!")
+
+	ticker := time.NewTicker(config.Config.TickerInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			logrus.Tracef("Looking advertised peers by rendezvous....")
+			//TODO: enhance, because synchronous
+			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
+			if err != nil {
+				logrus.Fatal(err)
+			}
+			ctn := 0
+			for _, p := range peers {
+				if p.ID == n.Host.ID() {
+					continue
+				}
+				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %s", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
+				//TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
+				if n.Host.Network().Connectedness(p.ID) != network.Connected {
+					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
+					if err != nil {
+						logrus.Tracef("Connect to peer was unsuccessful: %s", p.ID)
+
+					} else {
+						logrus.Tracef("Connected to peer %s", p.ID.Pretty())
+					}
+				}
+				if n.Host.Network().Connectedness(p.ID) == network.Connected {
+					ctn++
+				}
+
+			}
+			logrus.Infof("Total amout discovered and connected peers: %d", ctn)
+
+		case <-n.Ctx.Done():
+			return
+		}
+	}
 }

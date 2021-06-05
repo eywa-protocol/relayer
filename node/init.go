@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/sirupsen/logrus"
 )
@@ -261,16 +260,16 @@ func NewNode(path, name string) (err error) {
 	}
 	logrus.Printf("setDiscoveryPeers len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
 
-	n.ListenNodeAddedEventInFirstNetwork()
-
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
 	}
 
-	n.Discovery = discovery.NewRoutingDiscovery(n.Dht)
-
-	discovery.Advertise(n.Ctx, n.Discovery, "cross-chain-bridges-cohort")
+	//
+	// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
+	//
+	rendezvous := "TODO_rendezvousVVVV4"
+	go n.DiscoverByRendezvous(rendezvous)
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
@@ -334,17 +333,6 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	if err != nil {
 		return
 	}
-	err = dht.Bootstrap(n.Ctx)
-	if err != nil {
-		return
-	}
-	logrus.Printf("len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
-	//go func() {
-	//	for true {
-	//		logrus.Println("try reconnect every minute")
-	n.Reconnect(n.DiscoveryPeers)
-	//		time.Sleep(time.Minute)
-	//	}
-	//}()
+
 	return
 }

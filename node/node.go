@@ -81,9 +81,14 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 	consensus := <-consensuChannel
 	executed := false
 	if consensus == true && executed == false {
-
-		logrus.Tracef("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
-		if n.NodeBLS.Leader.Pretty() == n.Host.ID().Pretty() {
+		logrus.Tracef("Starting Leader election !!!")
+		leaderPeerId, err := libp2p.RelayerLeaderNode(n.NodeBLS.CurrentRendezvous, n.NodeBLS.Participants)
+		if err != nil {
+			panic(err)
+		}
+		logrus.Infof("LEADER IS %v", leaderPeerId)
+		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
+		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
 			recept, err := n.ReceiveRequestV2(event)
 			if err != nil {
@@ -222,12 +227,6 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 {
-					logrus.Tracef("Starting Leader election !!!")
-					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
-					if err != nil {
-						panic(err)
-					}
-					logrus.Infof("LEADER IS %v", leaderPeerId)
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
@@ -244,7 +243,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						Suite:             suite,
 						Participants:      topicParticipants,
 						CurrentRendezvous: topic,
-						Leader:            leaderPeerId,
+						Leader:            "",
 					}
 					break
 				}

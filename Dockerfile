@@ -18,5 +18,5 @@ COPY --from=build /p2p-bridge-b/$TYPE_ADAPTER_ENV ./
 
 EXPOSE $PORT
 
-ENTRYPOINT ./bridge -mode init -cnf $TYPE_ADAPTER_ENV && sleep 30 && ./bridge -v 5 -cnf $TYPE_ADAPTER_ENV
+ENTRYPOINT ./bridge -mode init -cnf $TYPE_ADAPTER_ENV && sleep 5 && ./bridge -cnf $TYPE_ADAPTER_ENV
 

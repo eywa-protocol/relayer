@@ -187,7 +187,7 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
-func NewNode(path, name string) (err error) {
+func NewNode(path, name string, rendezvous string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -268,7 +268,10 @@ func NewNode(path, name string) (err error) {
 	//
 	// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
 	//
-	rendezvous := "TODO_rendezvousVVVV4"
+
+	n.P2PPubSub = n.InitializeCoomonPubSub()
+	n.P2PPubSub.InitializePubSubWithTopic(n.Host, rendezvous)
+
 	go n.DiscoverByRendezvous(rendezvous)
 
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)

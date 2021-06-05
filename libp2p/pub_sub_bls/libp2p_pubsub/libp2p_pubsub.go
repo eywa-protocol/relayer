@@ -66,6 +66,10 @@ func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
 	}(msgBytes, c.topic, c.pubsub)
 }
 
+func (c *Libp2pPubSub) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
+	return c.pubsub.Join(topicMsg)
+}
+
 // Send uses Broadcast for sending messages
 func (c *Libp2pPubSub) Send(msgBytes []byte, id int) {
 	// In libp2p implementation, we also broadcast instead of sending directly. So Acks will be broadcast in this case.
@@ -227,6 +231,7 @@ func (c *Libp2pPubSub) InitializePubSubWithTopic(h core.Host, topic string) {
 
 }
 
+/*
 // InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
 func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
 	var err error
@@ -253,7 +258,7 @@ func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic stri
 	}
 
 }
-
+*/
 // InitializeVictim initializes buffer for keeping messages when a node is attacked by adversary.
 func (c *Libp2pPubSub) InitializeVictim(makeBuffer bool) {
 	// victim is always false in initialization

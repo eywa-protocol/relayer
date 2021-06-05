@@ -24,11 +24,13 @@ func main() {
 	var port uint
 	var logLevel int
 	var pprofFlag bool
+	var commonRendezvous string
 	flag.StringVar(&mode, "mode", "serve", "run \"./bridge -mode init\" to init node")
 	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
 	flag.UintVar(&port, "port", 0, "-port")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
+	flag.StringVar(&commonRendezvous, "randevoue", "mygroupofnodes", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
 	flag.Parse()
 	if pprofFlag == true {
 		initPprof()
@@ -53,7 +55,7 @@ func main() {
 		}
 
 	} else {
-		err := node.NewNode(path, fname)
+		err := node.NewNode(path, fname, commonRendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}

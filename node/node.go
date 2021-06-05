@@ -5,13 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"math/big"
-	"strings"
-	"sync"
-	"time"
-
 	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	common2 "github.com/DigiU-Lab/p2p-bridge/common"
 	"github.com/DigiU-Lab/p2p-bridge/config"
@@ -27,10 +20,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/linkpoolio/bridges"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
@@ -38,6 +34,10 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
 )
 
 type Node struct {
@@ -199,7 +199,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAd
 	return
 }
 
-func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
+func (n Node) NewBLSNode(topic *pubsub.Topic) (blsNode *modelBLS.Node, err error) {
 	publicKeys, err := n.GetPubKeysFromContract()
 	if err != nil {
 		return
@@ -223,7 +223,8 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(3*time.Second))
 			defer cancel()
 			for {
-				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
+
+				topicParticipants := topic.ListPeers()
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 {
@@ -242,14 +243,14 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 						PrivateKey:        n.PrivKey,
 						Suite:             suite,
 						Participants:      topicParticipants,
-						CurrentRendezvous: topic,
+						CurrentRendezvous: topic.String(),
 						Leader:            "",
 					}
 					break
 				}
 				if ctx.Err() != nil {
 					logrus.Warnf("Not enaugh participants %d , %v", len(topicParticipants), ctx.Err())
-					n.P2PPubSub.Disconnect()
+					_ = topic.Close()
 					break
 				}
 				time.Sleep(300 * time.Millisecond)
@@ -283,10 +284,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 				break
 			case event := <-channel:
 				logrus.Infof("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
-				if n.P2PPubSub != nil {
-					n.P2PPubSub.Disconnect()
-				}
-
+				//TODO disconnect from topic
 				/** TODO:
 				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
 				*/
@@ -320,8 +318,22 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
 				currentTopic := common2.ToHex(event.Raw.TxHash)
 				logrus.Debugf("currentTopic %s", currentTopic)
-				n.P2PPubSub = n.InitializePubSubWithTopicAndPeers(currentTopic, n.DiscoveryPeers)
-				n.NodeBLS, err = n.NewBLSNode(currentTopic)
+				//n.P2PPubSub.RegisterTopicValidator("test", func(ctx context.Context, p peer.ID, msg *Message) bool {
+				//	if string(msg.Data) == "invalid!" {
+				//		return false
+				//	} else {
+				//		return true
+				//	}
+				//})
+				sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				sub, err := sendTopic.Subscribe()
+				logrus.Print(sub.Topic())
+				logrus.Print(sendTopic.ListPeers())
+
+				n.NodeBLS, err = n.NewBLSNode(sendTopic)
 				if err != nil {
 					logrus.Fatal(err)
 				}
@@ -465,15 +477,8 @@ func (n Node) Discover(topic string) {
 	go libp2p.Discover(n.Ctx, n.Host, n.Dht, topic, 3*time.Second)
 }
 
-func (n Node) InitializePubSubWithTopicAndPeers(topic string, peerAddrs []multiaddr.Multiaddr) (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
-	p2pPubSub = new(libp2p_pubsub.Libp2pPubSub)
-	peerInfos := make([]peer.AddrInfo, 0)
-	for _, peerAddr := range peerAddrs {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		peerInfos = append(peerInfos, *peerinfo)
-	}
-	p2pPubSub.InitializePubSubWithTopicAndPeers(n.Host, topic, peerInfos)
-	return
+func (n Node) InitializeCoomonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
+	return new(libp2p_pubsub.Libp2pPubSub)
 }
 
 /**

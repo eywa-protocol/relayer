@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
 	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -258,7 +260,6 @@ func NewNode(path, name string) (err error) {
 	}
 	logrus.Printf("setDiscoveryPeers len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
 
-
 	n.Dht, err = n.initDHT()
 	if err != nil {
 		return
@@ -270,14 +271,19 @@ func NewNode(path, name string) (err error) {
 	rendezvous := "TODO_rendezvousVVVV4"
 	go n.DiscoverByRendezvous(rendezvous)
 
-
 	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
 	if err != nil {
 		return
 	}
+	eventChan := make(chan *wrappers.BridgeOracleRequest)
+	wg := &sync.WaitGroup{}
+	defer wg.Done()
+	err = n.ListenNodeOracleRequest(eventChan, wg)
+	if err != nil {
+		logrus.Fatalf(err.Error())
+	}
 
-	n.ListenNodeOracleRequest()
-	//n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()

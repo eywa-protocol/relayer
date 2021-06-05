@@ -221,7 +221,7 @@ func (n Node) NewBLSNode(topic string) (blsNode *modelBLS.Node, err error) {
 				topicParticipants := n.P2PPubSub.ListPeersByTopic(topic)
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.DiscoveryPeers)/2+1, len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) >= len(n.Dht.RoutingTable().ListPeers())/2+1 {
+				if len(topicParticipants) >= len(n.DiscoveryPeers)/2+1 {
 					logrus.Tracef("Starting Leader election !!!")
 					leaderPeerId, err := libp2p.RelayerLeaderNode(topic, topicParticipants)
 					if err != nil {
@@ -299,19 +299,19 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 }
 
-func (n *Node) ListenNodeOracleRequest() (err error) {
+func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) (err error) {
 	//defer wg.Done()
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
 	if err != nil {
 		return
 	}
-	channel := make(chan *wrappers.BridgeOracleRequest)
 	opt := &bind.WatchOpts{}
 
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
 		return
 	}
+	wg.Add(1)
 	go func() {
 		for {
 			select {
@@ -333,7 +333,7 @@ func (n *Node) ListenNodeOracleRequest() (err error) {
 			}
 		}
 	}()
-	
+	wg.Add(-1)
 	return
 }
 
@@ -477,7 +477,6 @@ func (n Node) InitializePubSubWithTopicAndPeers(topic string, peerAddrs []multia
 	return
 }
 
-
 /**
 * 	Announce your presence in network using a rendezvous point
 *	With the DHT set up, it’s time to discover other peers
@@ -505,7 +504,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 	for {
 		select {
 		case <-ticker.C:
-			logrus.Printf("Looking advertised peers by rendezvous....")
+			logrus.Tracef("Looking advertised peers by rendezvous....")
 			//TODO: enhance, because synchronous
 			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
 			if err != nil {
@@ -516,15 +515,15 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 				if p.ID == n.Host.ID() {
 					continue
 				}
-				logrus.Infof("Discovery: FoundedPee %v, isConnected: %s", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
+				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %s", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
 				//TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
 					if err != nil {
-						logrus.Debug("Connect to peer was unsuccessful: %s", p.ID)
+						logrus.Tracef("Connect to peer was unsuccessful: %s", p.ID)
 
 					} else {
-						logrus.Infof("Connected to peer %s", p.ID.Pretty())
+						logrus.Tracef("Connected to peer %s", p.ID.Pretty())
 					}
 				}
 				if n.Host.Network().Connectedness(p.ID) == network.Connected {

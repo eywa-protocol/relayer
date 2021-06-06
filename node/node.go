@@ -66,7 +66,7 @@ type addrList []multiaddr.Multiaddr
 //	n.NodeBLS.WaitForMsgNEW()
 //}
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string, ethClientTo *ethclient.Client, adrProxyTo string) {
 
 	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
@@ -90,7 +90,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
-			recept, err := n.ReceiveRequestV2(event)
+			recept, err := n.ReceiveRequestV2(event, ecdsa_key, ethClientTo, adrProxyTo)
 			if err != nil {
 				logrus.Errorf("%v", err)
 			}
@@ -199,7 +199,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAd
 	return
 }
 
-func (n Node) NewBLSNode(topic *pubsub.Topic) (blsNode *modelBLS.Node, err error) {
+func (n Node) NewBLSNode(topic *pubsub.Topic, adrNodeList string, ethClientFrom *ethclient.Client) (blsNode *modelBLS.Node, err error) {
 	publicKeys, err := n.GetPubKeysFromContract()
 	if err != nil {
 		return
@@ -210,7 +210,7 @@ func (n Node) NewBLSNode(topic *pubsub.Topic) (blsNode *modelBLS.Node, err error
 
 	} else {
 		//logrus-Printf("BLS ADDRESS %v ", n.BLSAddress)
-		node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), n.BLSAddress)
+		node, err := common2.GetNode(ethClientFrom, common.HexToAddress(adrNodeList), n.BLSAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -296,9 +296,16 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 }
 
-func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) (err error) {
+func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest,
+										wg *sync.WaitGroup,
+										adrProxyFrom string,
+										adrNodeList string,
+										ethClientFrom *ethclient.Client,
+										ethClientTo *ethclient.Client,
+										ecdsa_key string,
+										adrProxyTo string) (err error) {
 	//defer wg.Done()
-	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK1), n.EthClient_1)
+	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(adrProxyFrom), ethClientFrom)
 	if err != nil {
 		return
 	}
@@ -333,12 +340,12 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Print(sub.Topic())
 				logrus.Print(sendTopic.ListPeers())
 
-				n.NodeBLS, err = n.NewBLSNode(sendTopic)
+				n.NodeBLS, err = n.NewBLSNode(sendTopic, adrNodeList, ethClientFrom)
 				if err != nil {
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					go n.StartProtocolByOracleRequest(event)
+					go n.StartProtocolByOracleRequest(event, ecdsa_key, ethClientTo, adrProxyTo)
 
 				}
 			}
@@ -391,8 +398,8 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 //	resultCh <-  n.StartProtocolByOracleRequest(n.CurrentRendezvous)
 //}
 
-func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
-	privateKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_2)
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key string, ethClientTo *ethclient.Client, adrProxyTo string) (receipt *types.Receipt, err error) {
+	privateKey, err := common2.ToECDSAFromHex(ecdsa_key)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -402,11 +409,11 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 		logrus.Error("error casting public key to ECDSA")
 	}
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := n.EthClient_2.PendingNonceAt(n.Ctx, fromAddress)
+	nonce, err := ethClientTo.PendingNonceAt(n.Ctx, fromAddress)
 	if err != nil {
 		logrus.Error(err)
 	}
-	gasPrice, err := n.EthClient_2.SuggestGasPrice(n.Ctx)
+	gasPrice, err := ethClientTo.SuggestGasPrice(n.Ctx)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -416,15 +423,10 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	auth.GasLimit = uint64(300000) // in units
 	auth.GasPrice = gasPrice
 
-	instance, err := wrappers.NewBridge(common.HexToAddress(config.Config.PROXY_NETWORK2), n.EthClient_2)
+	instance, err := wrappers.NewBridge(common.HexToAddress(adrProxyTo), ethClientTo)
 	if err != nil {
 		logrus.Error(err)
 	}
-
-	/**   TODO: apporove that tx was real  */
-	/**   TODO: apporove that tx was real  */
-	/**   TODO: apporove that tx was real  */
-	/**   TODO: apporove that tx was real  */
 
 	oracleRequest := helpers.OracleRequest{
 		RequestType:    event.RequestType,
@@ -439,7 +441,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if err != nil {
 		logrus.Error(err)
 	}
-	receipt, err = helpers.WaitTransactionWithRetry(n.EthClient_2, tx)
+	receipt, err = helpers.WaitTransactionWithRetry(ethClientTo, tx)
 	if err != nil || receipt == nil {
 		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err.Error()))
 	}

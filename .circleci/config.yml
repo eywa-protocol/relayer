@@ -4,7 +4,7 @@ jobs:
   build:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.15.8
+      - image: circleci/golang:1.16.0
     steps:
       - setup_remote_docker:
           version: 19.03.13

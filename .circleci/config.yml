@@ -12,7 +12,9 @@ jobs:
             - go-mod-v4-{{ checksum "go.sum" }}
       - run:
           name: Install Dependencies
-          command: go mod download
+          command:
+            make -C external/eth-contracts
+            make
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:

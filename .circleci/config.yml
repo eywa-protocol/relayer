@@ -13,6 +13,7 @@ jobs:
       - run:
           name: Install Dependencies
           command: |
+            sudo apt update
             sudo apt install nodejs
             sudo apt install npm
             git submodule sync && git submodule update --init

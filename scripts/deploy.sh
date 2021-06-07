@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-mkdir keys
+mkdir ../keys
 ./1_clean_nodes.sh
 ./2_redeploy_contracts.sh
 ./3_edit_configs.sh

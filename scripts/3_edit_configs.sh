@@ -15,9 +15,9 @@ function writeMyConfig() {
 
 
 
-Env1Path="./external/eth-contracts/truffle/env_connect_to_network1.env"
-Env2Path="./external/eth-contracts/truffle/env_connect_to_network2.env"
-BootPath="bootstrap.env"
+Env1Path="../external/eth-contracts/truffle/env_connect_to_network1.env"
+Env2Path="../external/eth-contracts/truffle/env_connect_to_network2.env"
+BootPath="../bootstrap.env"
 
 
 

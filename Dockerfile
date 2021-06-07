@@ -2,8 +2,6 @@ FROM golang:alpine as build
 
 RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 
-ADD ./external/eth-contracts/wrappers /eth-contracts/wrappers
-
 WORKDIR /p2p-bridge-b
 
 ADD    ./p2p-bridge .

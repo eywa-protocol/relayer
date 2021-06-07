@@ -1,0 +1,3 @@
+[submodule "external/eth-contracts"]
+	path = external/eth-contracts
+	url = git@github.com:DigiU-Lab/eth-contracts.git

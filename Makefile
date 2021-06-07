@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := build
 
-.PHONY: update-modules build key
+.PHONY: update-modules eth-build key
 
 
 deps:
+	make -C external/eth-contracts
 	go mod tidy
 	go mod download
 

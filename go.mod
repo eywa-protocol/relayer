@@ -4,7 +4,7 @@ go 1.16
 
 replace github.com/DigiU-Lab/p2p-bridge => ./
 
-replace github.com/DigiU-Lab/eth-contracts-go-wrappers => ../eth-contracts/wrappers
+replace github.com/DigiU-Lab/eth-contracts-go-wrappers => ./external/eth-contracts/wrappers
 
 require (
 	github.com/DigiU-Lab/eth-contracts-go-wrappers v0.0.0-20210419095758-51b134180ee0

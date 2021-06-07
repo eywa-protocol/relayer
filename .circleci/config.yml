@@ -17,6 +17,7 @@ jobs:
             # sudo apt-get install apt-transport-https ca-certificates curl gnupg lsb-release
             # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
             # sudo apt-get install docker-ce docker-ce-cli containerd.io
+            sudo apt-get install docker.io
             curl -L https://github.com/docker/compose/releases/download/1.25.3/docker-compose-`uname -s`-`uname -m` > ~/docker-compose
             chmod +x ~/docker-compose
             sudo mv ~/docker-compose /usr/local/bin/docker-compose

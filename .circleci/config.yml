@@ -13,7 +13,7 @@ jobs:
       - run:
           name: Install Dependencies
           command: |
-            git submodule update --init --recursive
+            git submodule sync && git submodule update --init
             make -C external/eth-contracts
             make
       - save_cache:

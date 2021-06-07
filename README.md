@@ -6,8 +6,7 @@
 ```bash
 mkdir digiu
 cd digiu
-git clone git@github.com:digiu-ai/p2p-bridge.git
-git clone git@github.com:digiu-ai/eth-contracts.git
+git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
 cd p2p-bridge
 ./deploy.sh
 ```
@@ -16,8 +15,7 @@ cd p2p-bridge
 ### запуск теста
  
 ```
- cd ../eth-contracts/truffle
- npm run integration-test:local
+make -C external/eth-contracts local-test
  
 ```
 

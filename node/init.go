@@ -280,13 +280,36 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	}
 	eventChan := make(chan *wrappers.BridgeOracleRequest)
 	wg := &sync.WaitGroup{}
+	eventChan2 := make(chan *wrappers.BridgeOracleRequest)
+	wg2 := &sync.WaitGroup{}
 	defer wg.Done()
-	err = n.ListenNodeOracleRequest(eventChan, wg)
+	err = n.ListenNodeOracleRequest(
+		eventChan,
+		wg,
+		config.Config.PROXY_NETWORK1,
+		config.Config.NODELIST_NETWORK1,
+		n.EthClient_1,
+		n.EthClient_2,
+		config.Config.ECDSA_KEY_2,
+		config.Config.PROXY_NETWORK2)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
 
-	n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	err = n.ListenNodeOracleRequest(
+		eventChan2,
+		wg2,
+		config.Config.PROXY_NETWORK2,
+		config.Config.NODELIST_NETWORK2,
+		n.EthClient_2,
+		n.EthClient_1,
+		config.Config.ECDSA_KEY_1,
+		config.Config.PROXY_NETWORK1)
+	if err != nil {
+		logrus.Fatalf(err.Error())
+	}
+
+	//n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()

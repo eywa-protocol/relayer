@@ -137,7 +137,7 @@ func subscNodeOracleRequest(
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Errorf("OracleRequest error:", err, err)
+				logrus.Errorf("OracleRequest error: %v", err)
 			case event := <-channel:
 				logrus.Trace("Catching OracleRequest event")
 

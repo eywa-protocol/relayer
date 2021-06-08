@@ -206,7 +206,7 @@ func (n Node) NewBLSNode(topic *pubsub.Topic, adrNodeList string, ethClientFrom 
 	}
 	suite := pairing.NewSuiteBn256()
 	if !n.nodeExiats(n.BLSAddress) {
-		logrus.Errorf("node %x with keyFile %s does not exist", n.BLSAddress)
+		logrus.Errorf("node %x does not exist", n.BLSAddress)
 
 	} else {
 		//logrus-Printf("BLS ADDRESS %v ", n.BLSAddress)
@@ -297,13 +297,13 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 }
 
 func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest,
-										wg *sync.WaitGroup,
-										adrProxyFrom string,
-										adrNodeList string,
-										ethClientFrom *ethclient.Client,
-										ethClientTo *ethclient.Client,
-										ecdsa_key string,
-										adrProxyTo string) (err error) {
+	wg *sync.WaitGroup,
+	adrProxyFrom string,
+	adrNodeList string,
+	ethClientFrom *ethclient.Client,
+	ethClientTo *ethclient.Client,
+	ecdsa_key string,
+	adrProxyTo string) (err error) {
 	//defer wg.Done()
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(adrProxyFrom), ethClientFrom)
 	if err != nil {
@@ -521,7 +521,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 				if p.ID == n.Host.ID() {
 					continue
 				}
-				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %s", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
+				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %t", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
 				//TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)

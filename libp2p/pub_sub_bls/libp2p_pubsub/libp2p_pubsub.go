@@ -469,7 +469,7 @@ func connectHostToPeer(h core.Host, connectToAddress string) {
 	}
 }
 
-func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
+func connectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
 	// Creating multi address
 	multiAddr, err := multiaddr.NewMultiaddr(connectToAddress)
 	if err != nil {

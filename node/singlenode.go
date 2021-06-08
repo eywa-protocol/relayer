@@ -130,14 +130,14 @@ func subscNodeOracleRequest(
 	opt := &bind.WatchOpts{}
 	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
-		logrus.Error("Error %v", err.Error())
+		logrus.Errorf("Error %v", err.Error())
 		return
 	}
 	go func() {
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Errorf("OracleRequest error:", err)
+				logrus.Errorf("OracleRequest error:", err, err)
 			case event := <-channel:
 				logrus.Trace("Catching OracleRequest event")
 

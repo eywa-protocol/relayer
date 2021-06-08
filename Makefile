@@ -4,6 +4,7 @@
 
 
 deps:
+	make -C external/eth-contracts
 	go mod tidy
 	go mod download
 

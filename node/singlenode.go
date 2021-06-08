@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
-	"github.com/DigiU-Lab/p2p-bridge/config"
-	"github.com/DigiU-Lab/p2p-bridge/helpers"
+	wrappers "github.com/digiu-ai/eth-contracts/wrappers"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/helpers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"

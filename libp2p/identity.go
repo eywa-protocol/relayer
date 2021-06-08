@@ -1,7 +1,7 @@
 package libp2p
 
 import (
-	"github.com/DigiU-Lab/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/common"
 	"github.com/libp2p/go-libp2p"
 	"github.com/sirupsen/logrus"
 )

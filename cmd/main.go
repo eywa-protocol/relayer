@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/DigiU-Lab/p2p-bridge/node"
+	"github.com/digiu-ai/p2p-bridge/node"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	_ "net/http/pprof"

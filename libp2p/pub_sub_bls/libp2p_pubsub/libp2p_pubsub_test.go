@@ -2,10 +2,10 @@ package libp2p_pubsub
 
 import (
 	"fmt"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigpb "github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/test_utils"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	messageSigpb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/test_utils"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/model"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
 	core "github.com/libp2p/go-libp2p-core"
 )
 

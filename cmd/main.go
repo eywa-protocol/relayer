@@ -38,7 +38,6 @@ func main() {
 	logrus.Tracef("mode %v path %v", mode, path)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
-	logrus.Tracef("FILE", fname)
 	logrus.SetLevel(logrus.Level(logLevel))
 	if mode == "init" {
 		err := node.NodeInit(path, fname)

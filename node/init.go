@@ -346,7 +346,7 @@ func (n Node) setDiscoveryPeers() (discoveryPeers []multiaddr.Multiaddr, err err
 	for _, node := range nodes {
 		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
 		if err != nil {
-			logrus.Error("setDiscoveryPeers %v", err)
+			logrus.Errorf("setDiscoveryPeers %v", err)
 		}
 		discoveryPeers = append(discoveryPeers, peerMA)
 	}

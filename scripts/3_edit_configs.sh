@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 
 function parseMyConfig() {
-  sed -E "s/$1 *= *([^ ]+).*/\1/;t;d" "$2"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    gsed -E "s/$1 *= *([^ ]+).*/\1/;t;d" "$2"
+  else
+    sed -E "s/$1 *= *([^ ]+).*/\1/;t;d" "$2"
+  fi
 }
 
 function writeMyConfig() {
   if grep -q "$1" "$3"; then
-    sed -i "s/$1.*/$1=$2/" "$3"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      gsed -i "s/$1.*/$1=$2/" "$3"
+    else
+      sed -i "s/$1.*/$1=$2/" "$3"
+    fi
   else
     echo "$1=$2" >> "$3"
   fi
 }
-
 
 
 

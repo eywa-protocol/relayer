@@ -2,7 +2,7 @@ package messageSigpb
 
 import (
 	"fmt"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	"github.com/golang/protobuf/proto"
 )
 

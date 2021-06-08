@@ -3,7 +3,7 @@ package tls
 import (
 	"context"
 	"fmt"
-	common2 "github.com/DigiU-Lab/p2p-bridge/common"
+	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	"io/ioutil"

@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"errors"
-	wrappers "github.com/DigiU-Lab/eth-contracts-go-wrappers"
+	wrappers "github.com/digiu-ai/eth-contracts/wrappers"
 	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	common2 "github.com/DigiU-Lab/p2p-bridge/common"
-	"github.com/DigiU-Lab/p2p-bridge/config"
-	"github.com/DigiU-Lab/p2p-bridge/libp2p"
+	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/libp2p"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"

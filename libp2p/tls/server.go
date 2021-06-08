@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	common2 "github.com/DigiU-Lab/p2p-bridge/common"
+	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"net"
 	"time"
 

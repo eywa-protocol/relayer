@@ -6,12 +6,19 @@ export NETWORK_RPC_1=ws://172.20.128.11:7545
 export NETWORK_RPC_2=ws://172.20.128.12:8545
 export RANDEVOUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)
 
-docker-compose up -d --build --no-deps node
-docker-compose up -d --scale node=7
-#docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
-docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
-docker-compose logs -f -t | grep -v ganache
-
+if [[ "$OSTYPE" == "darwin"* ]];then
+  docker-compose -f ../docker-compose-macos.yaml up -d --build --no-deps node
+  docker-compose -f ../docker-compose-macos.yaml up -d --scale node=7
+  #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
+  docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
+  docker-compose -f ../docker-compose-macos.yaml logs -f -t | grep -v ganache
+else
+  docker-compose up -d --build --no-deps node
+  docker-compose up -d --scale node=7
+  #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
+  docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
+  docker-compose logs -f -t | grep -v ganache
+fi
 
 # # FOR SINGLE MODE
 # make clean

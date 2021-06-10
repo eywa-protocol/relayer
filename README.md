@@ -13,6 +13,7 @@ cd digiu
 git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
 git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
 cd p2p-bridge
+make -C external/eth-contracts/
 make
 cd scripts
 # for macos only run before deploy sudo ./macos_add_interfaces.sh

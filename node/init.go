@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	wrappers "github.com/digiu-ai/wrappers"
-	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
 	"math/rand"

@@ -9,6 +9,8 @@ deps:
 	go mod download
 
 build:
+	go mod tidy
+	go mod download
 	go build -o bridge  cmd/main.go
 
 clean:

@@ -11,6 +11,7 @@
 mkdir digiu
 cd digiu
 git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
+git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
 cd p2p-bridge
 make
 cd scripts

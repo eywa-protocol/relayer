@@ -15,7 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
+	"github.com/multiformats/go-multiaddr"
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
@@ -45,7 +45,7 @@ func loadNodeConfig(path string) (err error) {
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
 
-	//TODO: SCALED_NUM приходит ""
+	// TODO: SCALED_NUM приходит ""
 	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
 	nodeHostId, _ := strconv.Atoi(strNum)
 	if common2.FileExists("keys/scaled-num-peer.log") {
@@ -84,10 +84,10 @@ func loadNodeConfig(path string) (err error) {
 
 		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
 			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
-			//if nodeHostId == 0 || nodeHostId > len(keys)-1 {
+			// if nodeHostId == 0 || nodeHostId > len(keys)-1 {
 			rand.Seed(time.Now().UnixNano())
 			nodeHostId = rand.Intn(len(keys))
-			//}
+			// }
 			getRandomKeyForTestIfNoFunds()
 		}
 
@@ -104,44 +104,44 @@ func loadNodeConfig(path string) (err error) {
 	return
 }
 
-func NodeInit(path, name string) (err error) {
+func NodeInit(path, name, keysPath string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
 		return
 	}
 
-	if common2.FileExists("keys/" + name + "-ecdsa.key") {
+	if common2.FileExists(keysPath + name + "-ecdsa.key") {
 		return errors.New("node allready registered! ")
 	}
 
-	err = common2.GenAndSaveECDSAKey(name)
+	err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		panic(err)
 	}
 
-	_, _, err = common2.GenAndSaveBN256Key(name)
+	_, _, err = common2.GenAndSaveBN256Key(keysPath, name)
 	if err != nil {
 		panic(err)
 	}
 
-	blsAddr, pub, err := common2.GenAndSaveBN256Key(name)
+	blsAddr, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	err = common2.GenAndSaveECDSAKey(name)
+	err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	logrus.Tracef("keyfile %v", "keys/"+name+"-ecdsa.key")
+	logrus.Tracef("keyfile %v", keysPath+"/"+name+"-ecdsa.key")
 
-	h, err := libp2p.NewHostFromKeyFila(context.Background(), "keys/"+name+"-ecdsa.key", 0, "")
+	h, err := libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
 	if err != nil {
 		panic(err)
 	}
-	nodeURL := libp2p.WriteHostAddrToConfig(h, "keys/"+name+"-peer.env")
+	nodeURL := libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
 	c1, c2, err := getEthClients()
 
 	if err != nil {
@@ -195,11 +195,16 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
 
 	n := &Node{
 		Ctx: ctx,
 	}
-	//n.PublicKeys = make([]kyber.Point,0)
+	// n.PublicKeys = make([]kyber.Point,0)
 
 	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
@@ -309,7 +314,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		logrus.Fatalf(err.Error())
 	}
 
-	//n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	// n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()
@@ -317,7 +322,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		return
 	}*/
 
-	//n.Server.Start(port)
+	// n.Server.Start(port)
 
 	run(n.Host, cancel)
 	return

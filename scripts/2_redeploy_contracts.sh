@@ -7,8 +7,8 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   fi
   echo "compose for macos docker host"
   docker-compose -f ../docker-compose-macos.yaml stop && \
-  docker-compose -f ../docker-compose-macos.yaml up -d ganache_net1 && \
-  docker-compose -f ../docker-compose-macos.yaml up -d ganache_net2 && \
+  docker-compose -f ../docker-compose-macos.yaml up -d --build ganache_net1 && \
+  docker-compose -f ../docker-compose-macos.yaml up -d --build ganache_net2 && \
   make -C ../external/eth-contracts && \
   make -C ../external/eth-contracts eth-local-migrate
 else

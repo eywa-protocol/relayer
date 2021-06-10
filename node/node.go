@@ -5,6 +5,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/helpers"
@@ -34,10 +38,6 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
-	"math/big"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Node struct {
@@ -443,7 +443,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 	}
 	receipt, err = helpers.WaitTransactionWithRetry(ethClientTo, tx)
 	if err != nil || receipt == nil {
-		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err.Error()))
+		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err))
 	}
 
 	return
@@ -459,7 +459,7 @@ func (n Node) Reconnect(bootstrapPeers []multiaddr.Multiaddr) {
 			for {
 				err := n.Host.Connect(ctx, *peerinfo)
 				if err != nil {
-					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
+					logrus.Errorf("Error while connecting to node %q: %v", peerinfo, err)
 				} else {
 					logrus.Infof("Connection established with node: %q", peerinfo)
 					break

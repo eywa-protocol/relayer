@@ -16,9 +16,8 @@ COPY    ./p2p-bridge/bootstrap.env .
 COPY    ./p2p-bridge/go.mod .
 COPY    ./p2p-bridge/go.sum .
 
-RUN ls -la .
-RUN ls -la ./
-RUN ls -la ./external/eth-contracts/wrappers
+RUN mkdir -p ./keys
+
 RUN make
 
 FROM golang:alpine

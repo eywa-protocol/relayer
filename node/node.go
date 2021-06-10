@@ -5,10 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
-	"strings"
-	"sync"
-	"time"
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/helpers"
@@ -38,6 +34,10 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
 )
 
 type Node struct {
@@ -47,6 +47,7 @@ type Node struct {
 	DiscoveryPeers addrList
 	EthClient_1    *ethclient.Client
 	EthClient_2    *ethclient.Client
+	EthClient_3    *ethclient.Client
 	pKey           *ecdsa.PrivateKey
 	Host           host.Host
 	Dht            *dht.IpfsDHT
@@ -66,8 +67,13 @@ type addrList []multiaddr.Multiaddr
 //	n.NodeBLS.WaitForMsgNEW()
 //}
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string, ethClientTo *ethclient.Client, adrProxyTo string) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string, adrProxyTo string) {
 
+	ethClientTo, err := common2.GetClientByChainId(event.Chainid)
+	if err != nil {
+		logrus.Errorf("GetClientByChainId v", err)
+		return
+	}
 	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
@@ -301,7 +307,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	adrProxyFrom string,
 	adrNodeList string,
 	ethClientFrom *ethclient.Client,
-	ethClientTo *ethclient.Client,
 	ecdsa_key string,
 	adrProxyTo string) (err error) {
 	//defer wg.Done()
@@ -325,6 +330,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
 				currentTopic := common2.ToHex(event.Raw.TxHash)
 				logrus.Debugf("currentTopic %s", currentTopic)
+
 				//n.P2PPubSub.RegisterTopicValidator("test", func(ctx context.Context, p peer.ID, msg *Message) bool {
 				//	if string(msg.Data) == "invalid!" {
 				//		return false
@@ -345,7 +351,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					go n.StartProtocolByOracleRequest(event, ecdsa_key, ethClientTo, adrProxyTo)
+					go n.StartProtocolByOracleRequest(event, ecdsa_key, adrProxyTo)
 
 				}
 			}

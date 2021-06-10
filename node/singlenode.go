@@ -51,7 +51,7 @@ func NewSingleNode(path string) (err error) {
 	server := n.NewBridge()
 	n.Server = *server
 
-	n.EthClient_1, n.EthClient_2, _ = getEthClients()
+	n.EthClient_1, n.EthClient_2, n.EthClient_3, _ = getEthClients()
 
 	pendingTxFromNetwork1 := make(chan *PendingRequest)
 	pendingTxFromNetwork2 := make(chan *PendingRequest)

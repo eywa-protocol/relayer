@@ -22,7 +22,7 @@ services:
         - RANDEVOUE=${RANDEVOUE}
     networks:
       - static-network
-    
+
 
   # dev-adapter:
   #   build:
@@ -63,6 +63,17 @@ services:
         ipv4_address: 172.20.128.12
     ports:
      - "8545:8545"
+
+  ganache_net3:
+    build:
+      context: ./
+      dockerfile: ./external/eth-contracts/truffle/docker/network3/ganache/Dockerfile
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.13
+    ports:
+      - "9545:9545"
+
 
 networks:
   static-network:

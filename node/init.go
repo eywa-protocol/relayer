@@ -3,7 +3,16 @@ package node
 import (
 	"context"
 	"errors"
+	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/libp2p"
 	wrappers "github.com/digiu-ai/wrappers"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -14,15 +23,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"github.com/multiformats/go-multiaddr"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/sirupsen/logrus"
 )
 
 func loadNodeConfig(path string) (err error) {
@@ -61,7 +61,7 @@ func loadNodeConfig(path string) (err error) {
 		}
 	}
 
-	c1, c2, err := getEthClients()
+	c1, c2, c3, err := getEthClients()
 	if err != nil {
 		logrus.Fatal(err)
 
@@ -81,7 +81,12 @@ func loadNodeConfig(path string) (err error) {
 			logrus.Fatal(err)
 		}
 
-		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) {
+		balance3, err := c3.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_3), nil)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+
+		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) || balance3 == big.NewInt(0) {
 			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
 			// if nodeHostId == 0 || nodeHostId > len(keys)-1 {
 			rand.Seed(time.Now().UnixNano())
@@ -141,7 +146,7 @@ func NodeInit(path, name, keysPath string) (err error) {
 		panic(err)
 	}
 	nodeURL := libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
-	c1, c2, err := getEthClients()
+	c1, c2, _, err := getEthClients()
 
 	if err != nil {
 		return
@@ -214,7 +219,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	n.Server = *server
 	logrus.Tracef("n.Config.PORT_1 %d", config.Config.PORT_1)
 
-	n.EthClient_1, n.EthClient_2, err = getEthClients()
+	n.EthClient_1, n.EthClient_2, n.EthClient_3, err = getEthClients()
 	if err != nil {
 		return
 	}
@@ -293,7 +298,6 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		config.Config.PROXY_NETWORK1,
 		config.Config.NODELIST_NETWORK1,
 		n.EthClient_1,
-		n.EthClient_2,
 		config.Config.ECDSA_KEY_2,
 		config.Config.PROXY_NETWORK2)
 	if err != nil {
@@ -306,7 +310,18 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		config.Config.PROXY_NETWORK2,
 		config.Config.NODELIST_NETWORK2,
 		n.EthClient_2,
-		n.EthClient_1,
+		config.Config.ECDSA_KEY_1,
+		config.Config.PROXY_NETWORK1)
+	if err != nil {
+		logrus.Fatalf(err.Error())
+	}
+
+	err = n.ListenNodeOracleRequest(
+		eventChan2,
+		wg2,
+		config.Config.PROXY_NETWORK2,
+		config.Config.NODELIST_NETWORK2,
+		n.EthClient_3,
 		config.Config.ECDSA_KEY_1,
 		config.Config.PROXY_NETWORK1)
 	if err != nil {
@@ -327,7 +342,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	return
 }
 
-func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
+func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, c3 *ethclient.Client, err error) {
 	logrus.Tracef("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {
@@ -335,6 +350,10 @@ func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, err error) {
 	}
 
 	c2, err = ethclient.Dial(config.Config.NETWORK_RPC_2)
+	if err != nil {
+		return
+	}
+	c3, err = ethclient.Dial(config.Config.NETWORK_RPC_3)
 	if err != nil {
 		return
 	}

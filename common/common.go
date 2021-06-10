@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -42,6 +43,58 @@ func Health(helper *bridges.Helper, rpcUrl string) (out *Output, err error) {
 	out.ChainId = fmt.Sprintf("%d", chainId)
 	out.BlockNum = fmt.Sprintf("%d", block)
 	return
+}
+
+func GetChainIdByurl(rpcUrl string) (chainId *big.Int, err error) {
+	client, err := Connect(rpcUrl)
+	if err != nil {
+		return
+	}
+	chainId, err = client.ChainID(context.Background())
+	if err != nil {
+		return
+	}
+	return
+}
+
+func GetClientByChainId(chainIdFromClient *big.Int) (client *ethclient.Client, err error) {
+	client, err = Connect(config.Config.NETWORK_RPC_1)
+	if err != nil {
+		return
+	}
+	chainId, err := client.ChainID(context.Background())
+	if chainId == chainIdFromClient {
+		return
+	}
+	if chainId == chainIdFromClient {
+		return
+	}
+	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	client, err = Connect(config.Config.NETWORK_RPC_2)
+	if err != nil {
+		return
+	}
+	chainId, err = client.ChainID(context.Background())
+	if err != nil {
+		return
+	}
+	if chainId == chainIdFromClient {
+		return
+	}
+	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	client, err = Connect(config.Config.NETWORK_RPC_3)
+	if err != nil {
+		return
+	}
+	chainId, err = client.ChainID(context.Background())
+	if err != nil {
+		return
+	}
+	if chainId == chainIdFromClient {
+		return
+	}
+	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	return nil, errors.New(fmt.Sprintf("not found rpcurl for chainID %d", chainIdFromClient))
 }
 
 func HealthFirst(helper *bridges.Helper) (out *Output, err error) {

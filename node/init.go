@@ -3,6 +3,8 @@ package node
 import (
 	"context"
 	"errors"
+	wrappers "github.com/digiu-ai/wrappers"
+	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -13,10 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	wrappers "github.com/digiu-ai/eth-contracts/wrappers"
 	"github.com/multiformats/go-multiaddr"
-
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"

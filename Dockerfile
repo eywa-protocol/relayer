@@ -4,8 +4,21 @@ RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 
 WORKDIR /p2p-bridge-b
 
-ADD    ./p2p-bridge .
+COPY    ./p2p-bridge/cmd ./cmd
+COPY    ./p2p-bridge/common ./common
+COPY    ./p2p-bridge/config ./config
+COPY    ./p2p-bridge/helpers ./helpers
+COPY    ./p2p-bridge/libp2p ./libp2p
+COPY    ./p2p-bridge/node ./node
+ADD    ./p2p-bridge/external/eth-contracts/wrappers ./external/eth-contracts/wrappers
+COPY    ./p2p-bridge/Makefile .
+COPY    ./p2p-bridge/bootstrap.env .
+COPY    ./p2p-bridge/go.mod .
+COPY    ./p2p-bridge/go.sum .
 
+RUN ls -la .
+RUN ls -la ./
+RUN ls -la ./external/eth-contracts/wrappers
 RUN make
 
 FROM golang:alpine

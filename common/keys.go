@@ -3,6 +3,9 @@ package common
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"io/ioutil"
+	"os"
+
 	"github.com/ethereum/go-ethereum/common"
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	crypto "github.com/libp2p/go-libp2p-crypto"
@@ -11,8 +14,6 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/util/encoding"
 	"golang.org/x/crypto/sha3"
-	"io/ioutil"
-	"os"
 )
 
 // We pass in both the private keys of host and peer.
@@ -73,14 +74,14 @@ func GenPrivPubkey() ([]byte, []byte, error) {
 
 }
 
-func WriteKey(priv crypto.PrivKey, name string) error {
+func WriteKey(priv crypto.PrivKey, keysPath, name string) error {
 	privBytes, err := crypto.MarshalPrivateKey(priv)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 	filename := name + ".key"
 	logrus.Infof("Exporting key to %s", filename)
-	return ioutil.WriteFile("keys/"+filename, privBytes, 0644)
+	return ioutil.WriteFile(keysPath+"/"+filename, privBytes, 0644)
 }
 
 func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
@@ -96,20 +97,20 @@ func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
 	return
 }
 
-func GenAndSaveBN256Key(name string) (blsAddr common.Address, strPub string, err error) {
-	if !FileExists("keys/") {
-		os.MkdirAll("keys", os.ModePerm)
+func GenAndSaveBN256Key(keysPath, name string) (blsAddr common.Address, strPub string, err error) {
+	if !FileExists(keysPath) {
+		os.MkdirAll(keysPath, os.ModePerm)
 	}
 	suite := pairing.NewSuiteBn256()
 
-	nodeKeyFile := "keys/" + name + "-bn256.key"
+	nodeKeyFile := keysPath + "/" + name + "-bn256.key"
 
 	if !FileExists(nodeKeyFile) {
 		logrus.Tracef("CREATING KEYS")
 
 		prvKey := suite.Scalar().Pick(suite.RandomStream())
 		pubKey := suite.Point().Mul(prvKey, nil)
-		//blsAddr = common.BytesToAddress([]byte(pubKey.String()))
+		// blsAddr = common.BytesToAddress([]byte(pubKey.String()))
 		str, err := encoding.ScalarToStringHex(suite, prvKey)
 		if err != nil {
 			panic(err)
@@ -124,7 +125,7 @@ func GenAndSaveBN256Key(name string) (blsAddr common.Address, strPub string, err
 			panic(err)
 		}
 
-		err = os.WriteFile("keys/"+name+"-bn256.pub.key", []byte(strPub), 0644)
+		err = os.WriteFile(keysPath+"/"+name+"-bn256.pub.key", []byte(strPub), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -163,12 +164,12 @@ func BLSAddrFromKeyFile(nodeKeyFile string) (blsAddr common.Address, err error) 
 	return
 }
 
-func CreateRSAKey(name string) (err error) {
+func CreateRSAKey(keysPath, name string) (err error) {
 	pr, _, err := crypto.GenerateRSAKeyPair(2048, rand.Reader)
 	if err != nil {
 		return
 	}
-	if err = WriteKey(pr, name+"key-rsa"); err != nil {
+	if err = WriteKey(pr, keysPath, name+"key-rsa"); err != nil {
 		return
 	}
 	return
@@ -182,14 +183,14 @@ func Keccak256(data ...[]byte) []byte {
 	return d.Sum(nil)
 }
 
-func GenAndSaveECDSAKey(prefix string) (err error) {
-	nodeKeyFile := "keys/" + prefix + "-ecdsa.key"
+func GenAndSaveECDSAKey(keysPath, prefix string) (err error) {
+	nodeKeyFile := keysPath + "/" + prefix + "-ecdsa.key"
 	if !FileExists(nodeKeyFile) {
 		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
 		if err != nil {
 			return err
 		}
-		err = WriteKey(ecdsa, prefix+"-ecdsa")
+		err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa")
 		if err != nil {
 			return err
 		}

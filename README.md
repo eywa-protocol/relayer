@@ -11,7 +11,9 @@
 mkdir digiu
 cd digiu
 git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
-cd p2p-bridge/scripts
+cd p2p-bridge
+make
+cd scripts
 # for macos only run before deploy sudo ./macos_add_interfaces.sh
 ./deploy.sh
 ```

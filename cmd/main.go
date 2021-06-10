@@ -2,19 +2,20 @@ package main
 
 import (
 	"flag"
-	"github.com/digiu-ai/p2p-bridge/node"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	_ "net/http/pprof"
 	p "path"
 	"path/filepath"
 	"strings"
+
+	"github.com/digiu-ai/p2p-bridge/node"
+	"github.com/sirupsen/logrus"
 )
 
 func initPprof() {
 
 	go func() {
-		http.ListenAndServe(":1234", nil)
+		_ = http.ListenAndServe(":1234", nil)
 	}()
 }
 
@@ -24,6 +25,7 @@ func main() {
 	var port uint
 	var logLevel int
 	var pprofFlag bool
+	var keysPath string
 	var commonRendezvous string
 	flag.StringVar(&mode, "mode", "serve", "run \"./bridge -mode init\" to init node")
 	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
@@ -31,16 +33,18 @@ func main() {
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
 	flag.StringVar(&commonRendezvous, "randevoue", "mygroupofnodes", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
+	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
 	flag.Parse()
 	if pprofFlag == true {
 		initPprof()
 	}
-	logrus.Tracef("mode %v path %v", mode, path)
+	logrus.SetLevel(logrus.Level(logLevel))
+	keysPath = strings.TrimSuffix(keysPath, "/")
+	logrus.Tracef("mode: %s, path: %s, keys-path: %s", mode, path, keysPath)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
-	logrus.SetLevel(logrus.Level(logLevel))
 	if mode == "init" {
-		err := node.NodeInit(path, fname)
+		err := node.NodeInit(path, fname, keysPath)
 		if err != nil {
 			logrus.Errorf("nodeInit %v", err)
 		}

@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"errors"
-	wrappers "github.com/digiu-ai/eth-contracts/wrappers"
+	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/multiformats/go-multiaddr"
 	"io/ioutil"
 	"math/big"

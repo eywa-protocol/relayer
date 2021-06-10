@@ -2,13 +2,13 @@ module github.com/digiu-ai/p2p-bridge
 
 go 1.16
 
-replace github.com/digiu-ai/eth-contracts/wrappers => ./external/eth-contracts/wrappers/
+replace github.com/digiu-ai/wrappers => ./external/eth-contracts/wrappers/
 
 replace github.com/digiu-ai/p2p-bridge => ./
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
-	github.com/digiu-ai/eth-contracts/wrappers v0.0.0-20210610095807-6b6bd5e43077
+	github.com/digiu-ai/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0

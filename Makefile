@@ -2,10 +2,7 @@
 
 .PHONY: update-modules build key
 
-eth-contracts:
-	make -C external/eth-contracts
-
-deps:	eth-contracts
+deps:
 	go mod tidy
 	go mod download
 
@@ -15,7 +12,7 @@ build:	deps
 clean:
 	rm -f ./bridge keys/*.key keys/*.env
 
-all: eth-contracts deps build
+all: deps build
 
 .PHONY: docker
 develop:

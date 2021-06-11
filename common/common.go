@@ -63,13 +63,13 @@ func GetClientByChainId(chainIdFromClient *big.Int) (client *ethclient.Client, e
 		return
 	}
 	chainId, err := client.ChainID(context.Background())
-	if chainId == chainIdFromClient {
+	if err != nil {
 		return
 	}
-	if chainId == chainIdFromClient {
+	if chainId.Cmp(chainIdFromClient) == 0 {
 		return
 	}
-	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	logrus.Tracef("CHAIND 1 %d chainIdFromClient %d ", chainId, chainIdFromClient)
 	client, err = Connect(config.Config.NETWORK_RPC_2)
 	if err != nil {
 		return
@@ -78,10 +78,10 @@ func GetClientByChainId(chainIdFromClient *big.Int) (client *ethclient.Client, e
 	if err != nil {
 		return
 	}
-	if chainId == chainIdFromClient {
+	if chainId.Cmp(chainIdFromClient) == 0 {
 		return
 	}
-	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	logrus.Tracef("CHAIND 2 %d chainIdFromClient %d ", chainId, chainIdFromClient)
 	client, err = Connect(config.Config.NETWORK_RPC_3)
 	if err != nil {
 		return
@@ -90,10 +90,10 @@ func GetClientByChainId(chainIdFromClient *big.Int) (client *ethclient.Client, e
 	if err != nil {
 		return
 	}
-	if chainId == chainIdFromClient {
+	if chainId.Cmp(chainIdFromClient) == 0 {
 		return
 	}
-	logrus.Printf("CHAINDI %d chainIdFromClient %d ", chainId, chainIdFromClient)
+	logrus.Tracef("CHAIND 3 %d chainIdFromClient %d ", chainId, chainIdFromClient)
 	return nil, errors.New(fmt.Sprintf("not found rpcurl for chainID %d", chainIdFromClient))
 }
 

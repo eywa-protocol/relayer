@@ -43,6 +43,8 @@ func loadNodeConfig(path string) (err error) {
 	keys := strings.Split(keysList, ",")
 	keysList2 := os.Getenv("ECDSA_KEY_2")
 	keys2 := strings.Split(keysList2, ",")
+	keysList3 := os.Getenv("ECDSA_KEY_3")
+	keys3 := strings.Split(keysList3, ",")
 
 	// TODO: SCALED_NUM приходит ""
 	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
@@ -71,6 +73,7 @@ func loadNodeConfig(path string) (err error) {
 	getRandomKeyForTestIfNoFunds = func() {
 		config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
 		config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
+		config.Config.ECDSA_KEY_3 = keys3[nodeHostId-1]
 		balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
 		if err != nil {
 			logrus.Fatal(err)
@@ -88,22 +91,21 @@ func loadNodeConfig(path string) (err error) {
 
 		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) || balance3 == big.NewInt(0) {
 			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
-			// if nodeHostId == 0 || nodeHostId > len(keys)-1 {
 			rand.Seed(time.Now().UnixNano())
 			nodeHostId = rand.Intn(len(keys))
-			// }
 			getRandomKeyForTestIfNoFunds()
 		}
 
 	}
 	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
+	config.Config.ECDSA_KEY_3 = keys2[nodeHostId]
 
-	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" {
+	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" || config.Config.ECDSA_KEY_3 == "" {
 		panic(errors.New("you need key to start node"))
 	}
 
-	logrus.Tracef("hostName %s nodeHostId %v key1 %v key2 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2)
+	logrus.Tracef("hostName %s nodeHostId %v key1 %v key2 %v key3 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2, config.Config.ECDSA_KEY_3)
 
 	return
 }
@@ -169,11 +171,13 @@ func NodeInit(path, name, keysPath string) (err error) {
 	}
 	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
-		logrus.Errorf("error registaring node in network2 %v", err)
+		logrus.Fatalf("error registaring node in network2 %v", err)
+
 	}
 
 	pKey3, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_3)
 	if err != nil {
+		logrus.Errorf("ToECDSAFromHex %v", err)
 		return
 	}
 
@@ -299,8 +303,6 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	}
 	eventChan := make(chan *wrappers.BridgeOracleRequest)
 	wg := &sync.WaitGroup{}
-	eventChan2 := make(chan *wrappers.BridgeOracleRequest)
-	wg2 := &sync.WaitGroup{}
 	defer wg.Done()
 	err = n.ListenNodeOracleRequest(
 		eventChan,
@@ -308,51 +310,39 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		config.Config.BRIDGE_NETWORK1,
 		config.Config.NODELIST_NETWORK1,
 		n.EthClient_1,
-		config.Config.ECDSA_KEY_2,
-		config.Config.BRIDGE_NETWORK2)
+		config.Config.ECDSA_KEY_2)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
 
 	err = n.ListenNodeOracleRequest(
-		eventChan2,
-		wg2,
+		eventChan,
+		wg,
 		config.Config.BRIDGE_NETWORK2,
 		config.Config.NODELIST_NETWORK2,
 		n.EthClient_2,
-		config.Config.ECDSA_KEY_1,
-		config.Config.BRIDGE_NETWORK1)
+		config.Config.ECDSA_KEY_1)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
 
-	//err = n.ListenNodeOracleRequest(
-	//	eventChan2,
-	//	wg2,
-	//	config.Config.BRIDGE_NETWORK2,
-	//	config.Config.NODELIST_NETWORK2,
-	//	n.EthClient_3,
-	//	config.Config.ECDSA_KEY_1,
-	//	config.Config.BRIDGE_NETWORK1)
-	//if err != nil {
-	//	logrus.Fatalf(err.Error())
-	//}
-
-	// n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.BRIDGE_NETWORK2))
+	err = n.ListenNodeOracleRequest(
+		eventChan,
+		wg,
+		config.Config.BRIDGE_NETWORK3,
+		config.Config.NODELIST_NETWORK3,
+		n.EthClient_3,
+		config.Config.ECDSA_KEY_3)
+	if err != nil {
+		logrus.Fatalf(err.Error())
+	}
 
 	logrus.Info("bridge started")
-	/*err = n.runRPCService()
-	if err != nil {
-		return
-	}*/
-
-	// n.Server.Start(port)
-
 	run(n.Host, cancel)
 	return
 }
 
-func getEthClients() (c1 *ethclient.Client, c2 *ethclient.Client, c3 *ethclient.Client, err error) {
+func getEthClients() (c1, c2, c3 *ethclient.Client, err error) {
 	logrus.Tracef("config.Config.NETWORK_RPC_1 %s", config.Config.NETWORK_RPC_1)
 	c1, err = ethclient.Dial(config.Config.NETWORK_RPC_1)
 	if err != nil {

@@ -49,14 +49,6 @@ func main() {
 			logrus.Errorf("nodeInit %v", err)
 		}
 
-	} else if mode == "singlenode" {
-		logrus.Info("Enabled single node mode")
-		err := node.NewSingleNode(path)
-		if err != nil {
-			logrus.Fatalf("NewSingleNode %v", err)
-			panic(err)
-		}
-
 	} else {
 		err := node.NewNode(path, fname, commonRendezvous)
 		if err != nil {

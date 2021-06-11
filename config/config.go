@@ -25,6 +25,7 @@ type AppConfig struct {
 	NETWORK_RPC_1     string
 	BRIDGE_NETWORK1   string
 	BRIDGE_NETWORK2   string
+	BRIDGE_NETWORK3   string
 }
 
 // LoadConfig loads config from files

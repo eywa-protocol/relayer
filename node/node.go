@@ -67,13 +67,8 @@ type addrList []multiaddr.Multiaddr
 //	n.NodeBLS.WaitForMsgNEW()
 //}
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string, adrProxyTo string) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string) {
 
-	ethClientTo, err := common2.GetClientByChainId(event.Chainid)
-	if err != nil {
-		logrus.Errorf("GetClientByChainId v", err)
-		return
-	}
 	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
@@ -96,7 +91,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
-			recept, err := n.ReceiveRequestV2(event, ecdsa_key, ethClientTo, adrProxyTo)
+			recept, err := n.ReceiveRequestV2(event, ecdsa_key)
 			if err != nil {
 				logrus.Errorf("%v", err)
 			}
@@ -215,7 +210,7 @@ func (n Node) NewBLSNode(topic *pubsub.Topic, adrNodeList string, ethClientFrom 
 		logrus.Errorf("node %x does not exist", n.BLSAddress)
 
 	} else {
-		//logrus-Printf("BLS ADDRESS %v ", n.BLSAddress)
+		logrus.Tracef("BLS ADDRESS %v ", n.BLSAddress)
 		node, err := common2.GetNode(ethClientFrom, common.HexToAddress(adrNodeList), n.BLSAddress)
 		if err != nil {
 			return nil, err
@@ -307,9 +302,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	adrProxyFrom string,
 	adrNodeList string,
 	ethClientFrom *ethclient.Client,
-	ecdsa_key string,
-	adrProxyTo string) (err error) {
-	//defer wg.Done()
+	ecdsa_key string) (err error) {
 	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(adrProxyFrom), ethClientFrom)
 	if err != nil {
 		return
@@ -330,14 +323,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
 				currentTopic := common2.ToHex(event.Raw.TxHash)
 				logrus.Debugf("currentTopic %s", currentTopic)
-
-				//n.P2PPubSub.RegisterTopicValidator("test", func(ctx context.Context, p peer.ID, msg *Message) bool {
-				//	if string(msg.Data) == "invalid!" {
-				//		return false
-				//	} else {
-				//		return true
-				//	}
-				//})
 				sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
 				if err != nil {
 					logrus.Fatal(err)
@@ -351,7 +336,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					go n.StartProtocolByOracleRequest(event, ecdsa_key, adrProxyTo)
+					go n.StartProtocolByOracleRequest(event, ecdsa_key)
 
 				}
 			}
@@ -404,7 +389,12 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 //	resultCh <-  n.StartProtocolByOracleRequest(n.CurrentRendezvous)
 //}
 
-func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key string, ethClientTo *ethclient.Client, adrProxyTo string) (receipt *types.Receipt, err error) {
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key string) (receipt *types.Receipt, err error) {
+	ethClientTo, err := common2.GetClientByChainId(event.Chainid)
+	if err != nil {
+		logrus.Errorf("GetClientByChainId %v", err)
+		return
+	}
 	privateKey, err := common2.ToECDSAFromHex(ecdsa_key)
 	if err != nil {
 		logrus.Error(err)
@@ -429,21 +419,13 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 	auth.GasLimit = uint64(300000) // in units
 	auth.GasPrice = gasPrice
 
-	instance, err := wrappers.NewBridge(common.HexToAddress(adrProxyTo), ethClientTo)
+	instance, err := wrappers.NewBridge(event.OppositeBridge, ethClientTo)
 	if err != nil {
 		logrus.Error(err)
 	}
 
-	oracleRequest := helpers.OracleRequest{
-		RequestType:    event.RequestType,
-		Bridge:         event.Bridge,
-		RequestId:      event.RequestId,
-		Selector:       event.Selector,
-		ReceiveSide:    event.ReceiveSide,
-		OppositeBridge: event.OppositeBridge,
-	}
 	/** Invoke bridge on another side */
-	tx, err := instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
+	tx, err := instance.ReceiveRequestV2(auth, "", nil, event.Selector, [32]byte{}, event.ReceiveSide)
 	if err != nil {
 		logrus.Error(err)
 	}

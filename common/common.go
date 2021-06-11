@@ -161,7 +161,7 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Infof("Register Node %x", blsAddr)
+	logrus.Infof("Adding node Node %x", blsAddr)
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)

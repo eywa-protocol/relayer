@@ -24,34 +24,27 @@ function writeMyConfig() {
 
 Env1Path="../external/eth-contracts/truffle/env_connect_to_network1.env"
 Env2Path="../external/eth-contracts/truffle/env_connect_to_network2.env"
+Env3Path="../external/eth-contracts/truffle/env_connect_to_network3.env"
+
 BootPath="../bootstrap.env"
 
 
 
-BRIDGE_ADDRESS_NETWORK1=$(parseMyConfig BRIDGE_ADDRESS_NETWORK1 $Env1Path)
-writeMyConfig BRIDGE_ADDRESS_NETWORK1 $BRIDGE_ADDRESS_NETWORK1 $BootPath
-BRIDGE_ADDRESS_NETWORK2=$(parseMyConfig BRIDGE_ADDRESS_NETWORK2 $Env2Path)
-writeMyConfig BRIDGE_ADDRESS_NETWORK2 $BRIDGE_ADDRESS_NETWORK2 $BootPath
+BRIDGE_NETWORK1=$(parseMyConfig BRIDGE_NETWORK1    $Env1Path)
+writeMyConfig BRIDGE_NETWORK1    $BRIDGE_NETWORK1    $BootPath
+BRIDGE_NETWORK2=$(parseMyConfig BRIDGE_NETWORK2 $Env2Path)
+writeMyConfig BRIDGE_NETWORK2 $BRIDGE_NETWORK2 $BootPath
+BRIDGE_NETWORK3=$(parseMyConfig BRIDGE_NETWORK3 $Env3Path)
+writeMyConfig BRIDGE_NETWORK3 $BRIDGE_NETWORK3 $BootPath
 
-PROXY_NETWORK1=$(parseMyConfig PROXY_NETWORK1 $Env1Path)
-writeMyConfig PROXY_NETWORK1 $PROXY_NETWORK1 "$BootPath"
-PROXY_NETWORK2=$(parseMyConfig PROXY_NETWORK2 $Env2Path)
-writeMyConfig PROXY_NETWORK2 $PROXY_NETWORK2 "$BootPath"
-
-PROXY_ADMIN_NETWORK1=$(parseMyConfig PROXY_ADMIN_NETWORK1 $Env1Path)
-writeMyConfig PROXY_ADMIN_NETWORK1 $PROXY_ADMIN_NETWORK1 "$BootPath"
-PROXY_ADMIN_NETWORK2=$(parseMyConfig PROXY_ADMIN_NETWORK2 $Env2Path)
-writeMyConfig PROXY_ADMIN_NETWORK2 $PROXY_ADMIN_NETWORK2 "$BootPath"
 
 NODELIST_NETWORK1=$(parseMyConfig NODELIST_NETWORK1 $Env1Path)
 writeMyConfig NODELIST_NETWORK1 $NODELIST_NETWORK1 "$BootPath"
 NODELIST_NETWORK2=$(parseMyConfig NODELIST_NETWORK2 $Env2Path)
 writeMyConfig NODELIST_NETWORK2 $NODELIST_NETWORK2 "$BootPath"
+NODELIST_NETWORK3=$(parseMyConfig NODELIST_NETWORK3 $Env3Path)
+writeMyConfig NODELIST_NETWORK3 $NODELIST_NETWORK3 "$BootPath"
 
-MOCKDEX_NETWORK1=$(parseMyConfig MOCKDEX_NETWORK1 $Env1Path)
-writeMyConfig MOCKDEX_NETWORK1 $MOCKDEX_NETWORK1 "$BootPath"
-MOCKDEX_NETWORK2=$(parseMyConfig MOCKDEX_NETWORK2 $Env2Path)
-writeMyConfig MOCKDEX_NETWORK2 $MOCKDEX_NETWORK2 "$BootPath"
 
 
 

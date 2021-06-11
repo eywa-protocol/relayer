@@ -146,7 +146,7 @@ func NodeInit(path, name, keysPath string) (err error) {
 		panic(err)
 	}
 	nodeURL := libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
-	c1, c2, _, err := getEthClients()
+	c1, c2, c3, err := getEthClients()
 
 	if err != nil {
 		return
@@ -170,6 +170,16 @@ func NodeInit(path, name, keysPath string) (err error) {
 	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), []byte(nodeURL), []byte(pub), blsAddr)
 	if err != nil {
 		logrus.Errorf("error registaring node in network2 %v", err)
+	}
+
+	pKey3, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_3)
+	if err != nil {
+		return
+	}
+
+	err = common2.RegisterNode(c3, pKey3, common.HexToAddress(config.Config.NODELIST_NETWORK3), []byte(nodeURL), []byte(pub), blsAddr)
+	if err != nil {
+		logrus.Errorf("error registaring node in network3 %v", err)
 	}
 
 	return
@@ -295,11 +305,11 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	err = n.ListenNodeOracleRequest(
 		eventChan,
 		wg,
-		config.Config.PROXY_NETWORK1,
+		config.Config.BRIDGE_NETWORK1,
 		config.Config.NODELIST_NETWORK1,
 		n.EthClient_1,
 		config.Config.ECDSA_KEY_2,
-		config.Config.PROXY_NETWORK2)
+		config.Config.BRIDGE_NETWORK2)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
@@ -307,28 +317,28 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	err = n.ListenNodeOracleRequest(
 		eventChan2,
 		wg2,
-		config.Config.PROXY_NETWORK2,
+		config.Config.BRIDGE_NETWORK2,
 		config.Config.NODELIST_NETWORK2,
 		n.EthClient_2,
 		config.Config.ECDSA_KEY_1,
-		config.Config.PROXY_NETWORK1)
+		config.Config.BRIDGE_NETWORK1)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
 
-	err = n.ListenNodeOracleRequest(
-		eventChan2,
-		wg2,
-		config.Config.PROXY_NETWORK2,
-		config.Config.NODELIST_NETWORK2,
-		n.EthClient_3,
-		config.Config.ECDSA_KEY_1,
-		config.Config.PROXY_NETWORK1)
-	if err != nil {
-		logrus.Fatalf(err.Error())
-	}
+	//err = n.ListenNodeOracleRequest(
+	//	eventChan2,
+	//	wg2,
+	//	config.Config.BRIDGE_NETWORK2,
+	//	config.Config.NODELIST_NETWORK2,
+	//	n.EthClient_3,
+	//	config.Config.ECDSA_KEY_1,
+	//	config.Config.BRIDGE_NETWORK1)
+	//if err != nil {
+	//	logrus.Fatalf(err.Error())
+	//}
 
-	// n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.PROXY_NETWORK2))
+	// n.ListenReceiveRequest(n.EthClient_2, common.HexToAddress(config.Config.BRIDGE_NETWORK2))
 
 	logrus.Info("bridge started")
 	/*err = n.runRPCService()

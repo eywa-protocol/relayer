@@ -65,8 +65,8 @@ func NewSingleNode(path string) (err error) {
 	_, err = subscNodeOracleRequest(
 		n.EthClient_1,
 		n.EthClient_2,
-		common.HexToAddress(config.Config.PROXY_NETWORK1),
-		common.HexToAddress(config.Config.PROXY_NETWORK2),
+		common.HexToAddress(config.Config.BRIDGE_NETWORK1),
+		common.HexToAddress(config.Config.BRIDGE_NETWORK2),
 		config.Config.ECDSA_KEY_2,
 		pendingTxFromNetwork2)
 	if err != nil {
@@ -88,8 +88,8 @@ func NewSingleNode(path string) (err error) {
 	_, err = subscNodeOracleRequest(
 		n.EthClient_2,
 		n.EthClient_1,
-		common.HexToAddress(config.Config.PROXY_NETWORK2),
-		common.HexToAddress(config.Config.PROXY_NETWORK1),
+		common.HexToAddress(config.Config.BRIDGE_NETWORK2),
+		common.HexToAddress(config.Config.BRIDGE_NETWORK1),
 		config.Config.ECDSA_KEY_1,
 		pendingTxFromNetwork1)
 	if err != nil {

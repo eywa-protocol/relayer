@@ -10,24 +10,21 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
-	config                  string
-	TickerInterval          time.Duration
-	ECDSA_KEY_2             string
-	ECDSA_KEY_1             string
-	ECDSA_KEY_3             string
-	P2P_PORT                int
-	PORT_1                  int
-	BRIDGE_ADDRESS_NETWORK2 string
-	BRIDGE_ADDRESS_NETWORK1 string
-	NODELIST_NETWORK2       string
-	NODELIST_NETWORK1       string
-	NETWORK_RPC_3           string
-	NETWORK_RPC_2           string
-	NETWORK_RPC_1           string
-	PROXY_NETWORK1          string
-	MOCKDEX_NETWORK1        string
-	PROXY_NETWORK2          string
-	MOCKDEX_NETWORK2        string
+	config            string
+	TickerInterval    time.Duration
+	ECDSA_KEY_2       string
+	ECDSA_KEY_1       string
+	ECDSA_KEY_3       string
+	P2P_PORT          int
+	PORT_1            int
+	NODELIST_NETWORK3 string
+	NODELIST_NETWORK2 string
+	NODELIST_NETWORK1 string
+	NETWORK_RPC_3     string
+	NETWORK_RPC_2     string
+	NETWORK_RPC_1     string
+	BRIDGE_NETWORK1   string
+	BRIDGE_NETWORK2   string
 }
 
 // LoadConfig loads config from files

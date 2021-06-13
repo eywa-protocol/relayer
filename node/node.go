@@ -425,7 +425,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 	}
 
 	/** Invoke bridge on another side */
-	tx, err := instance.ReceiveRequestV2(auth, "", nil, event.Selector, [32]byte{}, event.ReceiveSide)
+	tx, err := instance.ReceiveRequestV2(auth, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {
 		logrus.Error(err)
 	}

@@ -5,18 +5,14 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
-	"math/big"
 	"sync"
 	"time"
 
 	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
-
-	"crypto/ecdsa"
 )
 
 type OracleRequest struct {
@@ -65,7 +61,8 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 /**
 * Catch event from first side
  */
-func ListenOracleRequest(
+// UNUSED CODE
+/*func ListenOracleRequest(
 	clientNetwork_1 *ethclient.Client,
 	clientNetwork_2 *ethclient.Client,
 	proxyNetwork_1 common.Address,
@@ -121,10 +118,10 @@ func ListenOracleRequest(
 					logrus.Fatal(err)
 				}
 
-				/**   TODO: apporove that tx was real  */
-				/**   TODO: apporove that tx was real  */
-				/**   TODO: apporove that tx was real  */
-				/**   TODO: apporove that tx was real  */
+				/**   TODO: apporove that tx was real  /
+				/**   TODO: apporove that tx was real  /
+				/**   TODO: apporove that tx was real  /
+				/**   TODO: apporove that tx was real  /
 
 				oracleRequest = OracleRequest{
 					RequestType:    event.RequestType,
@@ -134,7 +131,7 @@ func ListenOracleRequest(
 					ReceiveSide:    event.ReceiveSide,
 					OppositeBridge: event.OppositeBridge,
 				}
-				/** Invoke bridge on another side */
+				/** Invoke bridge on another side /
 				tx, err = instance.ReceiveRequestV2(auth, "", nil, oracleRequest.Selector, [32]byte{}, oracleRequest.ReceiveSide)
 				if err != nil {
 					logrus.Fatal(err)
@@ -146,7 +143,7 @@ func ListenOracleRequest(
 		}
 	}()
 	return
-}
+}*/
 
 func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
 	var receipt *types.Receipt

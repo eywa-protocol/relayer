@@ -45,10 +45,6 @@ type Node struct {
 	Router         *mux.Router
 	Server         bridges.Server
 	DiscoveryPeers addrList
-	EthClient_1    *ethclient.Client
-	EthClient_2    *ethclient.Client
-	EthClient_3    *ethclient.Client
-	pKey           *ecdsa.PrivateKey
 	Host           host.Host
 	Dht            *dht.IpfsDHT
 	Service        *libp2p.Service
@@ -58,6 +54,18 @@ type Node struct {
 	Discovery      *discovery.RoutingDiscovery
 	BLSAddress     common.Address
 	PrivKey        kyber.Scalar
+	Client1        Client
+	Client2        Client
+	Client3        Client
+}
+
+type Client struct {
+	ethClient        *ethclient.Client
+	ECDSA_KEY        string
+	Bridge           wrappers.BridgeSession
+	BridgeFilterer   wrappers.BridgeFilterer
+	NodeList         wrappers.NodeListSession
+	NodeListFilterer wrappers.NodeListFilterer
 }
 
 type addrList []multiaddr.Multiaddr
@@ -67,7 +75,7 @@ type addrList []multiaddr.Multiaddr
 //	n.NodeBLS.WaitForMsgNEW()
 //}
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, ecdsa_key string) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
 
 	consensuChannel := make(chan bool)
 	wg := &sync.WaitGroup{}
@@ -91,7 +99,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
-			recept, err := n.ReceiveRequestV2(event, ecdsa_key)
+			recept, err := n.ReceiveRequestV2(event)
 			if err != nil {
 				logrus.Errorf("%v", err)
 			}
@@ -114,43 +122,8 @@ func (n Node) runRPCService() (err error) {
 	return
 }
 
-func (n Node) NewBridge() (srv *bridges.Server) {
-	var bridgesList []bridges.Bridge
-	ad, err := common2.NewDBridge(n.EthClient_1, "Health Chain 1", "1", common2.HealthFirst)
-	if err != nil {
-		logrus.Fatal(err)
-		return
-	}
-
-	ad2, err := common2.NewDBridge(n.EthClient_2, "Health Chain 2", "2", common2.HealthSecond)
-	if err != nil {
-		logrus.Fatal(err)
-		return
-	}
-
-	/*	ad3, err := common2.NewDBridge(n.EthClient_1, "SetMockPoolTestRequest", "test", common2.SetMockPoolTestRequestV2)
-		if err != nil {
-			logrus.Fatal(err)
-			return
-		}*/
-
-	ad4, err := common2.NewDBridge(n.EthClient_1, "ChainlinkData", "control", common2.ChainlinkData)
-
-	if err != nil {
-		logrus.Fatal(err)
-		return
-	}
-
-	bridgesList = append(bridgesList, ad)
-	bridgesList = append(bridgesList, ad2)
-	//bridgesList = append(bridgesList, ad3)
-	bridgesList = append(bridgesList, ad4)
-	srv = bridges.NewServer(bridgesList...)
-	return
-}
-
 func (n Node) nodeExiats(blsAddr common.Address) bool {
-	node, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
+	node, err := common2.GetNode(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
 	logrus.Trace(node.NodeWallet, node.BlsPubKey, node.NodeId, node.P2pAddress, node.BlsPointAddr)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
@@ -162,7 +135,7 @@ func (n Node) nodeExiats(blsAddr common.Address) bool {
 func (n Node) GetPubKeysFromContract() (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
+	nodes, err := common2.GetNodesFromContract(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}
@@ -200,18 +173,19 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAd
 	return
 }
 
-func (n Node) NewBLSNode(topic *pubsub.Topic, adrNodeList string, ethClientFrom *ethclient.Client) (blsNode *modelBLS.Node, err error) {
+func (n Node) NewBLSNode(topic *pubsub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
 	publicKeys, err := n.GetPubKeysFromContract()
 	if err != nil {
 		return
 	}
+
 	suite := pairing.NewSuiteBn256()
 	if !n.nodeExiats(n.BLSAddress) {
 		logrus.Errorf("node %x does not exist", n.BLSAddress)
 
 	} else {
 		logrus.Tracef("BLS ADDRESS %v ", n.BLSAddress)
-		node, err := common2.GetNode(ethClientFrom, common.HexToAddress(adrNodeList), n.BLSAddress)
+		node, err := client.NodeList.GetNode(n.BLSAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -297,19 +271,9 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 }
 
-func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest,
-	wg *sync.WaitGroup,
-	adrProxyFrom string,
-	adrNodeList string,
-	ethClientFrom *ethclient.Client,
-	ecdsa_key string) (err error) {
-	bridgeFilterer, err := wrappers.NewBridge(common.HexToAddress(adrProxyFrom), ethClientFrom)
-	if err != nil {
-		return
-	}
+func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, client Client) (err error) {
 	opt := &bind.WatchOpts{}
-
-	sub, err := bridgeFilterer.WatchOracleRequest(opt, channel)
+	sub, err := client.BridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
 		return
 	}
@@ -318,7 +282,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Fatalf("OracleRequest: %v", err)
+				logrus.Errorf("OracleRequest: %v", err)
 			case event := <-channel:
 				logrus.Trace("going to InitializePubSubWithTopicAndPeers")
 				currentTopic := common2.ToHex(event.Raw.TxHash)
@@ -331,23 +295,23 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Print(sub.Topic())
 				logrus.Print(sendTopic.ListPeers())
 
-				n.NodeBLS, err = n.NewBLSNode(sendTopic, adrNodeList, ethClientFrom)
+				n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
 				if err != nil {
 					logrus.Fatal(err)
 				}
 				if n.NodeBLS != nil {
-					go n.StartProtocolByOracleRequest(event, ecdsa_key)
+					go n.StartProtocolByOracleRequest(event)
 
 				}
 			}
 		}
 	}()
-	wg.Add(-1)
+	//wg.Add(-1)
 	return
 }
 
 func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
-	bridgeFilterer, err := wrappers.NewNodeList(common.HexToAddress(config.Config.NODELIST_NETWORK1), n.EthClient_1)
+	bridgeFilterer, err := wrappers.NewNodeList(common.HexToAddress(config.Config.NODELIST_NETWORK1), n.Client1.ethClient)
 	if err != nil {
 		return
 	}
@@ -389,13 +353,11 @@ func (n *Node) ListenNodeAddedEventInFirstNetwork() (err error) {
 //	resultCh <-  n.StartProtocolByOracleRequest(n.CurrentRendezvous)
 //}
 
-func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key string) (receipt *types.Receipt, err error) {
-	ethClientTo, err := common2.GetClientByChainId(event.Chainid)
-	if err != nil {
-		logrus.Errorf("GetClientByChainId %v", err)
-		return
-	}
-	privateKey, err := common2.ToECDSAFromHex(ecdsa_key)
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
+
+	client, err := n.GetNodeClientByChainId(event.Chainid)
+
+	privateKey, err := common2.ToECDSAFromHex(client.ECDSA_KEY)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -405,11 +367,11 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 		logrus.Error("error casting public key to ECDSA")
 	}
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := ethClientTo.PendingNonceAt(n.Ctx, fromAddress)
+	nonce, err := client.ethClient.PendingNonceAt(n.Ctx, fromAddress)
 	if err != nil {
 		logrus.Error(err)
 	}
-	gasPrice, err := ethClientTo.SuggestGasPrice(n.Ctx)
+	gasPrice, err := client.ethClient.SuggestGasPrice(n.Ctx)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -419,7 +381,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 	auth.GasLimit = uint64(300000) // in units
 	auth.GasPrice = gasPrice
 
-	instance, err := wrappers.NewBridge(event.OppositeBridge, ethClientTo)
+	instance, err := wrappers.NewBridge(event.OppositeBridge, client.ethClient)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -429,7 +391,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, ecdsa_key s
 	if err != nil {
 		logrus.Error(err)
 	}
-	receipt, err = helpers.WaitTransactionWithRetry(ethClientTo, tx)
+	receipt, err = helpers.WaitTransactionWithRetry(client.ethClient, tx)
 	if err != nil || receipt == nil {
 		return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err))
 	}
@@ -487,7 +449,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 
 	// TODO: When TTL elapsed should check precense in network
 	// QEST: What's happening with presence in network when node goes down (in DHT table, in while other nodes is trying to connect)
-	logrus.Printf("Announcing ourselves...")
+	logrus.Printf("Announcing ourselves with rendezvous [%s] ...", rendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
 	logrus.Printf("Successfully announced!")

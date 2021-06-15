@@ -3,10 +3,12 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
 	wrappers "github.com/digiu-ai/wrappers"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -99,7 +101,7 @@ func loadNodeConfig(path string) (err error) {
 	}
 	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
 	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
-	config.Config.ECDSA_KEY_3 = keys2[nodeHostId]
+	config.Config.ECDSA_KEY_3 = keys3[nodeHostId]
 
 	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" || config.Config.ECDSA_KEY_3 == "" {
 		panic(errors.New("you need key to start node"))
@@ -126,17 +128,7 @@ func NodeInit(path, name, keysPath string) (err error) {
 		panic(err)
 	}
 
-	_, _, err = common2.GenAndSaveBN256Key(keysPath, name)
-	if err != nil {
-		panic(err)
-	}
-
 	blsAddr, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
-	if err != nil {
-		return
-	}
-
-	err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -222,21 +214,17 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	n := &Node{
 		Ctx: ctx,
 	}
-	// n.PublicKeys = make([]kyber.Point,0)
 
-	n.pKey, err = common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
-	if err != nil {
-		return
-	}
-
-	server := n.NewBridge()
-	n.Server = *server
 	logrus.Tracef("n.Config.PORT_1 %d", config.Config.PORT_1)
 
-	n.EthClient_1, n.EthClient_2, n.EthClient_3, err = getEthClients()
+	c1, c2, c3, err := getEthClients()
 	if err != nil {
 		return
 	}
+
+	n.Client1, err = setNodeEthClient(c1, config.Config.BRIDGE_NETWORK1, config.Config.NODELIST_NETWORK1, config.Config.ECDSA_KEY_1)
+	n.Client2, err = setNodeEthClient(c2, config.Config.BRIDGE_NETWORK2, config.Config.NODELIST_NETWORK2, config.Config.ECDSA_KEY_2)
+	n.Client3, err = setNodeEthClient(c3, config.Config.BRIDGE_NETWORK3, config.Config.NODELIST_NETWORK3, config.Config.ECDSA_KEY_3)
 
 	key_file := "keys/" + name + "-ecdsa.key"
 	bls_key_file := "keys/" + name + "-bn256.key"
@@ -246,7 +234,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		return
 	}
 
-	q, err := common2.GetNode(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1), blsAddr)
+	q, err := n.Client1.NodeList.GetNode(blsAddr)
 	if err != nil {
 		return
 	}
@@ -304,13 +292,11 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	eventChan := make(chan *wrappers.BridgeOracleRequest)
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
+
 	err = n.ListenNodeOracleRequest(
 		eventChan,
 		wg,
-		config.Config.BRIDGE_NETWORK1,
-		config.Config.NODELIST_NETWORK1,
-		n.EthClient_1,
-		config.Config.ECDSA_KEY_2)
+		n.Client1)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
@@ -318,10 +304,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	err = n.ListenNodeOracleRequest(
 		eventChan,
 		wg,
-		config.Config.BRIDGE_NETWORK2,
-		config.Config.NODELIST_NETWORK2,
-		n.EthClient_2,
-		config.Config.ECDSA_KEY_1)
+		n.Client2)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
@@ -329,10 +312,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	err = n.ListenNodeOracleRequest(
 		eventChan,
 		wg,
-		config.Config.BRIDGE_NETWORK3,
-		config.Config.NODELIST_NETWORK3,
-		n.EthClient_3,
-		config.Config.ECDSA_KEY_3)
+		n.Client3)
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}
@@ -360,9 +340,85 @@ func getEthClients() (c1, c2, c3 *ethclient.Client, err error) {
 	return
 }
 
+func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa_key string) (client Client, err error) {
+	bridge, err := wrappers.NewBridge(common.HexToAddress(bridgeAddress), c)
+	if err != nil {
+		return
+	}
+
+	bridgeFilterer, err := wrappers.NewBridgeFilterer(common.HexToAddress(bridgeAddress), c)
+	if err != nil {
+		return
+	}
+	nodeList, err := wrappers.NewNodeList(common.HexToAddress(nodeListAddress), c)
+	if err != nil {
+		return
+	}
+
+	nodeListFilterer, err := wrappers.NewNodeListFilterer(common.HexToAddress(nodeListAddress), c)
+	if err != nil {
+		return
+	}
+
+	client = Client{
+		ethClient: c,
+		ECDSA_KEY: ecdsa_key,
+		Bridge: wrappers.BridgeSession{
+			Contract:     bridge,
+			CallOpts:     bind.CallOpts{},
+			TransactOpts: bind.TransactOpts{},
+		},
+		NodeList: wrappers.NodeListSession{
+			Contract:     nodeList,
+			CallOpts:     bind.CallOpts{},
+			TransactOpts: bind.TransactOpts{},
+		},
+		BridgeFilterer:   *bridgeFilterer,
+		NodeListFilterer: *nodeListFilterer,
+	}
+	return
+}
+
+func CompareChainIds(client Client, chainId *big.Int) (equal bool, err error) {
+	chainIdToCompare, err := client.ethClient.ChainID(context.Background())
+	if err != nil {
+		return
+	}
+	if chainIdToCompare.Cmp(chainId) == 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (n Node) GetNodeClientByChainId(chainIdFromClient *big.Int) (client Client, err error) {
+
+	if equals, _ := CompareChainIds(n.Client1, chainIdFromClient); equals {
+		return n.Client1, nil
+	}
+
+	if equals, _ := CompareChainIds(n.Client2, chainIdFromClient); equals {
+		return n.Client2, nil
+	}
+
+	if equals, _ := CompareChainIds(n.Client3, chainIdFromClient); equals {
+		return n.Client3, nil
+	}
+
+	return Client{}, errors.New(fmt.Sprintf("not found rpcurl for chainID %d", chainIdFromClient))
+}
+
+func (n Node) setNodeClients(c1, c2, c3 *ethclient.Client) (err error) {
+
+	n.Client1, err = setNodeEthClient(c1, config.Config.BRIDGE_NETWORK1, config.Config.NODELIST_NETWORK1, config.Config.ECDSA_KEY_1)
+	n.Client2, err = setNodeEthClient(c2, config.Config.BRIDGE_NETWORK2, config.Config.NODELIST_NETWORK2, config.Config.ECDSA_KEY_2)
+	n.Client3, err = setNodeEthClient(c3, config.Config.BRIDGE_NETWORK3, config.Config.NODELIST_NETWORK3, config.Config.ECDSA_KEY_3)
+
+	return
+}
+
 func (n Node) setDiscoveryPeers() (discoveryPeers []multiaddr.Multiaddr, err error) {
 	discoveryPeers = make([]multiaddr.Multiaddr, 0)
-	nodes, err := common2.GetNodesFromContract(n.EthClient_1, common.HexToAddress(config.Config.NODELIST_NETWORK1))
+	nodes, err := common2.GetNodesFromContract(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}

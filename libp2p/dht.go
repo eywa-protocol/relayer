@@ -3,13 +3,14 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 )
 
 func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
@@ -25,25 +26,65 @@ func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
 	}
 
 	bootstrapPeers := dht.DefaultBootstrapPeers
-
+	mx := new(sync.Mutex)
+	connected := false
+	retryPeers := make([]*peer.AddrInfo, 0, len(bootstrapPeers))
 	var wg sync.WaitGroup
 	for _, peerAddr := range bootstrapPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		logrus.Printf("Bootstrap peer from DHT table: %s", peerinfo)
-		if host.ID().Pretty() != peerinfo.ID.Pretty() {
+		peerInfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+		if err != nil {
+			logrus.Error(fmt.Errorf("AddrInfoFromP2pAddr error: %w", err))
+		}
+		logrus.Printf("Bootstrap peer from DHT table: %s", peerInfo)
+		if host.ID().Pretty() != peerInfo.ID.Pretty() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := host.Connect(ctx, *peerinfo); err != nil {
-					logrus.Errorf("Error while connecting to node %q: %-v", peerinfo, err)
+				if err := host.Connect(ctx, *peerInfo); err != nil {
+					logrus.Errorf("Error while connecting to node %q: %-v", peerInfo, err)
+					mx.Lock()
+					retryPeers = append(retryPeers, peerInfo)
+					mx.Unlock()
 				} else {
-					logrus.Infof("Connection established with node: %q", peerinfo)
-
+					logrus.Infof("Connection established with node: %q", peerInfo)
+					mx.Lock()
+					connected = true
+					mx.Unlock()
 				}
 			}()
 		}
 	}
 	wg.Wait()
+
+	// todo: move to configuration
+	retryCount := 10
+	retryTimeout := 120 * time.Second
+
+	if !connected {
+		for i := 0; i < retryCount; i++ {
+			time.Sleep(retryTimeout)
+			logrus.Infof("reconnect try %d of %d", i, retryCount)
+			for _, peerInfo := range retryPeers {
+				pi := *peerInfo
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err := host.Connect(ctx, pi); err != nil {
+						logrus.Errorf("Error while connecting to node %q: %-v", pi, err)
+					} else {
+						logrus.Infof("Connection established with node: %q", pi)
+						mx.Lock()
+						connected = true
+						mx.Unlock()
+					}
+				}()
+			}
+			wg.Wait()
+			if connected {
+				break
+			}
+		}
+	}
 
 	return kdht, nil
 }

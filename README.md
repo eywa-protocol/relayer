@@ -28,3 +28,11 @@ make -C external/eth-contracts local-test
  
 ```
 
+### Переключение loglevel
+
+Переключение loglevel между заданным при старте и trace выполняется отправкой сигнала USR2 процессу 
+
+Например для node_1
+```
+docker-compose exec --index=1 node kill -12 1
+```

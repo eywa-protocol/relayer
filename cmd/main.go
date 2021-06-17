@@ -4,9 +4,12 @@ import (
 	"flag"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"os/signal"
 	p "path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/digiu-ai/p2p-bridge/node"
 	"github.com/sirupsen/logrus"
@@ -38,7 +41,35 @@ func main() {
 	if pprofFlag == true {
 		initPprof()
 	}
+
 	logrus.SetLevel(logrus.Level(logLevel))
+
+	// Toggle logrus log level between current logLevel and trace by USR2 os signal
+	if logrus.Level(logLevel) != logrus.TraceLevel {
+		logLevelChan := make(chan os.Signal, 1)
+		defer close(logLevelChan)
+		signal.Notify(logLevelChan, syscall.SIGUSR2)
+		go func() {
+		logLoop:
+			for {
+				select {
+				case sig := <-logLevelChan:
+					if sig != nil {
+						if logrus.GetLevel() != logrus.TraceLevel {
+							logrus.SetLevel(logrus.TraceLevel)
+							logrus.Infoln("set loglevel to ", logrus.TraceLevel.String())
+						} else {
+							logrus.SetLevel(logrus.Level(logLevel))
+							logrus.Infoln("set loglevel to ", logrus.Level(logLevel).String())
+						}
+					} else { // signal chan closed
+						break logLoop
+					}
+				}
+			}
+		}()
+	}
+
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("mode: %s, path: %s, keys-path: %s", mode, path, keysPath)
 	file := filepath.Base(path)

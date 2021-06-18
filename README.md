@@ -2,7 +2,7 @@
 
 
 #### пререквизиты
- go, truffle, npx
+ go, truffle, npx, docker, docker-compose
 
 
 ###  локальный деплой

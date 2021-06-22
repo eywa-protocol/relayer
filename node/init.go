@@ -2,19 +2,9 @@ package node
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
-	wrappers "github.com/digiu-ai/wrappers"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -25,7 +15,28 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/libp2p"
+	"github.com/digiu-ai/wrappers"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/go-yaml/yaml"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
 )
+
+type BsnConfig struct {
+	BootstrapAddrs []string `yaml:"bootstrap-addrs"`
+}
+
+//go:embed bsn.yaml
+var bsnConfigData []byte
 
 func loadNodeConfig(path string) (err error) {
 	dir, err := os.Getwd()
@@ -39,6 +50,7 @@ func loadNodeConfig(path string) (err error) {
 		logrus.Fatal(err)
 		return
 	}
+
 	hostName, _ := os.Hostname()
 
 	keysList := os.Getenv("ECDSA_KEY_1")
@@ -112,7 +124,7 @@ func loadNodeConfig(path string) (err error) {
 	return
 }
 
-func NodeInit(path, name, keysPath string) (err error) {
+func InitNode(path, name, keysPath string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -120,7 +132,7 @@ func NodeInit(path, name, keysPath string) (err error) {
 	}
 
 	if common2.FileExists(keysPath + name + "-ecdsa.key") {
-		return errors.New("node allready registered! ")
+		return errors.New("node already registered! ")
 	}
 
 	err = common2.GenAndSaveECDSAKey(keysPath, name)
@@ -181,6 +193,103 @@ func NodeInit(path, name, keysPath string) (err error) {
 	return
 }
 
+func BootstrapNodeInit(keysPath, name string) (err error) {
+
+	keyFile := keysPath + "/" + name + "-rsa.key"
+	if common2.FileExists(keyFile) {
+		return errors.New("node already registered! ")
+	}
+
+	r := rand.New(rand.NewSource(int64(4001)))
+
+	// Creates a new RSA key pair for this host.
+	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	if err != nil {
+		panic(err)
+	}
+
+	pkData, err := crypto.MarshalPrivateKey(prvKey)
+	if err != nil {
+		panic(err)
+	}
+
+	err = ioutil.WriteFile(keyFile, pkData, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	multiAddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/4001")
+	if err != nil {
+		panic(err)
+	}
+
+	h, err := libp2p.NewHostFromRsaKey(prvKey, multiAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	nodeURL := libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
+
+	logrus.Infof("init bootstrap node: %s", nodeURL)
+
+	return
+}
+
+func NewBootstrapNode(keysPath, name string) (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
+
+	keyFile := keysPath + "/" + name + "-rsa.key"
+
+	pkData, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		logrus.Fatalf("can not read private key file [%s] on error: %v", keyFile, err)
+	}
+
+	pk, err := crypto.UnmarshalPrivateKey(pkData)
+	if err != nil {
+		logrus.Fatalf("unmarshal private key error: %v", err)
+	}
+
+	registeredPeer, err := ioutil.ReadFile(keysPath + "/" + name + "-peer.env")
+	if err != nil {
+		logrus.Fatalf("File %s reading error: %v", "keys/"+name+"-peer.env", err)
+	}
+
+	words := strings.Split(string(registeredPeer), "/")
+
+	registeredPort, err := strconv.Atoi(words[4])
+	if err != nil {
+		logrus.Fatalf("Can't obtain port %d, %v", registeredPort, err)
+	}
+	logrus.Infof("PORT %d", registeredPort)
+
+	registeredAddress := words[2]
+
+	multiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", registeredAddress, registeredPort))
+	if err != nil {
+		logrus.Fatalf("create multiaddr error: %v", err)
+	}
+
+	h, err := libp2p.NewHostFromRsaKey(pk, multiAddr)
+	if err != nil {
+		logrus.Fatal(fmt.Errorf("new bootstrap host error: %w", err))
+	}
+
+	_, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
+	if err != nil {
+		return err
+	}
+
+	run(h, cancel)
+
+	return
+}
+
 func run(h host.Host, cancel func()) {
 	c := make(chan os.Signal, 1)
 
@@ -197,7 +306,7 @@ func run(h host.Host, cancel func()) {
 	os.Exit(0)
 }
 
-func NewNode(path, name string, rendezvous string) (err error) {
+func NewNode(path, keysPath, name, rendezvous string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -226,10 +335,10 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	n.Client2, err = setNodeEthClient(c2, config.Config.BRIDGE_NETWORK2, config.Config.NODELIST_NETWORK2, config.Config.ECDSA_KEY_2)
 	n.Client3, err = setNodeEthClient(c3, config.Config.BRIDGE_NETWORK3, config.Config.NODELIST_NETWORK3, config.Config.ECDSA_KEY_3)
 
-	key_file := "keys/" + name + "-ecdsa.key"
-	bls_key_file := "keys/" + name + "-bn256.key"
+	keyFile := keysPath + "/" + name + "-ecdsa.key"
+	blsKeyFile := keysPath + "/" + name + "-bn256.key"
 
-	blsAddr, err := common2.BLSAddrFromKeyFile(bls_key_file)
+	blsAddr, err := common2.BLSAddrFromKeyFile(blsKeyFile)
 	if err != nil {
 		return
 	}
@@ -249,7 +358,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 
 	registeredAddress := words[2]
 
-	registeredPeer, err := ioutil.ReadFile("keys/" + name + "-peer.env")
+	registeredPeer, err := ioutil.ReadFile(keysPath + "/" + name + "-peer.env")
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", "keys/"+name+"-peer.env", err)
 	}
@@ -258,7 +367,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 	if string(registeredPeer) != string(q.P2pAddress) {
 		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", string(registeredPeer), string(q.P2pAddress))
 	}
-	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, key_file, registeredPort, registeredAddress)
+	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, keyFile, registeredPort, registeredAddress)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -340,7 +449,7 @@ func getEthClients() (c1, c2, c3 *ethclient.Client, err error) {
 	return
 }
 
-func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa_key string) (client Client, err error) {
+func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsaKey string) (client Client, err error) {
 	bridge, err := wrappers.NewBridge(common.HexToAddress(bridgeAddress), c)
 	if err != nil {
 		return
@@ -362,7 +471,7 @@ func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa
 
 	client = Client{
 		ethClient: c,
-		ECDSA_KEY: ecdsa_key,
+		ECDSA_KEY: ecdsaKey,
 		Bridge: wrappers.BridgeSession{
 			Contract:     bridge,
 			CallOpts:     bind.CallOpts{},
@@ -434,7 +543,25 @@ func (n Node) setDiscoveryPeers() (discoveryPeers []multiaddr.Multiaddr, err err
 
 func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host)
+	var bsnConfig BsnConfig
+
+	err = yaml.Unmarshal(bsnConfigData, &bsnConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(bsnConfig.BootstrapAddrs))
+
+	for _, addr := range bsnConfig.BootstrapAddrs {
+		logrus.Infof("add bootstrap peer: %s", addr)
+		nAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, err
+		}
+		bootstrapPeers = append(bootstrapPeers, nAddr)
+	}
+	logrus.Infof("bootstrap peers count: %d", len(bootstrapPeers))
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers[:])
 	if err != nil {
 		return
 	}

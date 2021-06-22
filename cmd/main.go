@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -38,6 +39,7 @@ func main() {
 	flag.StringVar(&commonRendezvous, "randevoue", "mygroupofnodes", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
 	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
 	flag.Parse()
+
 	if pprofFlag == true {
 		initPprof()
 	}
@@ -74,17 +76,34 @@ func main() {
 	logrus.Tracef("mode: %s, path: %s, keys-path: %s", mode, path, keysPath)
 	file := filepath.Base(path)
 	fname := strings.TrimSuffix(file, p.Ext(file))
-	if mode == "init" {
-		err := node.NodeInit(path, fname, keysPath)
-		if err != nil {
-			logrus.Errorf("nodeInit %v", err)
-		}
 
-	} else {
-		err := node.NewNode(path, fname, commonRendezvous)
+	switch mode {
+	case "init":
+		err := node.InitNode(path, fname, keysPath)
+		if err != nil {
+			logrus.Error(fmt.Errorf("node init error %w", err))
+		}
+	case "start":
+		err := node.NewNode(path, keysPath, fname, commonRendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}
+	case "bs-init":
+		err := node.BootstrapNodeInit(keysPath, fname)
+		if err != nil {
+			logrus.Error(fmt.Errorf("node init error %w", err))
+		}
+	case "bs-start":
+		err := node.NewBootstrapNode(keysPath, fname)
+		if err != nil {
+			logrus.Error(fmt.Errorf("node init error %w", err))
+		}
+	default:
+		logrus.Fatalf("invalid mode: %s", mode)
+	}
+	if mode == "init" {
+
+	} else {
 
 	}
 

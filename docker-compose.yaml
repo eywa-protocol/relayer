@@ -1,7 +1,41 @@
 version: '3.6'
 
 services:
+# bootstrap nodes
+  bsn1:
+    build:
+      context: ../
+      dockerfile: ./p2p-bridge/bsn.Dockerfile
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
 
+  bsn2:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
+
+  bsn3:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
+
+  # protocol nodes
   node:
     build:
       context: ../

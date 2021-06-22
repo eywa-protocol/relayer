@@ -2,6 +2,7 @@ package libp2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"sync"
@@ -10,10 +11,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
 
-func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
+func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
 	var options []dht.Option
 
 	kdht, err := dht.New(ctx, host, options...)
@@ -25,7 +27,9 @@ func NewDHT(ctx context.Context, host host.Host) (*dht.IpfsDHT, error) {
 		return nil, err
 	}
 
-	bootstrapPeers := dht.DefaultBootstrapPeers
+	if len(bootstrapPeers) == 0 {
+		return nil, errors.New("empty bootstrap peers")
+	}
 	mx := new(sync.Mutex)
 	connected := false
 	retryPeers := make([]*peer.AddrInfo, 0, len(bootstrapPeers))

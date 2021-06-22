@@ -1,7 +1,41 @@
 version: '3.6'
 
 services:
+# bootstrap nodes
+  bsn1:
+    build:
+      context: ../
+      dockerfile: ./p2p-bridge/bsn.Dockerfile
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
 
+  bsn2:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
+
+  bsn3:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+      - TYPE_ADAPTER_ENV=bootstrap.env
+    networks:
+      static-network:
+
+# protocol nodes
   node:
     build:
       context: ../
@@ -24,8 +58,7 @@ services:
       - NETWORK_RPC_3=${NETWORK_RPC_3}
       - RANDEVOUE=${RANDEVOUE}
     networks:
-      - static-network
-    
+      static-network:
 
   # dev-adapter:
   #   build:
@@ -55,7 +88,7 @@ services:
       static-network:
         ipv4_address: 172.20.128.11
     ports:
-     - "172.20.128.11:7545:7545"
+      - "172.20.128.11:7545:7545"
 
   ganache_net2:
     build:
@@ -65,7 +98,7 @@ services:
       static-network:
         ipv4_address: 172.20.128.12
     ports:
-     - "172.20.128.12:8545:8545"
+      - "172.20.128.12:8545:8545"
 
   ganache_net3:
     build:

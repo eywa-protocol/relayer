@@ -3,4 +3,4 @@ bridge
 tmp
 node*.env
 .idea
-node/bsn.yaml
+bsn.yaml

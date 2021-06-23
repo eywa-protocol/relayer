@@ -15,21 +15,22 @@ COPY    ./p2p-bridge/common ./common
 COPY    ./p2p-bridge/config ./config
 COPY    ./p2p-bridge/helpers ./helpers
 COPY    ./p2p-bridge/libp2p ./libp2p
+COPY    ./p2p-bridge/node ./node
+COPY    ./p2p-bridge/run ./run
 COPY    ./p2p-bridge/Makefile .
 COPY    ./p2p-bridge/bootstrap.env .
-COPY    ./p2p-bridge/node ./node
 
-RUN mkdir -p ./keys
-
-RUN make
+RUN make build-bsn
 
 FROM golang:alpine
 
-COPY --from=build /p2p-bridge-b/bridge ./
+COPY --from=build /p2p-bridge-b/bsn ./
 
 COPY --from=build /p2p-bridge-b/$TYPE_ADAPTER_ENV ./
 
+RUN mkdir -p ./keys
+
 EXPOSE $PORT
 
-ENTRYPOINT ./bridge -mode bs-init -cnf $TYPE_ADAPTER_ENV && sleep 5 && ./bridge -mode bs-start -cnf $TYPE_ADAPTER_ENV
+ENTRYPOINT ./bsn -mode init  -port $PORT && sleep 5 && ./bsn -mode start -port $PORT
 

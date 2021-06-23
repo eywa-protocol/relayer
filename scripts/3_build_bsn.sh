@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+
+touch ../node/bsn.yaml
 if [[ "$OSTYPE" == "darwin"* ]];then
   echo "compose bsn for macos docker host"
 
@@ -27,7 +29,7 @@ else
   export BSN_URL3=$(docker-compose -f ../docker-compose.yaml exec bsn3 cat keys/bootstrap-peer.env)
 fi
 
-cat > ../node/bsn.yaml <<EOF
+cat > ../bsn.yaml <<EOF
 bootstrap-addrs:
   - "${BSN_URL1}"
   - "${BSN_URL2}"

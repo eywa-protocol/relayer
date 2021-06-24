@@ -7,12 +7,7 @@ deps:
 	go mod download
 
 build:	deps
-	go build -o bridge  cmd/bridge/bridge.go
-
-.PHONY: build-bsn
-
-build-bsn: deps
-	go build -o bsn  cmd/bsn/bsn.go
+	go build -o bridge  cmd/main.go
 
 clean:
 	rm -f ./bridge keys/*.key keys/*.env

@@ -64,3 +64,12 @@ func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address s
 		id)
 	return
 }
+
+func NewHostFromRsaKey(prvKey crypto.PrivKey, multiAddr multiaddr.Multiaddr) (host2 host.Host, err error) {
+
+	return libp2p.New(
+		context.Background(),
+		libp2p.ListenAddrs(multiAddr),
+		libp2p.Identity(prvKey),
+	)
+}

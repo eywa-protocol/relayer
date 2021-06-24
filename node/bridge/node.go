@@ -160,14 +160,10 @@ func (n Node) AddPubkeyToNodeKeys(blsPubKey []byte) {
 	n.NodeBLS.PublicKeys = append(n.NodeBLS.PublicKeys, p)
 }
 
-func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, blsAddr common.Address, err error) {
+func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err error) {
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 	prvKey, err = common2.ReadScalarFromFile(nodeKeyFile)
-	if err != nil {
-		return
-	}
-	blsAddr, err = common2.BLSAddrFromKeyFile(nodeKeyFile)
 	if err != nil {
 		return
 	}

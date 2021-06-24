@@ -17,7 +17,6 @@ import (
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
-	"github.com/digiu-ai/p2p-bridge/run"
 	"github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -128,7 +127,7 @@ func InitNode(path, name, keysPath string) (err error) {
 	}
 
 	if common2.FileExists(keysPath + name + "-ecdsa.key") {
-		return errors.New("node already registered! ")
+		return errors.New("node allready registered! ")
 	}
 
 	err = common2.GenAndSaveECDSAKey(keysPath, name)
@@ -136,7 +135,7 @@ func InitNode(path, name, keysPath string) (err error) {
 		panic(err)
 	}
 
-	blsAddr, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -147,20 +146,19 @@ func InitNode(path, name, keysPath string) (err error) {
 	if err != nil {
 		panic(err)
 	}
-	nodeURL := libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
+	_ = libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
 	c1, c2, c3, err := getEthClients()
 
 	if err != nil {
 		return
 	}
 
-	logrus.Infof("nodelist1 blsAddress: %v", blsAddr)
 	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
 		return
 	}
 
-	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c1, pKey1, common.HexToAddress(config.Config.NODELIST_NETWORK1), h.ID(), []byte(pub))
 	if err != nil {
 		logrus.Errorf("error registaring node in network1 %v", err)
 	}
@@ -169,7 +167,7 @@ func InitNode(path, name, keysPath string) (err error) {
 	if err != nil {
 		return
 	}
-	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c2, pKey2, common.HexToAddress(config.Config.NODELIST_NETWORK2), h.ID(), []byte(pub))
 	if err != nil {
 		logrus.Fatalf("error registaring node in network2 %v", err)
 
@@ -181,7 +179,7 @@ func InitNode(path, name, keysPath string) (err error) {
 		return
 	}
 
-	err = common2.RegisterNode(c3, pKey3, common.HexToAddress(config.Config.NODELIST_NETWORK3), []byte(nodeURL), []byte(pub), blsAddr)
+	err = common2.RegisterNode(c3, pKey3, common.HexToAddress(config.Config.NODELIST_NETWORK3), h.ID(), []byte(pub))
 	if err != nil {
 		logrus.Errorf("error registaring node in network3 %v", err)
 	}
@@ -189,7 +187,7 @@ func InitNode(path, name, keysPath string) (err error) {
 	return
 }
 
-func NewNode(path, keysPath, name, rendezvous string) (err error) {
+func NewNode(path, name string, rendezvous string) (err error) {
 
 	err = loadNodeConfig(path)
 	if err != nil {
@@ -218,99 +216,95 @@ func NewNode(path, keysPath, name, rendezvous string) (err error) {
 	n.Client2, err = setNodeEthClient(c2, config.Config.BRIDGE_NETWORK2, config.Config.NODELIST_NETWORK2, config.Config.ECDSA_KEY_2)
 	n.Client3, err = setNodeEthClient(c3, config.Config.BRIDGE_NETWORK3, config.Config.NODELIST_NETWORK3, config.Config.ECDSA_KEY_3)
 
-	keyFile := keysPath + "/" + name + "-ecdsa.key"
-	blsKeyFile := keysPath + "/" + name + "-bn256.key"
+	key_file := "keys/" + name + "-ecdsa.key"
 
-	blsAddr, err := common2.BLSAddrFromKeyFile(blsKeyFile)
-	if err != nil {
-		return
-	}
-
-	q, err := n.Client1.NodeList.GetNode(blsAddr)
-	if err != nil {
-		return
-	}
-
-	words := strings.Split(string(q.P2pAddress), "/")
-
-	registeredPort, err := strconv.Atoi(words[4])
-	if err != nil {
-		logrus.Fatalf("Can't obtain port %d, %v", registeredPort, err)
-	}
-	logrus.Infof("PORT %d", registeredPort)
-
-	registeredAddress := words[2]
-
-	registeredPeer, err := ioutil.ReadFile(keysPath + "/" + name + "-peer.env")
+	peerStringFromFile, err := ioutil.ReadFile("keys/" + name + "-peer.env")
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", "keys/"+name+"-peer.env", err)
 	}
-	logrus.Infof("Node address: %s nodeAddress from contract: %s", string(registeredPeer), string(q.P2pAddress))
 
-	if string(registeredPeer) != string(q.P2pAddress) {
-		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", string(registeredPeer), string(q.P2pAddress))
+	words := strings.Split(string(peerStringFromFile), "/")
+
+	portFromFile, err := strconv.Atoi(words[4])
+	if err != nil {
+		logrus.Fatalf("Can't obtain port", err)
 	}
-	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, keyFile, registeredPort, registeredAddress)
+
+	ipFromFile := words[2]
+	logrus.Info("IP ADDRESS", ipFromFile)
+	hostFromFile, err := libp2p.NewHostFromKeyFila(n.Ctx, key_file, portFromFile, ipFromFile)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	logrus.Infof("host id %v address %v", n.Host.ID(), n.Host.Addrs()[0])
+	NodeidAddressFromFile := common.BytesToAddress([]byte(hostFromFile.ID()))
+	res, err := n.Client1.NodeList.NodeExists(NodeidAddressFromFile)
+	if res {
 
-	n.DiscoveryPeers, err = n.setDiscoveryPeers()
-	if err != nil {
-		logrus.Fatal(err)
+		nodeFromContract, err := n.Client1.NodeList.GetNode(NodeidAddressFromFile)
+		if err != nil {
+			return err
+		}
+		logrus.Infof("PORT %d", portFromFile)
+
+		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(hostFromFile.ID())), nodeFromContract.NodeIdAddress)
+
+		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(hostFromFile.ID())) {
+			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(hostFromFile.ID())))
+		}
+
+		n.Host = hostFromFile
+
+		n.Dht, err = n.initDHT()
+		if err != nil {
+			return err
+		}
+
+		//
+		// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
+		//
+
+		n.P2PPubSub = n.InitializeCoomonPubSub()
+		n.P2PPubSub.InitializePubSubWithTopic(n.Host, rendezvous)
+
+		go n.DiscoverByRendezvous(rendezvous)
+
+		n.PrivKey, err = n.KeysFromFilesByConfigName(name)
+		if err != nil {
+			return err
+		}
+		eventChan := make(chan *wrappers.BridgeOracleRequest)
+		wg := &sync.WaitGroup{}
+		defer wg.Done()
+
+		err = n.ListenNodeOracleRequest(
+			eventChan,
+			wg,
+			n.Client1)
+		if err != nil {
+			logrus.Fatalf(err.Error())
+		}
+
+		err = n.ListenNodeOracleRequest(
+			eventChan,
+			wg,
+			n.Client2)
+		if err != nil {
+			logrus.Fatalf(err.Error())
+		}
+
+		err = n.ListenNodeOracleRequest(
+			eventChan,
+			wg,
+			n.Client3)
+		if err != nil {
+			logrus.Fatalf(err.Error())
+		}
+
+		logrus.Info("bridge started")
+		run(n.Host, cancel)
+		return nil
 	}
-	logrus.Printf("setDiscoveryPeers len(n.DiscoveryPeers)=%d", len(n.DiscoveryPeers))
-
-	n.Dht, err = n.initDHT()
-	if err != nil {
-		return
-	}
-
-	//
-	// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
-	//
-
-	n.P2PPubSub = n.InitializeCoomonPubSub()
-	n.P2PPubSub.InitializePubSubWithTopic(n.Host, rendezvous)
-
-	go n.DiscoverByRendezvous(rendezvous)
-
-	n.PrivKey, n.BLSAddress, err = n.KeysFromFilesByConfigName(name)
-	if err != nil {
-		return
-	}
-	eventChan := make(chan *wrappers.BridgeOracleRequest)
-	wg := &sync.WaitGroup{}
-	defer wg.Done()
-
-	err = n.ListenNodeOracleRequest(
-		eventChan,
-		wg,
-		n.Client1)
-	if err != nil {
-		logrus.Fatalf(err.Error())
-	}
-
-	err = n.ListenNodeOracleRequest(
-		eventChan,
-		wg,
-		n.Client2)
-	if err != nil {
-		logrus.Fatalf(err.Error())
-	}
-
-	err = n.ListenNodeOracleRequest(
-		eventChan,
-		wg,
-		n.Client3)
-	if err != nil {
-		logrus.Fatalf(err.Error())
-	}
-
-	logrus.Info("bridge started")
-	run.Host(n.Host, cancel)
 	return
 }
 

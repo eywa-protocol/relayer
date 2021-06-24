@@ -13,14 +13,14 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   docker-compose -f ../docker-compose-macos.yaml up -d --build --no-deps node
   docker-compose -f ../docker-compose-macos.yaml up -d --scale node=7
   #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
-  docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
+  #docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
   docker-compose -f ../docker-compose-macos.yaml logs -f -t | grep -v ganache
 else
   export RANDEVOUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)
   docker-compose -f ../docker-compose.yaml up -d --build --no-deps node
   docker-compose -f ../docker-compose.yaml up -d --scale node=7
   #docker restart $(docker ps -a --format "{{.Names}}" | grep node | sort -n)
-  docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
+  #docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
   docker-compose -f ../docker-compose.yaml logs -f -t | grep -v ganache
 fi
 

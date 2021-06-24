@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/digiu-ai/p2p-bridge/helpers"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"log"
 	"math/big"
 	"os"
@@ -160,33 +162,49 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 	}
 }
 
-func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, p2pAddress []byte, blsPubkey []byte, blsAddr common.Address) (err error) {
-	logrus.Infof("Adding node Node %x", blsAddr)
+func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, peerId peer.ID, blsPubkey []byte) (err error) {
+	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
+
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
-	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr)
-	if res {
-		logrus.Infof("node %x allready exists", blsAddr)
+	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+	if res == true {
+		logrus.Infof("Node %x allready exists", peerId)
 	} else {
-		logrus.Infof("creating peer")
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		mychannel := make(chan bool)
 		for {
 			select {
 			case <-ticker.C:
-				txOpts1 := CustomAuth(client, pk)
-				tx, err := nodeListContract1.AddNode(txOpts1, fromAddress, p2pAddress, blsAddr, blsPubkey, true)
-				if tx != nil {
-					if created, _ := nodeListContract1.NodeExists(&bind.CallOpts{}, blsAddr); created {
-						logrus.Infof("Added Node: %x blsAddR: %v txhash %x", fromAddress, blsAddr, tx.Hash())
+				created, err := nodeListContract1.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+				if err != nil {
+					logrus.Errorf("NodeExists: %v", err)
+				}
+				if created == false {
+					txOpts1 := CustomAuth(client, pk)
+					tx, err := nodeListContract1.AddNode(txOpts1, fromAddress, common.BytesToAddress([]byte(peerId)), blsPubkey)
+					if err != nil {
+						chainId, _ := client.ChainID(context.Background())
+						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)
+						ticker.Stop()
+						return err
+						//if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance"){
+						//	ticker.Stop()
+						//	return err
+						//}
+					} else {
+						recept, _ := helpers.WaitTransaction(client, tx)
+						logrus.Print("recept.Status ", recept.Status)
 						ticker.Stop()
 						return nil
+
 					}
 
-				}
-				if err != nil {
-					logrus.Errorf("AddNode ERROR: %v", err)
+				} else {
+
+					ticker.Stop()
+					return nil
 				}
 			case <-mychannel:
 				return
@@ -224,8 +242,9 @@ func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
 	for _, node1 := range nodes {
-		logrus.Tracef("node ID %d p2pAddress %v  BlsPointAddr %v", node1.NodeId, string(node1.P2pAddress), node1.BlsPointAddr)
+		logrus.Tracef("node ID %d node.NodeIdAddress %v", node1.NodeId, node1.NodeIdAddress)
 	}
 
 }

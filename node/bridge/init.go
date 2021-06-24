@@ -4,29 +4,36 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
-	wrappers "github.com/digiu-ai/wrappers"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/libp2p"
+	"github.com/digiu-ai/p2p-bridge/runa"
+	wrappers "github.com/digiu-ai/wrappers"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
-func loadNodeConfig(path string) (err error) {
+type BsnConfig struct {
+	BootstrapAddrs []string `yaml:"bootstrap-addrs"`
+}
+
+const bsnConfigFile = "bsn.yaml"
+
+func loadNodeConfig(path, keysPath string) (err error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		logrus.Fatal(err)
@@ -38,6 +45,7 @@ func loadNodeConfig(path string) (err error) {
 		logrus.Fatal(err)
 		return
 	}
+
 	hostName, _ := os.Hostname()
 
 	keysList := os.Getenv("ECDSA_KEY_1")
@@ -50,15 +58,15 @@ func loadNodeConfig(path string) (err error) {
 	// TODO: SCALED_NUM приходит ""
 	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
 	nodeHostId, _ := strconv.Atoi(strNum)
-	if common2.FileExists("keys/scaled-num-peer.log") {
-		nodeHostIdB, err := ioutil.ReadFile("keys/scaled-num-peer.log")
+	if common2.FileExists(keysPath + "/scaled-num-peer.log") {
+		nodeHostIdB, err := ioutil.ReadFile(keysPath + "/scaled-num-peer.log")
 		if err != nil {
 			panic(err)
 		}
 		nodeHostId, _ = strconv.Atoi(string(nodeHostIdB))
 	} else {
 
-		err = ioutil.WriteFile("keys/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
+		err = ioutil.WriteFile(keysPath+"/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -113,13 +121,13 @@ func loadNodeConfig(path string) (err error) {
 
 func InitNode(path, name, keysPath string) (err error) {
 
-	err = loadNodeConfig(path)
+	err = loadNodeConfig(path, keysPath)
 	if err != nil {
 		return
 	}
 
 	if common2.FileExists(keysPath + name + "-ecdsa.key") {
-		return errors.New("node allready registered! ")
+		return errors.New("node already registered! ")
 	}
 
 	err = common2.GenAndSaveECDSAKey(keysPath, name)
@@ -180,25 +188,9 @@ func InitNode(path, name, keysPath string) (err error) {
 	return
 }
 
-func run(h host.Host, cancel func()) {
-	c := make(chan os.Signal, 1)
+func NewNode(path, keysPath, name, rendezvous string) (err error) {
 
-	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	<-c
-
-	logrus.Infof("\rExiting...\n")
-
-	cancel()
-
-	if err := h.Close(); err != nil {
-		panic(err)
-	}
-	os.Exit(0)
-}
-
-func NewNode(path, name string, rendezvous string) (err error) {
-
-	err = loadNodeConfig(path)
+	err = loadNodeConfig(path, keysPath)
 	if err != nil {
 		return
 	}
@@ -236,7 +228,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 
 	portFromFile, err := strconv.Atoi(words[4])
 	if err != nil {
-		logrus.Fatalf("Can't obtain port", err)
+		logrus.Fatalf("Can't obtain port on error: %v", err)
 	}
 
 	ipFromFile := words[2]
@@ -311,7 +303,7 @@ func NewNode(path, name string, rendezvous string) (err error) {
 		}
 
 		logrus.Info("bridge started")
-		run(n.Host, cancel)
+		runa.Host(n.Host, cancel)
 		return nil
 	}
 	return
@@ -420,7 +412,32 @@ func (n Node) setNodeClients(c1, c2, c3 *ethclient.Client) (err error) {
 
 func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host)
+	bsnConfigData, err := ioutil.ReadFile(bsnConfigFile)
+	if err != nil {
+		err = fmt.Errorf("can not resd bootstrap nodes config %s on error: %w", bsnConfigFile, err)
+		logrus.Error(err)
+		return nil, err
+	}
+
+	var bsnConfig BsnConfig
+
+	err = yaml.Unmarshal(bsnConfigData, &bsnConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(bsnConfig.BootstrapAddrs))
+
+	for _, addr := range bsnConfig.BootstrapAddrs {
+		logrus.Infof("add bootstrap peer: %s", addr)
+		nAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, err
+		}
+		bootstrapPeers = append(bootstrapPeers, nAddr)
+	}
+	logrus.Infof("bootstrap peers count: %d", len(bootstrapPeers))
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers[:])
 	if err != nil {
 		return
 	}

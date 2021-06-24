@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Host wait os signals for gracefully shutdown hosts
 func Host(h host.Host, cancel func()) {
 	c := make(chan os.Signal, 1)
 

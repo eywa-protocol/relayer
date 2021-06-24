@@ -62,10 +62,5 @@ func main() {
 	default:
 		logrus.Fatalf("invalid mode: %s", mode)
 	}
-	if mode == "init" {
-
-	} else {
-
-	}
 
 }

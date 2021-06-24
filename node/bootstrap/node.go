@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/digiu-ai/p2p-bridge/runa"
 	"io/ioutil"
 	"math/rand"
 
+	"github.com/digiu-ai/p2p-bridge/runa"
+
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
-	_ "github.com/digiu-ai/p2p-bridge/runa"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"

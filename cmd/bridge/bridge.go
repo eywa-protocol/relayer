@@ -59,17 +59,12 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	case "start":
-		err := bridge.NewNode(path, fname, commonRendezvous)
+		err := bridge.NewNode(path, keysPath, fname, commonRendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}
 	default:
 		logrus.Fatalf("invalid mode: %s", mode)
-	}
-	if mode == "init" {
-
-	} else {
-
 	}
 
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// LogrusLevelHandler Toggle logrus log level between logLevel and trace by USR2 os signal
+// LogrusLevelHandler wait USR2 os signal for toggle logrus log level between logLevel and trace
 func LogrusLevelHandler(logLevel logrus.Level) {
 	if logLevel != logrus.TraceLevel {
 		logLevelChan := make(chan os.Signal, 1)

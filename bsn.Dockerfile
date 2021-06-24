@@ -3,6 +3,7 @@ FROM golang:alpine as build
 RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 
 WORKDIR /p2p-bridge-b
+
 COPY    ./p2p-bridge/go.mod .
 COPY    ./p2p-bridge/go.sum .
 ADD     ./p2p-bridge/external/eth-contracts/wrappers ./external/eth-contracts/wrappers
@@ -19,19 +20,17 @@ COPY    ./p2p-bridge/run ./run
 COPY    ./p2p-bridge/Makefile .
 COPY    ./p2p-bridge/bootstrap.env .
 
-RUN make
+RUN make build-bsn
 
 FROM golang:alpine
 
-RUN mkdir -p ./keys
-
-COPY --from=build /p2p-bridge-b/bridge ./
+COPY --from=build /p2p-bridge-b/bsn ./
 
 COPY --from=build /p2p-bridge-b/$TYPE_ADAPTER_ENV ./
 
-COPY ./p2p-bridge/bsn.yaml .
+RUN mkdir -p ./keys
 
 EXPOSE $PORT
 
-ENTRYPOINT ./bridge -mode init -cnf $TYPE_ADAPTER_ENV && sleep 5 && ./bridge -mode start -cnf $TYPE_ADAPTER_ENV
+ENTRYPOINT ./bsn -mode init  -port $PORT && sleep 5 && ./bsn -mode start -port $PORT
 

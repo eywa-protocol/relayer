@@ -1,7 +1,41 @@
 version: '3.6'
 
 services:
+# bootstrap nodes
+  bsn1:
+    build:
+      context: ../
+      dockerfile: ./p2p-bridge/bsn.Dockerfile
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+    networks:
+      static-network:
+        ipv4_address: 172.20.64.11
 
+  bsn2:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+    networks:
+      static-network:
+        ipv4_address: 172.20.64.12
+
+  bsn3:
+    image: p2p-bridge_bsn
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+    environment:
+      - PORT=4001
+    networks:
+      static-network:
+        ipv4_address: 172.20.64.13
+
+  # protocol nodes
   node:
     build:
       context: ../
@@ -11,7 +45,7 @@ services:
       - ganache_net2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-    environment:
+      vironment:
         - MODE=${MODE}
         - PORT=0
         - TYPE_ADAPTER_ENV=bootstrap.env

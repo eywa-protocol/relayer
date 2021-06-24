@@ -10,12 +10,12 @@ require (
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/digiu-ai/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	github.com/ethereum/go-ethereum v1.10.3
-	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0
 	github.com/ipfs/go-datastore v0.4.5
 	github.com/libp2p/go-libp2p v0.14.2
 	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-gorpc v0.1.3
 	github.com/libp2p/go-libp2p-host v0.1.0

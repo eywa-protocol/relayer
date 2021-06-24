@@ -2,36 +2,29 @@ package bridge
 
 import (
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
+	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/libp2p"
+	wrappers "github.com/digiu-ai/wrappers"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
-
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
-	"github.com/digiu-ai/wrappers"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/go-yaml/yaml"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/sirupsen/logrus"
 )
-
-type BsnConfig struct {
-	BootstrapAddrs []string `yaml:"bootstrap-addrs"`
-}
-
-const bsnConfigFile = "bsn.yaml"
 
 func loadNodeConfig(path string) (err error) {
 	dir, err := os.Getwd()
@@ -45,7 +38,6 @@ func loadNodeConfig(path string) (err error) {
 		logrus.Fatal(err)
 		return
 	}
-
 	hostName, _ := os.Hostname()
 
 	keysList := os.Getenv("ECDSA_KEY_1")
@@ -135,7 +127,7 @@ func InitNode(path, name, keysPath string) (err error) {
 		panic(err)
 	}
 
-	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	blsAddr, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -153,6 +145,7 @@ func InitNode(path, name, keysPath string) (err error) {
 		return
 	}
 
+	logrus.Infof("nodelist1 blsAddress: %v", blsAddr)
 	pKey1, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
 	if err != nil {
 		return
@@ -185,6 +178,22 @@ func InitNode(path, name, keysPath string) (err error) {
 	}
 
 	return
+}
+
+func run(h host.Host, cancel func()) {
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	<-c
+
+	logrus.Infof("\rExiting...\n")
+
+	cancel()
+
+	if err := h.Close(); err != nil {
+		panic(err)
+	}
+	os.Exit(0)
 }
 
 func NewNode(path, name string, rendezvous string) (err error) {
@@ -326,7 +335,12 @@ func getEthClients() (c1, c2, c3 *ethclient.Client, err error) {
 	return
 }
 
-func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsaKey string) (client Client, err error) {
+func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa_key string) (client Client, err error) {
+	pKey, err := common2.ToECDSAFromHex(config.Config.ECDSA_KEY_1)
+	if err != nil {
+		return
+	}
+
 	bridge, err := wrappers.NewBridge(common.HexToAddress(bridgeAddress), c)
 	if err != nil {
 		return
@@ -346,18 +360,20 @@ func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa
 		return
 	}
 
+	txOpts := common2.CustomAuth(c, pKey)
+
 	client = Client{
 		ethClient: c,
-		ECDSA_KEY: ecdsaKey,
+		ECDSA_KEY: ecdsa_key,
 		Bridge: wrappers.BridgeSession{
 			Contract:     bridge,
 			CallOpts:     bind.CallOpts{},
-			TransactOpts: bind.TransactOpts{},
+			TransactOpts: *txOpts,
 		},
 		NodeList: wrappers.NodeListSession{
 			Contract:     nodeList,
 			CallOpts:     bind.CallOpts{},
-			TransactOpts: bind.TransactOpts{},
+			TransactOpts: *txOpts,
 		},
 		BridgeFilterer:   *bridgeFilterer,
 		NodeListFilterer: *nodeListFilterer,
@@ -402,50 +418,9 @@ func (n Node) setNodeClients(c1, c2, c3 *ethclient.Client) (err error) {
 	return
 }
 
-func (n Node) setDiscoveryPeers() (discoveryPeers []multiaddr.Multiaddr, err error) {
-	discoveryPeers = make([]multiaddr.Multiaddr, 0)
-	nodes, err := common2.GetNodesFromContract(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
-	if err != nil {
-		return
-	}
-	for _, node := range nodes {
-		peerMA, err := multiaddr.NewMultiaddr(string(node.P2pAddress[:]))
-		if err != nil {
-			logrus.Errorf("setDiscoveryPeers %v", err)
-		}
-		discoveryPeers = append(discoveryPeers, peerMA)
-	}
-	return
-}
-
 func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 
-	bsnConfigData, err := ioutil.ReadFile(bsnConfigFile)
-	if err != nil {
-		err = fmt.Errorf("can not resd bootstrap nodes config %s on error: %w", bsnConfigFile, err)
-		logrus.Error(err)
-		return nil, err
-	}
-
-	var bsnConfig BsnConfig
-
-	err = yaml.Unmarshal(bsnConfigData, &bsnConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(bsnConfig.BootstrapAddrs))
-
-	for _, addr := range bsnConfig.BootstrapAddrs {
-		logrus.Infof("add bootstrap peer: %s", addr)
-		nAddr, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return nil, err
-		}
-		bootstrapPeers = append(bootstrapPeers, nAddr)
-	}
-	logrus.Infof("bootstrap peers count: %d", len(bootstrapPeers))
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers[:])
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host)
 	if err != nil {
 		return
 	}

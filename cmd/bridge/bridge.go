@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/digiu-ai/p2p-bridge/node/bridge"
-	"github.com/digiu-ai/p2p-bridge/run"
+	"github.com/digiu-ai/p2p-bridge/runa"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,7 +45,7 @@ func main() {
 	logrus.SetLevel(logrus.Level(logLevel))
 
 	// Toggle logrus log level between current logLevel and trace by USR2 os signal
-	run.LogrusLevelHandler(logrus.Level(logLevel))
+	runa.LogrusLevelHandler(logrus.Level(logLevel))
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("mode: %s, path: %s, keys-path: %s", mode, path, keysPath)
@@ -59,7 +59,7 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	case "start":
-		err := bridge.NewNode(path, keysPath, fname, commonRendezvous)
+		err := bridge.NewNode(path, fname, commonRendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}

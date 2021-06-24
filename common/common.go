@@ -187,8 +187,6 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())
 						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)
-						ticker.Stop()
-						return err
 						if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance") {
 							ticker.Stop()
 							return err

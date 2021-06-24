@@ -189,10 +189,10 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)
 						ticker.Stop()
 						return err
-						//if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance"){
-						//	ticker.Stop()
-						//	return err
-						//}
+						if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance") {
+							ticker.Stop()
+							return err
+						}
 					} else {
 						recept, _ := helpers.WaitTransaction(client, tx)
 						logrus.Print("recept.Status ", recept.Status)

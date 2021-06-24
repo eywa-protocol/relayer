@@ -4,13 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
-	mrand "math/rand"
-
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/multiformats/go-multiaddr"
+	"io"
+	mrand "math/rand"
 )
 
 func NewHost(ctx context.Context, seed int64, keyFile string, port int) (host host.Host, err error) {

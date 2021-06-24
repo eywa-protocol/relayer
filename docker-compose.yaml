@@ -45,7 +45,7 @@ services:
       - ganache_net2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      vironment:
+    environment:
         - MODE=${MODE}
         - PORT=0
         - TYPE_ADAPTER_ENV=bootstrap.env

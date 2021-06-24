@@ -7,9 +7,10 @@ import (
 	"io/ioutil"
 	"math/rand"
 
+	"github.com/digiu-ai/p2p-bridge/runa"
+
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
-	"github.com/digiu-ai/p2p-bridge/run"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
@@ -93,7 +94,7 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 		return err
 	}
 
-	run.Host(h, cancel)
+	runa.Host(h, cancel)
 
 	return
 }

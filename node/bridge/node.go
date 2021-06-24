@@ -1,9 +1,13 @@
-package node
+package bridge
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/helpers"
@@ -31,9 +35,6 @@ import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/util/encoding"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Node struct {
@@ -64,10 +65,10 @@ type Client struct {
 
 type addrList map[peer.ID]multiaddr.Multiaddr
 
-//func (n Node) RunNode(wg *sync.WaitGroup) {
+// func (n Node) RunNode(wg *sync.WaitGroup) {
 //	defer wg.Done()
 //	n.NodeBLS.WaitForMsgNEW()
-//}
+// }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
 	consensuChannel := make(chan bool)
@@ -181,7 +182,8 @@ func (n Node) NewBLSNode(topic *pubsub.Topic, client Client) (blsNode *modelBLS.
 
 				topicParticipants := topic.ListPeers()
 				topicParticipants = append(topicParticipants, n.Host.ID())
-				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
+				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
+				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) >= 5 {
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
@@ -239,7 +241,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 				break
 			case event := <-channel:
 				logrus.Infof("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
-				//TODO disconnect from topic
+				// TODO disconnect from topic
 				/** TODO:
 				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
 				*/
@@ -294,7 +296,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 			}
 		}
 	}()
-	//wg.Add(-1)
+	// wg.Add(-1)
 	return
 }
 
@@ -345,7 +347,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 	logrus.Printf("Announcing ourselves with rendezvous [%s] ...", rendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
-	logrus.Printf("Successfully announced! n.Host.ID() ", n.Host.ID())
+	logrus.Printf("Successfully announced! n.Host.ID():%s ", n.Host.ID().Pretty())
 
 	ticker := time.NewTicker(config.Config.TickerInterval)
 	defer ticker.Stop()
@@ -354,7 +356,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 		select {
 		case <-ticker.C:
 			logrus.Infof("Looking advertised peers by rendezvous %s....", rendezvous)
-			//TODO: enhance, because synchronous
+			// TODO: enhance, because synchronous
 			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
 			if err != nil {
 				logrus.Fatal("FindPeers ", err)
@@ -365,7 +367,7 @@ func (n Node) DiscoverByRendezvous(rendezvous string) {
 					continue
 				}
 				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %t", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
-				//TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
+				// TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
 
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)

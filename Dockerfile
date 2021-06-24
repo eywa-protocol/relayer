@@ -15,7 +15,7 @@ COPY    ./p2p-bridge/config ./config
 COPY    ./p2p-bridge/helpers ./helpers
 COPY    ./p2p-bridge/libp2p ./libp2p
 COPY    ./p2p-bridge/node ./node
-COPY    ./p2p-bridge/run ./run
+COPY    ./p2p-bridge/runa ./runa
 COPY    ./p2p-bridge/Makefile .
 COPY    ./p2p-bridge/bootstrap.env .
 

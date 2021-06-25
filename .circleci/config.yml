@@ -34,7 +34,7 @@ jobs:
             make -C external/eth-contracts
             make
             curl -sf https://gobinaries.com/tj/node-prune | sh
-            ./bin/node-prune
+            # ./bin/node-prune
             # cd scripts
             # ./deploy.sh
       - save_cache:

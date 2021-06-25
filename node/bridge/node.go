@@ -301,15 +301,15 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 }
 
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
-
+	logrus.Infof("event.Bridge %v event.Chainid %v event.OppositeBridge %v event.ReceiveSide %v event.Selector %v event.RequestType", event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, event.Selector, event.RequestType)
 	client, err := n.GetNodeClientByChainId(event.Chainid)
-
+	destinationChainid, err := client.ethClient.ChainID(context.Background())
+	logrus.Infof("going to make this call in %d chain", destinationChainid)
 	/** Invoke bridge on another side */
 
 	tx, err := client.Bridge.ReceiveRequestV2(event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
-
 	if err != nil {
-		logrus.Error(err)
+		logrus.Error("ReceiveRequestV2", err)
 	}
 	if tx != nil {
 		receipt, err = helpers.WaitTransaction(client.ethClient, tx)

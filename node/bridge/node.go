@@ -302,15 +302,28 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
 	logrus.Infof("event.Bridge %v event.Chainid %v event.OppositeBridge %v event.ReceiveSide %v event.Selector %v event.RequestType", event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, event.Selector, event.RequestType)
+
 	client, err := n.GetNodeClientByChainId(event.Chainid)
+	pKey1, err := common2.ToECDSAFromHex(client.ECDSA_KEY)
+	if err != nil {
+		return
+	}
+	txOpts := common2.CustomAuth(client.ethClient, pKey1)
+
 	destinationChainid, err := client.ethClient.ChainID(context.Background())
 	logrus.Infof("going to make this call in %d chain", destinationChainid)
 	/** Invoke bridge on another side */
+	instance, err := wrappers.NewBridge(event.OppositeBridge, client.ethClient)
+	if err != nil {
+		logrus.Error(err)
+	}
 
-	tx, err := client.Bridge.ReceiveRequestV2(event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+	/** Invoke bridge on another side */
+	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {
 		logrus.Error("ReceiveRequestV2", err)
 	}
+
 	if tx != nil {
 		receipt, err = helpers.WaitTransaction(client.ethClient, tx)
 		if err != nil || receipt == nil {

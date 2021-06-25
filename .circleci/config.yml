@@ -9,25 +9,38 @@ jobs:
       - setup_remote_docker:
           version: 19.03.13
       - checkout
-      - restore_cache:
-          keys:
-            - go-mod-v4-{{ checksum "go.sum" }}
       - run:
           name: Install Dependencies
           command: |
             sudo apt update
-            # sudo apt-get install apt-transport-https ca-certificates curl gnupg lsb-release
-            # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            # sudo apt-get install docker-ce docker-ce-cli containerd.io
-            sudo apt-get install docker.io
-            curl -L https://github.com/docker/compose/releases/download/1.25.3/docker-compose-`uname -s`-`uname -m` > ~/docker-compose
-            chmod +x ~/docker-compose
-            sudo mv ~/docker-compose /usr/local/bin/docker-compose
+            sudo apt install docker.io
+            sudo apt install docker-compose
+            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
             sudo apt install nodejs
-            sudo apt install npm
             git submodule sync && git submodule update --init
+            git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "./external/eth-contracts/truffle/package-lock.json" }}
+            - v1-dependencies-
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+            # fallback to using the latest cache if no exact match is found
+            - go-mod-v4-
+      - run:
+          name: Build
+          command: |
             make -C external/eth-contracts
             make
+            curl -sf https://gobinaries.com/tj/node-prune | sh
+            # ./bin/node-prune
+            # cd scripts
+            # ./deploy.sh
+      - save_cache:
+          key: v1-dependencies-{{ checksum "./external/eth-contracts/truffle/package-lock.json" }}
+          paths:
+            - " /node/pkg/modules"
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
@@ -36,6 +49,7 @@ jobs:
           name: Run tests
           command: |
             mkdir -p /tmp/test-reports
+            # make -C external/eth-contracts local-test
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports

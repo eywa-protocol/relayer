@@ -33,6 +33,8 @@ func CustomAuth(client *ethclient.Client, privateKey *ecdsa.PrivateKey) (auth *b
 		logrus.Error("error casting public key to ECDSA")
 	}
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	logrus.Print("Eth ADDRESS for pk provided", fromAddress)
+
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		logrus.Error(err)

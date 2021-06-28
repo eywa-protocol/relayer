@@ -26,9 +26,9 @@ Env1Path="../external/eth-contracts/truffle/env_connect_to_network1.env"
 Env2Path="../external/eth-contracts/truffle/env_connect_to_network2.env"
 Env3Path="../external/eth-contracts/truffle/env_connect_to_network3.env"
 
-BootPath="../bootstrap.env"
+BootPath="../.data/bootstrap.env"
 
-
+cp ../bootstrap.env $BootPath
 
 BRIDGE_NETWORK1=$(parseMyConfig BRIDGE_NETWORK1    $Env1Path)
 writeMyConfig BRIDGE_NETWORK1    $BRIDGE_NETWORK1    $BootPath
@@ -44,8 +44,6 @@ NODELIST_NETWORK2=$(parseMyConfig NODELIST_NETWORK2 $Env2Path)
 writeMyConfig NODELIST_NETWORK2 $NODELIST_NETWORK2 "$BootPath"
 NODELIST_NETWORK3=$(parseMyConfig NODELIST_NETWORK3 $Env3Path)
 writeMyConfig NODELIST_NETWORK3 $NODELIST_NETWORK3 "$BootPath"
-
-
 
 
 

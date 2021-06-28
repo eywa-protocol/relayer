@@ -3,11 +3,16 @@
 touch ../node/bsn.yaml
 if [[ "$OSTYPE" == "darwin"* ]];then
   echo "compose bsn for macos docker host"
-
-  docker-compose -f ../docker-compose-macos.yaml stop bsn1 bsn2 bsn3 && \
-  docker-compose -f ../docker-compose-macos.yaml up -d --build --no-deps bsn1 && \
-  docker-compose -f ../docker-compose-macos.yaml up -d bsn2 && \
-  docker-compose -f ../docker-compose-macos.yaml up -d bsn3
+  # stop and remove bootstrap nodes containers
+  docker-compose -f ../docker-compose-macos.yaml rm -s -f bsn1 bsn2 bsn3 && \
+  # build image for bootstrap and bridge nodes
+  docker-compose -f ../docker-compose-macos.yaml build bsn1 && \
+  # init bootstrap nodes
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn1 ./bsn -mode init
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn2 ./bsn -mode init
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn3 ./bsn -mode init
+  # up bootstrap nodes
+  docker-compose -f ../docker-compose-macos.yaml up -d bsn1 bsn2 bsn3
 
   sleep 5
 
@@ -16,11 +21,16 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   export BSN_URL3=$(docker-compose -f ../docker-compose-macos.yaml exec bsn3 cat keys/bootstrap-peer.env)
 else
   echo "compose bsn for linux docker host"
-
-  docker-compose -f ../docker-compose.yaml stop bsn1 bsn2 bsn3 && \
-  docker-compose -f ../docker-compose.yaml up -d --build --no-deps bsn1 && \
-  docker-compose -f ../docker-compose.yaml up -d bsn2 && \
-  docker-compose -f ../docker-compose.yaml up -d bsn3
+  # stop and remove bootstrap nodes containers
+  docker-compose -f ../docker-compose.yaml rm -s -f bsn1 bsn2 bsn3 && \
+  # build image for bootstrap and bridge nodes
+  docker-compose -f ../docker-compose.yaml build bsn1 && \
+  # init bootstrap nodes
+  docker-compose -f ../docker-compose.yaml run --rm  bsn1 ./bsn -mode init
+  docker-compose -f ../docker-compose.yaml run --rm  bsn2 ./bsn -mode init
+  docker-compose -f ../docker-compose.yaml run --rm  bsn3 ./bsn -mode init
+  # up bootstrap nodes
+  docker-compose -f ../docker-compose.yaml up -d bsn1 bsn2 bsn3
 
   sleep 5
 
@@ -29,7 +39,8 @@ else
   export BSN_URL3=$(docker-compose -f ../docker-compose.yaml exec bsn3 cat keys/bootstrap-peer.env)
 fi
 
-cat > ../bsn.yaml <<EOF
+# build shared bootstrap nodes config for use in bridge nodes
+cat > ../.data/bsn.yaml <<EOF
 bootstrap-addrs:
   - "${BSN_URL1}"
   - "${BSN_URL2}"

@@ -1,0 +1,9 @@
+.data
+Dockerfile
+.idea
+dev.Dockerfile
+docker-compose-macos.yaml
+docker-compose-testnet.yaml
+docker-compose.yaml
+docker-compose.yaml.OLD
+.dockerignore

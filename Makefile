@@ -1,4 +1,4 @@
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := build-all
 
 .PHONY: update-modules build key
 
@@ -15,9 +15,9 @@ build-bsn: deps
 	go build -o bsn  cmd/bsn/bsn.go
 
 clean:
-	rm -f ./bridge keys/*.key keys/*.env
+	rm -f ./bridge ./bsn keys/*.key keys/*.env
 
-all: deps build
+build-all: deps build build-bsn
 
 .PHONY: docker
 develop:

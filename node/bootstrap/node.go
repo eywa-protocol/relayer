@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"time"
 
 	"github.com/digiu-ai/p2p-bridge/runa"
 
@@ -24,7 +25,7 @@ func NodeInit(keysPath, name, listen string, port uint) (err error) {
 		return errors.New("node already initialized! ")
 	}
 
-	r := rand.New(rand.NewSource(int64(4001)))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// Creates a new RSA key pair for this host.
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)

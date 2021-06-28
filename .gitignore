@@ -1,4 +1,5 @@
 keys
+./.data
 ./bridge
 ./bsn
 tmp

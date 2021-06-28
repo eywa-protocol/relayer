@@ -17,21 +17,16 @@ COPY    ./p2p-bridge/libp2p ./libp2p
 COPY    ./p2p-bridge/node ./node
 COPY    ./p2p-bridge/runa ./runa
 COPY    ./p2p-bridge/Makefile .
-COPY    ./p2p-bridge/bootstrap.env .
 
 RUN make
 
 FROM golang:alpine
 
+#create mounting points for volumes
 RUN mkdir -p ./keys
+RUN touch ./bsn.yaml
+RUN touch ./bootstrap.env
 
 COPY --from=build /p2p-bridge-b/bridge ./
 
-COPY --from=build /p2p-bridge-b/$TYPE_ADAPTER_ENV ./
-
-COPY ./p2p-bridge/bsn.yaml .
-
-EXPOSE $PORT
-
-ENTRYPOINT ./bridge -mode init -cnf $TYPE_ADAPTER_ENV && sleep 5 && ./bridge -mode start -cnf $TYPE_ADAPTER_ENV
-
+COPY --from=build /p2p-bridge-b/bsn ./

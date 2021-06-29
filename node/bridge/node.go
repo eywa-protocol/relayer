@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/event"
 	"strings"
 	"sync"
 	"time"
@@ -257,15 +258,21 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	opt := &bind.WatchOpts{}
 	sub, err := client.BridgeFilterer.WatchOracleRequest(opt, channel)
 	if err != nil {
+		logrus.Errorf("WatchOracleRequest can't %v", err)
 		return
 	}
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case err := <-sub.Err():
-				logrus.Errorf("OracleRequest: %v", err)
-				return
+				logrus.Errorf("OracleRequest subscription: %v", err)
+				{
+					sub = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+						return client.BridgeFilterer.WatchOracleRequest(opt, channel)
+					})
+				}
 			case event := <-channel:
 				logrus.Info("going to InitializePubSubWithTopicAndPeers")
 				currentTopic := common2.ToHex(event.Raw.TxHash)
@@ -276,12 +283,12 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				}
 				defer sendTopic.Close()
 				if sendTopic != nil {
-					sub, err := sendTopic.Subscribe()
+					p2psub, err := sendTopic.Subscribe()
 					if err != nil {
 						logrus.Error("Subscribe ", err)
 					}
-					defer sub.Cancel()
-					logrus.Print(sub.Topic())
+					defer p2psub.Cancel()
+					logrus.Print(p2psub.Topic())
 					logrus.Print(sendTopic.ListPeers())
 
 					n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
@@ -296,7 +303,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 			}
 		}
 	}()
-	// wg.Add(-1)
 	return
 }
 

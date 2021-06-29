@@ -91,9 +91,6 @@ services:
     command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
     image: p2p-bridge_img
     depends_on:
-      - ganache_net1
-      - ganache_net2
-      - ganache_net3
       - bsn1
       - bsn2
       - bsn3
@@ -120,9 +117,6 @@ services:
     command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
     image: p2p-bridge_img
     depends_on:
-      - ganache_net1
-      - ganache_net2
-      - ganache_net3
       - bsn1
       - bsn2
       - bsn3
@@ -149,9 +143,6 @@ services:
     command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
     image: p2p-bridge_img
     depends_on:
-      - ganache_net1
-      - ganache_net2
-      - ganache_net3
       - bsn1
       - bsn2
       - bsn3
@@ -178,9 +169,6 @@ services:
     command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
     image: p2p-bridge_img
     depends_on:
-      - ganache_net1
-      - ganache_net2
-      - ganache_net3
       - bsn1
       - bsn2
       - bsn3
@@ -207,9 +195,6 @@ services:
     command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
     image: p2p-bridge_img
     depends_on:
-      - ganache_net1
-      - ganache_net2
-      - ganache_net3
       - bsn1
       - bsn2
       - bsn3

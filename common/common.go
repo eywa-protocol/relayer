@@ -118,8 +118,16 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return fmt.Errorf("get chain id error: %w", err)
+	}
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+	if err != nil {
+		err = fmt.Errorf("node not exists nodeListContractAddress: %s, client.Id: %s, error: %w",
+			nodeListContractAddress.String(), chainId.String(), err)
+	}
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
 	} else {

@@ -4,15 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
@@ -25,6 +16,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	"io/ioutil"
+	"math/big"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
 )
 
 type BsnConfig struct {
@@ -33,7 +30,18 @@ type BsnConfig struct {
 
 const bsnConfigFile = "bsn.yaml"
 
-func loadNodeConfig(path, keysPath string) (err error) {
+func loadConfigSetKeysAndCheck(path string) {
+	if err := loadConfig(path); err != nil {
+		logrus.Fatal(err)
+	}
+	loadKeys()
+	if err := checkKeys(); err != nil {
+		logrus.Fatal(err)
+	}
+	checkBalances()
+}
+
+func loadConfig(path string) (err error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		logrus.Fatal(err)
@@ -41,36 +49,23 @@ func loadNodeConfig(path, keysPath string) (err error) {
 	}
 	logrus.Tracef("started in directory %s", dir)
 	err = config.LoadConfigAndArgs(path)
-	if err != nil {
-		logrus.Fatal(err)
-		return
+	return
+}
+
+func loadKeys() {
+	config.Config.ECDSA_KEY_1 = os.Getenv("ECDSA_KEY_1")
+	config.Config.ECDSA_KEY_2 = os.Getenv("ECDSA_KEY_2")
+	config.Config.ECDSA_KEY_3 = os.Getenv("ECDSA_KEY_3")
+}
+
+func checkKeys() (err error) {
+	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" || config.Config.ECDSA_KEY_3 == "" {
+		return errors.New("you need key to start node")
 	}
+	return nil
+}
 
-	hostName, _ := os.Hostname()
-
-	keysList := os.Getenv("ECDSA_KEY_1")
-	keys := strings.Split(keysList, ",")
-	keysList2 := os.Getenv("ECDSA_KEY_2")
-	keys2 := strings.Split(keysList2, ",")
-	keysList3 := os.Getenv("ECDSA_KEY_3")
-	keys3 := strings.Split(keysList3, ",")
-
-	// TODO: SCALED_NUM приходит ""
-	strNum := strings.TrimPrefix(os.Getenv("SCALED_NUM"), "p2p-bridge_node_")
-	nodeHostId, _ := strconv.Atoi(strNum)
-	if common2.FileExists(keysPath + "/scaled-num-peer.log") {
-		nodeHostIdB, err := ioutil.ReadFile(keysPath + "/scaled-num-peer.log")
-		if err != nil {
-			panic(err)
-		}
-		nodeHostId, _ = strconv.Atoi(string(nodeHostIdB))
-	} else {
-
-		err = ioutil.WriteFile(keysPath+"/scaled-num-peer.log", []byte(strconv.Itoa(nodeHostId)), 0644)
-		if err != nil {
-			panic(err)
-		}
-	}
+func checkBalances() {
 
 	c1, c2, c3, err := getEthClients()
 	if err != nil {
@@ -78,53 +73,29 @@ func loadNodeConfig(path, keysPath string) (err error) {
 
 	}
 
-	var getRandomKeyForTestIfNoFunds func()
-	getRandomKeyForTestIfNoFunds = func() {
-		config.Config.ECDSA_KEY_1 = keys[nodeHostId-1]
-		config.Config.ECDSA_KEY_2 = keys2[nodeHostId-1]
-		config.Config.ECDSA_KEY_3 = keys3[nodeHostId-1]
-		balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		balance3, err := c3.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_3), nil)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) || balance3 == big.NewInt(0) {
-			logrus.Errorf("you need balance on your wallets 1: %d 2: %d to start node", balance1, balance2)
-			rand.Seed(time.Now().UnixNano())
-			nodeHostId = rand.Intn(len(keys))
-			getRandomKeyForTestIfNoFunds()
-		}
-
-	}
-	config.Config.ECDSA_KEY_1 = keys[nodeHostId]
-	config.Config.ECDSA_KEY_2 = keys2[nodeHostId]
-	config.Config.ECDSA_KEY_3 = keys3[nodeHostId]
-
-	if config.Config.ECDSA_KEY_1 == "" || config.Config.ECDSA_KEY_2 == "" || config.Config.ECDSA_KEY_3 == "" {
-		panic(errors.New("you need key to start node"))
+	balance1, err := c1.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_1), nil)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 
-	logrus.Tracef("hostName %s nodeHostId %v key1 %v key2 %v key3 %v", hostName, nodeHostId, config.Config.ECDSA_KEY_1, config.Config.ECDSA_KEY_2, config.Config.ECDSA_KEY_3)
+	balance2, err := c2.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_2), nil)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 
-	return
+	balance3, err := c3.BalanceAt(context.Background(), common2.AddressFromPrivKey(config.Config.ECDSA_KEY_3), nil)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	if balance1 == big.NewInt(0) || balance2 == big.NewInt(0) || balance3 == big.NewInt(0) {
+		logrus.Fatalf("you need balance on your wallets 1: %d 2: %d 3: %d to start node", balance1, balance2, balance3)
+	}
 }
 
 func InitNode(path, name, keysPath string) (err error) {
 
-	err = loadNodeConfig(path, keysPath)
-	if err != nil {
-		return
-	}
+	loadConfigSetKeysAndCheck(path)
 
 	if common2.FileExists(keysPath + name + "-ecdsa.key") {
 		return errors.New("node already registered! ")
@@ -189,12 +160,7 @@ func InitNode(path, name, keysPath string) (err error) {
 }
 
 func NewNode(path, keysPath, name, rendezvous string) (err error) {
-
-	err = loadNodeConfig(path, keysPath)
-	if err != nil {
-		return
-	}
-
+	loadConfigSetKeysAndCheck(path)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err != nil {
@@ -355,7 +321,7 @@ func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa
 	txOpts := common2.CustomAuth(c, pKey)
 
 	client = Client{
-		ethClient: c,
+		EthClient: c,
 		ECDSA_KEY: ecdsa_key,
 		Bridge: wrappers.BridgeSession{
 			Contract:     bridge,
@@ -374,7 +340,7 @@ func setNodeEthClient(c *ethclient.Client, bridgeAddress, nodeListAddress, ecdsa
 }
 
 func CompareChainIds(client Client, chainId *big.Int) (equal bool, err error) {
-	chainIdToCompare, err := client.ethClient.ChainID(context.Background())
+	chainIdToCompare, err := client.EthClient.ChainID(context.Background())
 	if err != nil {
 		return
 	}

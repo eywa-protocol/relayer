@@ -56,7 +56,7 @@ type Node struct {
 }
 
 type Client struct {
-	ethClient        *ethclient.Client
+	EthClient        *ethclient.Client
 	ECDSA_KEY        string
 	Bridge           wrappers.BridgeSession
 	BridgeFilterer   wrappers.BridgeFilterer
@@ -107,7 +107,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 }
 
 func (n Node) nodeExists(nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1), nodeIdAddress)
+	node, err := common2.GetNode(n.Client1.EthClient, common.HexToAddress(config.Config.NODELIST_NETWORK1), nodeIdAddress)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -118,7 +118,7 @@ func (n Node) nodeExists(nodeIdAddress common.Address) bool {
 func (n Node) GetPubKeysFromContract() (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
+	nodes, err := common2.GetNodesFromContract(n.Client1.EthClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
 	if err != nil {
 		return
 	}
@@ -314,12 +314,12 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if err != nil {
 		return
 	}
-	txOpts := common2.CustomAuth(client.ethClient, pKey1)
+	txOpts := common2.CustomAuth(client.EthClient, pKey1)
 
-	destinationChainid, err := client.ethClient.ChainID(context.Background())
+	destinationChainid, err := client.EthClient.ChainID(context.Background())
 	logrus.Infof("going to make this call in %d chain", destinationChainid)
 	/** Invoke bridge on another side */
-	instance, err := wrappers.NewBridge(event.OppositeBridge, client.ethClient)
+	instance, err := wrappers.NewBridge(event.OppositeBridge, client.EthClient)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -331,10 +331,12 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	}
 
 	if tx != nil {
-		receipt, err = helpers.WaitTransaction(client.ethClient, tx)
+		logrus.Infof("ReceiveRequestV2 Tx Hash: %x", tx.Hash())
+		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {
 			return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err))
 		}
+		logrus.Info("ReceiveRequestV2 receipt.Status:", receipt.Status)
 	}
 	return
 }

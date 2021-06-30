@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/digiu-ai/p2p-bridge/runa"
@@ -95,7 +96,7 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 		return err
 	}
 
-	runa.Host(h, cancel)
+	runa.Host(h, cancel, &sync.WaitGroup{})
 
 	return
 }

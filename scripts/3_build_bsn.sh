@@ -8,9 +8,9 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   # build image for bootstrap and bridge nodes
   docker-compose -f ../docker-compose-macos.yaml build bsn1 && \
   # init bootstrap nodes
-  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn1 ./bsn -mode init
-  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn2 ./bsn -mode init
-  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn3 ./bsn -mode init
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn1 ./bsn -init
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn2 ./bsn -init
+  docker-compose -f ../docker-compose-macos.yaml run --rm  bsn3 ./bsn -init
   # up bootstrap nodes
   docker-compose -f ../docker-compose-macos.yaml up -d bsn1 bsn2 bsn3
 
@@ -26,9 +26,9 @@ else
   # build image for bootstrap and bridge nodes
   docker-compose -f ../docker-compose.yaml build bsn1 && \
   # init bootstrap nodes
-  docker-compose -f ../docker-compose.yaml run --rm  bsn1 ./bsn -mode init
-  docker-compose -f ../docker-compose.yaml run --rm  bsn2 ./bsn -mode init
-  docker-compose -f ../docker-compose.yaml run --rm  bsn3 ./bsn -mode init
+  docker-compose -f ../docker-compose.yaml run --rm  bsn1 ./bsn -init
+  docker-compose -f ../docker-compose.yaml run --rm  bsn2 ./bsn -init
+  docker-compose -f ../docker-compose.yaml run --rm  bsn3 ./bsn -init
   # up bootstrap nodes
   docker-compose -f ../docker-compose.yaml up -d bsn1 bsn2 bsn3
 

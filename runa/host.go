@@ -3,6 +3,7 @@ package runa
 import (
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -10,7 +11,7 @@ import (
 )
 
 // Host wait os signals for gracefully shutdown hosts
-func Host(h host.Host, cancel func()) {
+func Host(h host.Host, cancel func(), wg *sync.WaitGroup) {
 	c := make(chan os.Signal, 1)
 
 	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
@@ -19,7 +20,7 @@ func Host(h host.Host, cancel func()) {
 	logrus.Infof("\rExiting...\n")
 
 	cancel()
-
+	wg.Wait()
 	if err := h.Close(); err != nil {
 		panic(err)
 	}

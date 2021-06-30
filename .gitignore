@@ -1,8 +1,9 @@
 keys
-./.data
+/.data
 ./bridge
 ./bsn
 tmp
 node*.env
 .idea
 bsn.yaml
+

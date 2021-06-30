@@ -6,7 +6,7 @@ if [[ "$OSTYPE" == "darwin"* ]];then
     exit 1
   fi
   echo "compose for macos docker host"
-  docker-compose -f ../docker-compose-macos.yaml stop ganache_net1 ganache_net2 ganache_net3 && \
+  docker-compose -f ../docker-compose-macos.yaml rm -f -s -v ganache_net1 ganache_net2 ganache_net3 && \
   docker-compose -f ../docker-compose-macos.yaml up -d --no-deps --build --force-recreate ganache_net1 && \
   docker-compose -f ../docker-compose-macos.yaml up -d --no-deps --build --force-recreate ganache_net2 && \
   docker-compose -f ../docker-compose-macos.yaml up -d --no-deps --build --force-recreate ganache_net3 && \

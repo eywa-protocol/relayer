@@ -1,61 +1,86 @@
 package config
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"fmt"
+	"io/ioutil"
+	"math/big"
+	"strings"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
+	_ "gopkg.in/yaml.v3"
 )
 
-// Config is global object that holds all application level variables.
-var Config AppConfig
+// App is global object that holds all application level variables.
+var App Configuration
 
-type AppConfig struct {
-	config            string
-	TickerInterval    time.Duration
-	ECDSA_KEY_2       string
-	ECDSA_KEY_1       string
-	ECDSA_KEY_3       string
-	P2P_PORT          int
-	PORT_1            int
-	NODELIST_NETWORK3 string
-	NODELIST_NETWORK2 string
-	NODELIST_NETWORK1 string
-	NETWORK_RPC_3     string
-	NETWORK_RPC_2     string
-	NETWORK_RPC_1     string
-	BRIDGE_NETWORK1   string
-	BRIDGE_NETWORK2   string
-	BRIDGE_NETWORK3   string
+type Configuration struct {
+	TickerInterval time.Duration `yaml:"ticker_interval"`
+	Chains         []*Chain      `yaml:"chains"`
+	BootstrapAddrs []string      `yaml:"bootstrap-addrs"`
 }
 
-// LoadConfig loads config from files
-func LoadConfig(config AppConfig) error {
-	v := viper.New()
-	v.SetConfigType("env")
-	if config.config == "" {
-		v.SetConfigName("bootstrap")
-	} else {
-		v.SetConfigName(config.config)
-	}
+type Chain struct {
+	Id              uint `yaml:"id"`
+	ChainId         *big.Int
+	EcdsaKeyString  string `yaml:"ecdsa_key"`
+	EcdsaKey        *ecdsa.PrivateKey
+	EcdsaAddress    common.Address
+	BridgeAddress   common.Address `yaml:"bridge_address"`
+	NodeListAddress common.Address `yaml:"node_list_address"`
+	DexPoolAddress  common.Address `yaml:"dex_pool_address"`
+	RpcUrls         []string       `yaml:"rpc_urls"`
+}
 
-	v.SetEnvPrefix("cross-chain")
-	v.AutomaticEnv()
-	v.AddConfigPath(".")
-	err := v.ReadInConfig()
+func Load(path string) error {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read config file [%s] error: %w",
+			path, err)
 	}
-	return v.Unmarshal(&Config)
+	if err := yaml.Unmarshal(data, &App); err != nil {
+		return fmt.Errorf("unmarshal config error: %w", err)
+	}
+
+	for _, chain := range App.Chains {
+		if chain.EcdsaKey, err = crypto.HexToECDSA(strings.TrimPrefix(chain.EcdsaKeyString, "0x")); err != nil {
+			return fmt.Errorf("decode chain [%d] ecdsa_key error: %w", chain.Id, err)
+		}
+		publicKey := chain.EcdsaKey.Public()
+		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("chain [%d] casting public key to ECDSA Address error: %w", chain.Id, err)
+		}
+		chain.EcdsaAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+	}
+	return nil
 }
 
-func LoadConfigAndArgs(path string) (err error) {
-	cfg := NewConfig(path)
-	err = LoadConfig(*cfg)
-	return
-}
+func (c *Chain) GetEthClient() (client *ethclient.Client, err error) {
+	for _, url := range c.RpcUrls {
+		if client, err = ethclient.Dial(url); err != nil {
+			logrus.Error(fmt.Errorf("chain [%d] connect to rpc url %s error: %w", c.Id, url, err))
+			continue
+		} else {
+			balance, err := client.BalanceAt(context.Background(), c.EcdsaAddress, nil)
+			if err != nil {
+				logrus.Error(fmt.Errorf("chain [%d] get balance for address %s error: %w",
+					c.Id, c.EcdsaAddress.String(), err))
+			}
+			if balance == big.NewInt(0) {
+				return nil, fmt.Errorf("you need balance on your chain [%d] wallet [%s]: %s to start node",
+					c.Id, c.EcdsaAddress.String(), balance.String())
 
-func NewConfig(path string) *AppConfig {
-	c := AppConfig{}
-	c.config = path
-	return &c
+			}
+
+			return client, nil
+		}
+	}
+	return nil, fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
 }

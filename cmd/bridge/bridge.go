@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/node/bridge"
 	"github.com/digiu-ai/p2p-bridge/runa"
 	"github.com/sirupsen/logrus"
@@ -22,15 +23,15 @@ func initPprof() {
 }
 
 func main() {
-	var mode string
+	var init bool
 	var path string
 	var port uint
 	var logLevel int
 	var pprofFlag bool
 	var keysPath string
 	var commonRendezvous string
-	flag.StringVar(&mode, "mode", "start", "run \"./bridge -mode init\" to init node")
-	flag.StringVar(&path, "cnf", "bootstrap.env", "config file absolute path")
+	flag.BoolVar(&init, "init", false, "run \"./bridge -init\" to init node")
+	flag.StringVar(&path, "cnf", "bridge.yaml", "config file absolute path")
 	flag.UintVar(&port, "port", 0, "-port")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
@@ -48,23 +49,25 @@ func main() {
 	runa.LogrusLevelHandler(logrus.Level(logLevel))
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
-	logrus.Tracef("mode: %s, path: %s, keys-path: %s", mode, path, keysPath)
-	file := filepath.Base(path)
-	fname := strings.TrimSuffix(file, p.Ext(file))
+	logrus.Tracef("init: %v, path: %s, keys-path: %s", init, path, keysPath)
 
-	switch mode {
-	case "init":
-		err := bridge.InitNode(path, fname, keysPath)
+	if err := config.Load(path); err != nil {
+		logrus.Fatal(err)
+	}
+
+	file := filepath.Base(path)
+	name := strings.TrimSuffix(file, p.Ext(file))
+
+	if init {
+		err := bridge.InitNode(name, keysPath)
 		if err != nil {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
-	case "start":
-		err := bridge.NewNode(path, keysPath, fname, commonRendezvous)
+	} else {
+		err := bridge.NewNode(name, keysPath, commonRendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}
-	default:
-		logrus.Fatalf("invalid mode: %s", mode)
 	}
 
 }

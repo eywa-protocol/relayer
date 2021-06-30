@@ -2,12 +2,13 @@ package bridge
 
 import (
 	"context"
-	"errors"
+	"crypto/ecdsa"
 	"fmt"
-	"github.com/ethereum/go-ethereum/event"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/event"
 
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
@@ -15,8 +16,8 @@ import (
 	"github.com/digiu-ai/p2p-bridge/libp2p"
 	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigpb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
-	wrappers "github.com/digiu-ai/wrappers"
+	messageSigPb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -24,13 +25,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubSub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/linkpoolio/bridges"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -50,29 +49,23 @@ type Node struct {
 	Routing   routing.PeerRouting
 	Discovery *discovery.RoutingDiscovery
 	PrivKey   kyber.Scalar
-	Client1   Client
-	Client2   Client
-	Client3   Client
+	Clients   map[string]Client
 }
 
 type Client struct {
 	ethClient        *ethclient.Client
-	ECDSA_KEY        string
+	ChainCfg         *config.Chain
+	EcdsaKey         *ecdsa.PrivateKey
 	Bridge           wrappers.BridgeSession
 	BridgeFilterer   wrappers.BridgeFilterer
 	NodeList         wrappers.NodeListSession
 	NodeListFilterer wrappers.NodeListFilterer
 }
 
-type addrList map[peer.ID]multiaddr.Multiaddr
-
-// func (n Node) RunNode(wg *sync.WaitGroup) {
-//	defer wg.Done()
-//	n.NodeBLS.WaitForMsgNEW()
-// }
-
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
-	consensuChannel := make(chan bool)
+	consensusChannel := make(chan bool)
+
+	// todo: wait group without waiting?
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
 	wg.Add(1)
@@ -81,10 +74,9 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 
 	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous)
 	wg.Add(1)
-	go n.NodeBLS.WaitForMsgNEW(consensuChannel)
-	consensus := <-consensuChannel
-	executed := false
-	if consensus == true && executed == false {
+	go n.NodeBLS.WaitForMsgNEW(consensusChannel)
+	consensus := <-consensusChannel
+	if consensus == true {
 		logrus.Tracef("Starting Leader election !!!")
 		leaderPeerId, err := libp2p.RelayerLeaderNode(n.NodeBLS.CurrentRendezvous, n.NodeBLS.Participants)
 		if err != nil {
@@ -94,20 +86,17 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
-			recept, err := n.ReceiveRequestV2(event)
+			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
 				logrus.Errorf("%v", err)
-			}
-			if recept != nil {
-				executed = true
 			}
 		}
 	}
 	logrus.Println("The END of Protocol")
 }
 
-func (n Node) nodeExists(nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1), nodeIdAddress)
+func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
+	node, err := common2.GetNode(client.ethClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -115,10 +104,10 @@ func (n Node) nodeExists(nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract() (publicKeys []kyber.Point, err error) {
+func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(n.Client1.ethClient, common.HexToAddress(config.Config.NODELIST_NETWORK1))
+	nodes, err := common2.GetNodesFromContract(client.ethClient, client.ChainCfg.NodeListAddress)
 	if err != nil {
 		return
 	}
@@ -153,8 +142,8 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err e
 	return
 }
 
-func (n Node) NewBLSNode(topic *pubsub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
-	publicKeys, err := n.GetPubKeysFromContract()
+func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
+	publicKeys, err := n.GetPubKeysFromContract(client)
 	if err != nil {
 		return
 	}
@@ -162,7 +151,7 @@ func (n Node) NewBLSNode(topic *pubsub.Topic, client Client) (blsNode *modelBLS.
 	suite := pairing.NewSuiteBn256()
 
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
-	if !n.nodeExists(nodeIdAddress) {
+	if !n.nodeExists(client, nodeIdAddress) {
 		logrus.Errorf("node %x does not exist", n.Host.ID())
 
 	} else {
@@ -192,7 +181,7 @@ func (n Node) NewBLSNode(topic *pubsub.Topic, client Client) (blsNode *modelBLS.
 						ThresholdWit:      len(topicParticipants)/2 + 1,
 						ThresholdAck:      len(topicParticipants)/2 + 1,
 						Acks:              0,
-						ConvertMsg:        &messageSigpb.Convert{},
+						ConvertMsg:        &messageSigPb.Convert{},
 						Comm:              n.P2PPubSub,
 						History:           make([]modelBLS.MessageWithSig, 0),
 						Signatures:        make([][]byte, len(publicKeys)),
@@ -240,11 +229,11 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			select {
 			case _ = <-sub.Err():
 				break
-			case event := <-channel:
-				logrus.Infof("ReceiveRequest: %v %v %v", event.ReqId, event.ReceiveSide, common2.ToHex(event.Tx))
+			case e := <-channel:
+				logrus.Infof("ReceiveRequest: %v %v %v", e.ReqId, e.ReceiveSide, common2.ToHex(e.Tx))
 				// TODO disconnect from topic
 				/** TODO:
-				Is transaction true, otherwise repeate to invoke tx, err := instance.ReceiveRequestV2(auth)
+				Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)
 				*/
 
 			}
@@ -273,33 +262,41 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 						return client.BridgeFilterer.WatchOracleRequest(opt, channel)
 					})
 				}
-			case event := <-channel:
+			case e := <-channel:
 				logrus.Info("going to InitializePubSubWithTopicAndPeers")
-				currentTopic := common2.ToHex(event.Raw.TxHash)
-				logrus.Debugf("currentTopic %s", currentTopic)
-				sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
-				if err != nil {
-					logrus.Error("JoinTopic ", err)
-				}
-				defer sendTopic.Close()
-				if sendTopic != nil {
-					p2psub, err := sendTopic.Subscribe()
+				currentTopic := common2.ToHex(e.Raw.TxHash)
+				func(topic string) {
+					logrus.Debugf("currentTopic %s", topic)
+					sendTopic, err := n.P2PPubSub.JoinTopic(topic)
 					if err != nil {
-						logrus.Error("Subscribe ", err)
+						logrus.Error("JoinTopic ", err)
 					}
-					defer p2psub.Cancel()
-					logrus.Print(p2psub.Topic())
-					logrus.Print(sendTopic.ListPeers())
+					if sendTopic != nil {
+						defer func() {
+							if err := sendTopic.Close(); err != nil {
+								logrus.Error(fmt.Errorf("close topic error: %w", err))
+							}
+						}()
+						p2pSub, err := sendTopic.Subscribe()
+						if err != nil {
+							logrus.Error("Subscribe ", err)
+						}
+						defer p2pSub.Cancel()
+						logrus.Print(p2pSub.Topic())
+						logrus.Print(sendTopic.ListPeers())
 
-					n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
-					if err != nil {
-						logrus.Error("NewBLSNode ", err)
-					}
-					if n.NodeBLS != nil {
-						go n.StartProtocolByOracleRequest(event)
+						n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
+						if err != nil {
+							logrus.Error("NewBLSNode ", err)
+						}
+						if n.NodeBLS != nil {
+							go n.StartProtocolByOracleRequest(e)
 
+						}
 					}
-				}
+				}(currentTopic)
+			case <-n.Ctx.Done():
+				return
 			}
 		}
 	}()
@@ -307,17 +304,16 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 }
 
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
-	logrus.Infof("event.Bridge %v event.Chainid %v event.OppositeBridge %v event.ReceiveSide %v event.Selector %v event.RequestType", event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, event.Selector, event.RequestType)
+	logrus.Infof("event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
+		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, event.Selector, event.RequestType)
 
 	client, err := n.GetNodeClientByChainId(event.Chainid)
-	pKey1, err := common2.ToECDSAFromHex(client.ECDSA_KEY)
 	if err != nil {
 		return
 	}
-	txOpts := common2.CustomAuth(client.ethClient, pKey1)
+	txOpts := common2.CustomAuth(client.ethClient, client.EcdsaKey)
 
-	destinationChainid, err := client.ethClient.ChainID(context.Background())
-	logrus.Infof("going to make this call in %d chain", destinationChainid)
+	logrus.Infof("going to make this call in %s chain", client.ChainCfg.ChainId.String())
 	/** Invoke bridge on another side */
 	instance, err := wrappers.NewBridge(event.OppositeBridge, client.ethClient)
 	if err != nil {
@@ -333,7 +329,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if tx != nil {
 		receipt, err = helpers.WaitTransaction(client.ethClient, tx)
 		if err != nil || receipt == nil {
-			return nil, errors.New(fmt.Sprintf("ReceiveRequestV2 Failed %v", err))
+			return nil, fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
 		}
 	}
 	return
@@ -343,32 +339,30 @@ func (n Node) Discover(topic string) {
 	go libp2p.Discover(n.Ctx, n.Host, n.Dht, topic, 3*time.Second)
 }
 
-func (n Node) InitializeCoomonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
+func (n Node) InitializeCommonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
 	return new(libp2p_pubsub.Libp2pPubSub)
 }
 
-/**
-* 	Announce your presence in network using a rendezvous point
-*	With the DHT set up, it’s time to discover other peers
-*
-*	The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
-*	It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
-*	routingDiscovery.Advertise makes this node announce that it can provide a value for the given key.
-*	Where a key in this case is rendezvousString. Other peers will hit the same key to find other peers.
- */
-func (n Node) DiscoverByRendezvous(rendezvous string) {
+// DiscoverByRendezvous	Announce your presence in network using a rendezvous point
+// With the DHT set up, it’s time to discover other peers
+// The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
+// It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
+// routingDiscovery.Advertise makes this node announce that it can provide a value for the given key.
+// Where a key in this case is rendezvousString. Other peers will hit the same key to find other peers.
+func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 
+	defer wg.Done()
 	//	The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
 	//	It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
 
-	// TODO: When TTL elapsed should check precense in network
-	// QEST: What's happening with presence in network when node goes down (in DHT table, in while other nodes is trying to connect)
+	// TODO: When TTL elapsed should check presence in network
+	// QUEST: What's happening with presence in network when node goes down (in DHT table, in while other nodes is trying to connect)
 	logrus.Printf("Announcing ourselves with rendezvous [%s] ...", rendezvous)
 	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
 	logrus.Printf("Successfully announced! n.Host.ID():%s ", n.Host.ID().Pretty())
 
-	ticker := time.NewTicker(config.Config.TickerInterval)
+	ticker := time.NewTicker(config.App.TickerInterval)
 	defer ticker.Stop()
 
 	for {

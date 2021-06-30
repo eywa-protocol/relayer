@@ -15,7 +15,6 @@ require (
 	github.com/ipfs/go-datastore v0.4.5
 	github.com/libp2p/go-libp2p v0.14.2
 	github.com/libp2p/go-libp2p-core v0.8.5
-	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-gorpc v0.1.3
 	github.com/libp2p/go-libp2p-host v0.1.0
@@ -28,10 +27,9 @@ require (
 	github.com/linkpoolio/bridges v0.0.0-20200226172010-aa6f132d477e
 	github.com/multiformats/go-multiaddr v0.3.2
 	github.com/sirupsen/logrus v1.8.1
-	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )

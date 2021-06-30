@@ -5,15 +5,15 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/digiu-ai/p2p-bridge/helpers"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"log"
 	"math/big"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/digiu-ai/p2p-bridge/config"
+	"github.com/digiu-ai/p2p-bridge/helpers"
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -57,54 +57,6 @@ func GetChainIdByurl(rpcUrl string) (chainId *big.Int, err error) {
 		return
 	}
 	return
-}
-
-func GetClientByChainId(chainIdFromClient *big.Int) (client *ethclient.Client, err error) {
-	client, err = Connect(config.Config.NETWORK_RPC_1)
-	if err != nil {
-		return
-	}
-	chainId, err := client.ChainID(context.Background())
-	if err != nil {
-		return
-	}
-	if chainId.Cmp(chainIdFromClient) == 0 {
-		return
-	}
-	logrus.Tracef("CHAIND 1 %d chainIdFromClient %d ", chainId, chainIdFromClient)
-	client, err = Connect(config.Config.NETWORK_RPC_2)
-	if err != nil {
-		return
-	}
-	chainId, err = client.ChainID(context.Background())
-	if err != nil {
-		return
-	}
-	if chainId.Cmp(chainIdFromClient) == 0 {
-		return
-	}
-	logrus.Tracef("CHAIND 2 %d chainIdFromClient %d ", chainId, chainIdFromClient)
-	client, err = Connect(config.Config.NETWORK_RPC_3)
-	if err != nil {
-		return
-	}
-	chainId, err = client.ChainID(context.Background())
-	if err != nil {
-		return
-	}
-	if chainId.Cmp(chainIdFromClient) == 0 {
-		return
-	}
-	logrus.Tracef("CHAIND 3 %d chainIdFromClient %d ", chainId, chainIdFromClient)
-	return nil, errors.New(fmt.Sprintf("not found rpcurl for chainID %d", chainIdFromClient))
-}
-
-func HealthFirst(helper *bridges.Helper) (out *Output, err error) {
-	return Health(helper, config.Config.NETWORK_RPC_1)
-}
-
-func HealthSecond(helper *bridges.Helper) (*Output, error) {
-	return Health(helper, config.Config.NETWORK_RPC_2)
 }
 
 func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
@@ -166,8 +118,16 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return fmt.Errorf("get chain id error: %w", err)
+	}
 	nodeListContract1, err := wrappers.NewNodeList(nodeListContractAddress, client)
 	res, err := nodeListContract1.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+	if err != nil {
+		err = fmt.Errorf("node not exists nodeListContractAddress: %s, client.Id: %s, error: %w",
+			nodeListContractAddress.String(), chainId.String(), err)
+	}
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
 	} else {

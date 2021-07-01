@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
-	"math/big"
 	"sync"
 	"time"
 
@@ -193,51 +192,4 @@ func WaitTransactionWithRetry(client *ethclient.Client, tx *types.Transaction) (
 		return nil, fmt.Errorf("transaction %s failed: %s", tx.Hash().Hex(), code)
 	}
 	return receipt, nil
-}
-
-var GasUsed = big.NewInt(0)
-
-func WaitForBlockCompletation(client *ethclient.Client, hash string) (int, *types.Receipt) {
-	ctx, chancel := context.WithTimeout(context.Background(), time.Second*60)
-	defer chancel()
-	transaction := make(chan *types.Receipt)
-	go func(context context.Context, client *ethclient.Client) {
-		for {
-			statusCode := -1
-			txHash := common.HexToHash(hash)
-			tx, err := client.TransactionReceipt(ctx, txHash)
-			//tx.BlockNumber.String()
-			if err == nil {
-				statusCode = int(tx.Status)
-				transaction <- tx
-				return
-			} else {
-				statusCode = -1
-			}
-			select {
-			case <-ctx.Done():
-				if statusCode == -1 {
-					transaction <- nil
-				} else {
-					transaction <- tx
-				}
-				break
-			default:
-				_ = 1
-			}
-			time.Sleep(time.Second * 2)
-		}
-	}(ctx, client)
-	select {
-	case tx := <-transaction:
-		if tx != nil {
-
-			txd, _, _ := client.TransactionByHash(context.Background(), tx.TxHash)
-			total := new(big.Int).Mul(txd.GasPrice(), new(big.Int).SetUint64(tx.GasUsed))
-			GasUsed.Add(GasUsed, total)
-			//GasUsed += tx.CumulativeGasUsed
-			return int(tx.Status), tx
-		}
-		return -1, nil
-	}
 }

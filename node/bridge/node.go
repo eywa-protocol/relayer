@@ -53,7 +53,7 @@ type Node struct {
 }
 
 type Client struct {
-	ethClient        *ethclient.Client
+	EthClient        *ethclient.Client
 	ChainCfg         *config.Chain
 	EcdsaKey         *ecdsa.PrivateKey
 	Bridge           wrappers.BridgeSession
@@ -96,7 +96,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) 
 }
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(client.ethClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
+	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -107,7 +107,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(client.ethClient, client.ChainCfg.NodeListAddress)
+	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
 	if err != nil {
 		return
 	}
@@ -311,11 +311,11 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if err != nil {
 		return
 	}
-	txOpts := common2.CustomAuth(client.ethClient, client.EcdsaKey)
+	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
 
 	logrus.Infof("going to make this call in %s chain", client.ChainCfg.ChainId.String())
 	/** Invoke bridge on another side */
-	instance, err := wrappers.NewBridge(event.OppositeBridge, client.ethClient)
+	instance, err := wrappers.NewBridge(event.OppositeBridge, client.EthClient)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -327,7 +327,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	}
 
 	if tx != nil {
-		receipt, err = helpers.WaitTransaction(client.ethClient, tx)
+		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {
 			return nil, fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
 		}

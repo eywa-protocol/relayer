@@ -30,3 +30,5 @@ bls_test:
 custom_bls_test:
 	 go test -v ./libp2p/pub_sub_bls/libp2p_pubsub -run TestOneStepBLS
 
+test_local_bridge:
+	go test -v ./test -run Test_SendRequestV2

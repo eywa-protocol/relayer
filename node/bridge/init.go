@@ -4,12 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"math/big"
-	"strconv"
-	"strings"
-	"sync"
-
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
@@ -17,9 +11,16 @@ import (
 	"github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
+	"math/big"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync"
 )
 
 func InitNode(name, keysPath string) (err error) {
@@ -60,31 +61,15 @@ func InitNode(name, keysPath string) (err error) {
 }
 
 func NewNode(name, keysPath, rendezvous string) (err error) {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err != nil {
 			cancel()
 		}
 	}()
-
-	n := &Node{
-		Ctx:     ctx,
-		Clients: make(map[string]Client, len(config.App.Chains)),
-	}
-
-	// logrus.Tracef("n.Config.PORT_1 %d", config.Config.PORT_1)
-
-	for _, chain := range config.App.Chains {
-		client, err := NewClient(chain)
-		if err != nil {
-			return fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
-		}
-		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
-			return fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w",
-				chain.Id, client.ChainCfg.ChainId, err)
-		}
-		n.Clients[client.ChainCfg.ChainId.String()] = client
+	n, err := NewNodeWithClients(name, ctx)
+	if err != nil {
+		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
 	}
 
 	keyFile := keysPath + "/" + name + "-ecdsa.key"
@@ -209,7 +194,7 @@ func NewClient(chain *config.Chain) (client Client, err error) {
 	txOpts := common2.CustomAuth(c, chain.EcdsaKey)
 
 	return Client{
-		ethClient: c,
+		EthClient: c,
 		ChainCfg:  chain,
 		EcdsaKey:  chain.EcdsaKey,
 		Bridge: wrappers.BridgeSession{
@@ -254,5 +239,31 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 		return
 	}
 
+	return
+}
+
+func NewNodeWithClients(path string, ctx context.Context) (n *Node, err error) {
+	n = &Node{
+		Ctx:     ctx,
+		Clients: make(map[string]Client, len(config.App.Chains)),
+	}
+	if err := config.Load(path); err != nil {
+		logrus.Fatal(err)
+	}
+	logrus.Print(len(config.App.Chains), " chains Length")
+	for _, chain := range config.App.Chains {
+		logrus.Print("CHAIN ", chain, "chain")
+		client, err := NewClient(chain)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("init chain[%d] node client error: %w", chain.Id, err))
+		}
+		if reflect.DeepEqual(client, ethclient.Client{}) {
+			return nil, errors.New(fmt.Sprintf("init chain [%d] client failed", chain.Id))
+		}
+		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
+			return nil, errors.New(fmt.Sprintf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err))
+		}
+		n.Clients[client.ChainCfg.ChainId.String()] = client
+	}
 	return
 }

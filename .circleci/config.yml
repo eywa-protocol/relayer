@@ -3,7 +3,7 @@ version: 2.1
 parameters:
   cache_version:
     type: string
-    default: "u2"
+    default: "u3"
 jobs:
 
   build:
@@ -14,10 +14,10 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install Dependencies
+          name: git
           command: |
             git submodule sync && git submodule update --init
-            git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
+            git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo develop)'
       - restore_cache:
           keys:
             - go-mod-<< pipeline.parameters.cache_version >>
@@ -32,7 +32,7 @@ jobs:
             cd scripts
             ./2_redeploy_contracts.sh 
             sudo ./3_build_bsn.sh
-            sudo ./4_edit_configs.sh
+            sudo ./4_build_config.sh
       - run:
           name: Save Docker layers cache
           command: |
@@ -43,7 +43,7 @@ jobs:
           key: go-mod-<< pipeline.parameters.cache_version >>
           paths:
             - ~/docker-layers.tar
-            - "/home/circleci/.go_workspace/pkg/mod"
+            - "~/.go_workspace/pkg/mod"
             - "./external/eth-contracts/truffle/node_modules"
             - "./external/eth-contracts/truffle/build"
             - "./external/eth-contracts/wrappers"
@@ -62,6 +62,7 @@ jobs:
             docker-compose -f $DC run --rm --no-deps  node7 ./bridge -init -cnf bridge.yaml &&\
             # up nodes containers
             docker-compose -f $DC up -d --no-deps node1 node2 node3 node4 node5 node6 node7
+            docker start $(docker ps -f "status=exited" --format "{{.Names}}" | grep node)
       - run:
           name: Run tests
           command: |

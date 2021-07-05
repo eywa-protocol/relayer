@@ -1,55 +1,72 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
+Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
+parameters:
+  cache_version:
+    type: string
+    default: "u2"
 jobs:
+
   build:
-    working_directory: ~/repo
-    docker:
-      - image: circleci/golang:1.16.0
+    working_directory: ~/p2p-bridge
+    machine:
+      image: ubuntu-2004:202104-01
+      #- image: circleci/golang:1.16.0
     steps:
-      - setup_remote_docker:
-          version: 19.03.13
       - checkout
       - run:
           name: Install Dependencies
           command: |
-            sudo apt update
-            sudo apt install docker.io
-            sudo apt install docker-compose
-            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-            sudo apt install nodejs
             git submodule sync && git submodule update --init
             git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "./external/eth-contracts/truffle/package-lock.json" }}
-            - v1-dependencies-
-      - restore_cache:
-          keys:
-            - go-mod-v4-{{ checksum "go.sum" }}
-            # fallback to using the latest cache if no exact match is found
-            - go-mod-v4-
+            - go-mod-<< pipeline.parameters.cache_version >>
       - run:
-          name: Build
+          name: Load Docker layers cache
           command: |
-            make -C external/eth-contracts
-            make
-            curl -sf https://gobinaries.com/tj/node-prune | sh
-            # ./bin/node-prune
-            # cd scripts
-            # ./deploy.sh
+            set +o pipefail
+            docker load -i ~/docker-layers.tar | true
+      - run:
+          name: Deploy contracts and bsn
+          command: |
+            cd scripts
+            ./2_redeploy_contracts.sh 
+            sudo ./3_build_bsn.sh
+            sudo ./4_edit_configs.sh
+      - run:
+          name: Save Docker layers cache
+          command: |
+            DOCKER_IMAGES=$(docker images --format "{{.Repository}}" --filter=reference="${CIRCLE_PROJECT_REPONAME}_*")
+            DOCKER_LAYERS=$(for image in $DOCKER_IMAGES; do docker history $image -q | grep -v missing; done)
+            docker save -o ~/docker-layers.tar $DOCKER_LAYERS
       - save_cache:
-          key: v1-dependencies-{{ checksum "./external/eth-contracts/truffle/package-lock.json" }}
+          key: go-mod-<< pipeline.parameters.cache_version >>
           paths:
-            - " /node/pkg/modules"
-      - save_cache:
-          key: go-mod-v4-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
+            - ~/docker-layers.tar
+            - "/home/circleci/.go_workspace/pkg/mod"
+            - "./external/eth-contracts/truffle/node_modules"
+            - "./external/eth-contracts/truffle/build"
+            - "./external/eth-contracts/wrappers"
+      - run:
+          name: Deploy nodes
+          command: |
+            export RANDEVOUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)
+            DC="docker-compose.yaml"
+            # init nodes
+            docker-compose -f $DC run --rm --no-deps  node1 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node2 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node3 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node4 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node5 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node6 ./bridge -init -cnf bridge.yaml &&\
+            docker-compose -f $DC run --rm --no-deps  node7 ./bridge -init -cnf bridge.yaml &&\
+            # up nodes containers
+            docker-compose -f $DC up -d --no-deps node1 node2 node3 node4 node5 node6 node7
       - run:
           name: Run tests
           command: |
-            mkdir -p /tmp/test-reports
-            # make -C external/eth-contracts local-test
-            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
+            #mkdir -p /tmp/test-reports
+            make test_local_bridge
+            # gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports

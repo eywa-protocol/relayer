@@ -2,17 +2,19 @@ package test
 
 import (
 	"context"
+	"math/big"
+	"math/rand"
+	"testing"
+	"time"
+
 	common2 "github.com/digiu-ai/p2p-bridge/common"
+	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/helpers"
 	"github.com/digiu-ai/p2p-bridge/node/bridge"
 	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 var node *bridge.Node
@@ -21,7 +23,11 @@ var err error
 var random int
 
 func init() {
-	node, err = bridge.NewNodeWithClients("../.data/bridge.yaml", context.Background())
+	err = config.Load("../.data/bridge.yaml")
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	node, err = bridge.NewNodeWithClients(context.Background())
 	if err != nil {
 		logrus.Fatal(err)
 	}

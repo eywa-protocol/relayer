@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ var App Configuration
 
 type Configuration struct {
 	TickerInterval time.Duration `yaml:"ticker_interval"`
+	Rendezvous     string        `yaml:"rendezvous"`
 	Chains         []*Chain      `yaml:"chains"`
 	BootstrapAddrs []string      `yaml:"bootstrap-addrs"`
 }
@@ -59,6 +61,12 @@ func Load(path string) error {
 		}
 		chain.EcdsaAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
 	}
+
+	// override config fields from env
+	if rendezvous := os.Getenv("RANDEVOUE"); rendezvous != "" {
+		App.Rendezvous = rendezvous
+	}
+
 	return nil
 }
 

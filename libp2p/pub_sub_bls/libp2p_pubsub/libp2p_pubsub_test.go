@@ -2,6 +2,12 @@ package libp2p_pubsub
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	messageSigpb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
 	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
@@ -10,11 +16,6 @@ import (
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
-	"log"
-	"os"
-	"sync"
-	"testing"
-	"time"
 
 	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
 	core "github.com/libp2p/go-libp2p-core"
@@ -47,7 +48,7 @@ func setupHosts(n int, initialPort int, failureModel FailureModel) ([]*model.Nod
 
 	for i := range nodes {
 
-		//var comm model.CommunicationInterface
+		// var comm model.CommunicationInterface
 		var comm *Libp2pPubSub
 		comm = new(Libp2pPubSub)
 		comm.topic = "TLC"
@@ -173,7 +174,7 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 
 func minorityFailure(nodes []*model.Node, n int) int {
 	nFail := (n - 1) / 2
-	//nFail := 4
+	// nFail := 4
 	go func(nodes []*model.Node, nFail int) {
 		time.Sleep(FailureDelay * time.Second)
 		failures(nodes, nFail)
@@ -367,7 +368,7 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 
 	for i := range nodes {
 
-		//var comm model.CommunicationInterface
+		// var comm model.CommunicationInterface
 		var comm *Libp2pPubSub
 		comm = new(Libp2pPubSub)
 		comm.topic = "TLC"
@@ -380,7 +381,7 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		comm.InitializePubSub(*host)
 		comm.InitializeVictim(false)
 		mask, _ := sign.NewMask(suite, publicKeys, nil)
-		//////
+		// ////
 
 		nodes[i] = &modelBLS.Node{
 			Id:           i,
@@ -419,7 +420,7 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 	fmt.Println("The END")
 }
 
-//StartTest is used for starting tlc nodes
+// StartTest is used for starting tlc nodes
 func StartTestOneStepBLS(nodes []*modelBLS.Node) {
 	fmt.Print("START")
 	wg := &sync.WaitGroup{}
@@ -447,14 +448,15 @@ func runNodeBLS(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	err := node.WaitForMsg(stop)
 	if err != nil {
-		fmt.Errorf(err.Error())
+		fmt.Println(err)
 	}
 }
 
 func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup) {
 	defer wg.Done()
-	consensuChannel := make(chan bool)
-	go node.WaitForMsgNEW(consensuChannel)
-	_ = <-consensuChannel
+	consensusChannel := make(chan bool)
+	wg.Add(1)
+	go node.WaitForMsgNEW(consensusChannel, wg)
+	_ = <-consensusChannel
 	return
 }

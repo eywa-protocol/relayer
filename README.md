@@ -36,3 +36,10 @@ make -C external/eth-contracts local-test
 ```
 docker-compose exec --index=1 node kill -12 1
 ```
+
+### Ребилд нод после изменения кода
+
+```
+cd scripts
+./rebuild_nodes.sh
+```

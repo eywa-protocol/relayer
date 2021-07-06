@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const defaultRendezvous = "mygroupofnodes"
+
 func initPprof() {
 
 	go func() {
@@ -35,7 +37,7 @@ func main() {
 	flag.UintVar(&port, "port", 0, "-port")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
-	flag.StringVar(&commonRendezvous, "randevoue", "mygroupofnodes", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
+	flag.StringVar(&commonRendezvous, "randevoue", "", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
 	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
 	flag.Parse()
 
@@ -55,6 +57,16 @@ func main() {
 		logrus.Fatal(err)
 	}
 
+	// override config from flags
+	if commonRendezvous != "" {
+		config.App.Rendezvous = commonRendezvous
+	}
+
+	// set default rendezvous on empty
+	if config.App.Rendezvous == "" {
+		config.App.Rendezvous = defaultRendezvous
+	}
+
 	file := filepath.Base(path)
 	name := strings.TrimSuffix(file, p.Ext(file))
 
@@ -64,7 +76,7 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	} else {
-		err := bridge.NewNode(name, keysPath, commonRendezvous)
+		err := bridge.NewNode(name, keysPath, config.App.Rendezvous)
 		if err != nil {
 			logrus.Fatalf("not registered Node or no keyfile: %v", err)
 		}

@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -37,6 +38,10 @@ import (
 	"go.dedis.ch/kyber/v3/util/encoding"
 )
 
+var ErrContextDone = errors.New("interrupt on context done")
+
+const minConsensusNodesCount = 5
+
 type Node struct {
 	Ctx       context.Context
 	Router    *mux.Router
@@ -62,19 +67,14 @@ type Client struct {
 	NodeListFilterer wrappers.NodeListFilterer
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest) {
-	consensusChannel := make(chan bool)
-
-	// todo: wait group without waiting?
-	wg := &sync.WaitGroup{}
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
-
+	consensusChannel := make(chan bool)
 	logrus.Tracef("сurrentRendezvous %v LEADER %v", n.NodeBLS.CurrentRendezvous, n.NodeBLS.Leader)
-
-	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous)
 	wg.Add(1)
-	go n.NodeBLS.WaitForMsgNEW(consensusChannel)
+	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous, wg)
+	wg.Add(1)
+	go n.NodeBLS.WaitForMsgNEW(consensusChannel, wg)
 	consensus := <-consensusChannel
 	if consensus == true {
 		logrus.Tracef("Starting Leader election !!!")
@@ -174,7 +174,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) >= 5 {
+				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.App.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
@@ -253,6 +253,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+	reqLoop:
 		for {
 			select {
 			case err := <-sub.Err():
@@ -263,40 +264,46 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					})
 				}
 			case e := <-channel:
-				logrus.Info("going to InitializePubSubWithTopicAndPeers")
+
+				logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", e.Chainid.String())
 				currentTopic := common2.ToHex(e.Raw.TxHash)
-				func(topic string) {
-					logrus.Debugf("currentTopic %s", topic)
-					sendTopic, err := n.P2PPubSub.JoinTopic(topic)
+				logrus.Debugf("currentTopic %s", currentTopic)
+				sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
+				if err != nil {
+					logrus.Error(fmt.Errorf("JoinTopic %s on chain %s error: %w", currentTopic, e.Chainid, err))
+					continue reqLoop
+				}
+				go func(topic *pubSub.Topic) {
+					defer func() {
+						if err := topic.Close(); err != nil {
+							logrus.Error(fmt.Errorf("close topic error: %w", err))
+						}
+						logrus.Tracef("chainId %s topic %s closed", e.Chainid.String(), topic.String())
+					}()
+					p2pSub, err := topic.Subscribe()
 					if err != nil {
-						logrus.Error("JoinTopic ", err)
+						logrus.Error("Subscribe ", err)
+						return
 					}
-					if sendTopic != nil {
-						defer func() {
-							if err := sendTopic.Close(); err != nil {
-								logrus.Error(fmt.Errorf("close topic error: %w", err))
-							}
-						}()
-						p2pSub, err := sendTopic.Subscribe()
-						if err != nil {
-							logrus.Error("Subscribe ", err)
-						}
-						defer p2pSub.Cancel()
-						logrus.Print(p2pSub.Topic())
-						logrus.Print(sendTopic.ListPeers())
+					defer p2pSub.Cancel()
+					logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
+					logrus.Println("sendTopic.ListPeers(): ", sendTopic.ListPeers())
 
-						n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
-						if err != nil {
-							logrus.Error("NewBLSNode ", err)
-						}
-						if n.NodeBLS != nil {
-							go n.StartProtocolByOracleRequest(e)
-
-						}
+					n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
+					if err != nil {
+						logrus.Error("NewBLSNode ", err)
+						return
 					}
-				}(currentTopic)
+					if n.NodeBLS != nil {
+						wg := new(sync.WaitGroup)
+						wg.Add(1)
+						go n.StartProtocolByOracleRequest(e, wg)
+						wg.Wait()
+					}
+				}(sendTopic)
 			case <-n.Ctx.Done():
-				return
+				err = ErrContextDone
+				break reqLoop
 			}
 		}
 	}()

@@ -4,6 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync"
+
 	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"github.com/digiu-ai/p2p-bridge/config"
 	"github.com/digiu-ai/p2p-bridge/libp2p"
@@ -15,12 +22,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"math/big"
-	"reflect"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 func InitNode(name, keysPath string) (err error) {
@@ -67,7 +68,7 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			cancel()
 		}
 	}()
-	n, err := NewNodeWithClients(name, ctx)
+	n, err := NewNodeWithClients(ctx)
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
 	}
@@ -143,8 +144,11 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 				eventChan,
 				wg,
 				client)
-			if err != nil {
-				return fmt.Errorf("can not listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
+			if errors.Is(err, ErrContextDone) {
+				logrus.Info(err)
+				return nil
+			} else if err != nil {
+				return fmt.Errorf("stop listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
 			}
 		}
 
@@ -242,26 +246,23 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 	return
 }
 
-func NewNodeWithClients(path string, ctx context.Context) (n *Node, err error) {
+func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 	n = &Node{
 		Ctx:     ctx,
 		Clients: make(map[string]Client, len(config.App.Chains)),
-	}
-	if err := config.Load(path); err != nil {
-		logrus.Fatal(err)
 	}
 	logrus.Print(len(config.App.Chains), " chains Length")
 	for _, chain := range config.App.Chains {
 		logrus.Print("CHAIN ", chain, "chain")
 		client, err := NewClient(chain)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("init chain[%d] node client error: %w", chain.Id, err))
+			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
 		}
 		if reflect.DeepEqual(client, ethclient.Client{}) {
-			return nil, errors.New(fmt.Sprintf("init chain [%d] client failed", chain.Id))
+			return nil, fmt.Errorf("init chain [%d] client failed", chain.Id)
 		}
 		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
-			return nil, errors.New(fmt.Sprintf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err))
+			return nil, fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
 		}
 		n.Clients[client.ChainCfg.ChainId.String()] = client
 	}

@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 if [[ "$OSTYPE" == "darwin"* ]];then
-  export RANDEVOUE=$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)
   DC="../docker-compose-macos.yaml"
 else 
-  export RANDEVOUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)
   DC="../docker-compose.yaml"
 fi 
   # stop and remove nodes

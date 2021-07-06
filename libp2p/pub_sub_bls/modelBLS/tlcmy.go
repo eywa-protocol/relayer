@@ -3,19 +3,21 @@ package modelBLS
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
+
 	"github.com/sirupsen/logrus"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/sign/bdn"
-	"sync"
 )
 
-// Advance will change the step of the node to a new one and then broadcast a message to the network.
-func (node *Node) AdvanceWithTopic(step int, topic string) {
+// AdvanceWithTopic  will change the step of the node to a new one and then broadcast a message to the network.
+func (node *Node) AdvanceWithTopic(step int, topic string, wg *sync.WaitGroup) {
+	wg.Done()
 	node.TimeStep = step
 	node.Acks = 0
 	node.Wits = 0
 
-	//fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -40,8 +42,9 @@ func (node *Node) DisconnectPubSub() {
 
 }
 
-// waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
-func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
+// WaitForMsgNEW  waits for upcoming messages and then decides the next action with respect to msg's contents.
+func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	mutex := &sync.Mutex{}
 	end := false
 	msgChan := make(chan *[]byte, ChanLen)
@@ -65,9 +68,9 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool) {
 			break
 		}
 		msgChan <- rcvdMsg
-
+		wg.Add(1)
 		go func(nodeTimeStep int) {
-
+			defer wg.Done()
 			msgBytes := <-msgChan
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 

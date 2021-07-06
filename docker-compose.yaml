@@ -50,8 +50,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node1:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.11
@@ -70,8 +68,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node2:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.12
@@ -90,8 +86,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node3:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.13
@@ -110,8 +104,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node4:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.14
@@ -130,8 +122,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node5:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.15
@@ -150,8 +140,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node6:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.16
@@ -170,8 +158,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node7:/go/keys
-    environment:
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.17

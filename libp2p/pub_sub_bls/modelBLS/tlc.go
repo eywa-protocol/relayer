@@ -4,11 +4,12 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
+	"sync"
+
 	"github.com/sirupsen/logrus"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/sign/bdn"
-	"log"
-	"sync"
 )
 
 const ChanLen = 500
@@ -21,8 +22,8 @@ func (node *Node) Advance(step int) {
 	node.Acks = 0
 	node.Wits = 0
 
-	//fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
-	//fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
+	// fmt.Printf("node %d , Broadcast in timeStep %d\n", node.Id, node.TimeStep)
+	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
 		Source:  node.Id,
@@ -42,7 +43,7 @@ func (node *Node) Advance(step int) {
 	node.Comm.Broadcast(*msgBytes)
 }
 
-// waitForMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
+// WaitForMsg  waits for upcoming messages and then decides the next action with respect to msg's contents.
 func (node *Node) WaitForMsg(stop int) (err error) {
 	mutex := &sync.Mutex{}
 	end := false
@@ -322,7 +323,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	if err != nil {
 		return
 	}
-	//fmt.Println("signature VERIFIED !!!!!\n")
+	// fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

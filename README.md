@@ -1,13 +1,12 @@
 ## децентрализованный релеер для выполнения кросc-чейн вызовов
 
-
 #### пререквизиты
- go, truffle, npx, docker, docker-compose
 
+go, truffle, npx, docker, docker-compose
 
-###  локальный деплой
+### локальный деплой
 
-```bash
+```shell
 mkdir digiu
 cd digiu
 git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
@@ -20,26 +19,47 @@ cd scripts
 ./deploy.sh
 ```
 
-
 ### запуск теста
- 
-```
+
+```shell
 make -C external/eth-contracts local-test
  
 ```
 
 ### Переключение loglevel
 
-Переключение loglevel между заданным при старте и trace выполняется отправкой сигнала USR2 процессу 
+Переключение loglevel между заданным при старте и trace выполняется отправкой сигнала USR2 процессу
 
 Например для node_1
-```
+
+```shell
 docker-compose exec --index=1 node kill -12 1
 ```
 
 ### Ребилд нод после изменения кода
 
-```
+```shell
 cd scripts
 ./rebuild_nodes.sh
+```
+
+### Остановка всех контейнеров
+
+```shell
+cd scripts
+./stop_all.sh
+```
+
+### Запуск всех контейнеров
+
+```shell
+cd scripts
+./start_all.sh
+
+```
+
+### Запуск теста
+
+```shell
+for (( c=0; c<=10; c++ )) do go test -count=1 test/testnets_test.go; done
 ```

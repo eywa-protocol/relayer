@@ -249,6 +249,7 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 	n = &Node{
 		Ctx:     ctx,
+		nonceMx: new(sync.Mutex),
 		Clients: make(map[string]Client, len(config.App.Chains)),
 	}
 	logrus.Print(len(config.App.Chains), " chains Length")

@@ -44,13 +44,13 @@ const minConsensusNodesCount = 5
 
 type Node struct {
 	Ctx       context.Context
+	nonceMx   *sync.Mutex
 	Router    *mux.Router
 	Server    bridges.Server
 	Host      host.Host
 	Dht       *dht.IpfsDHT
 	Service   *libp2p.Service
 	P2PPubSub *libp2p_pubsub.Libp2pPubSub
-	NodeBLS   *modelBLS.Node
 	Routing   routing.PeerRouting
 	Discovery *discovery.RoutingDiscovery
 	PrivKey   kyber.Scalar
@@ -67,23 +67,23 @@ type Client struct {
 	NodeListFilterer wrappers.NodeListFilterer
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
 	defer wg.Done()
 	consensusChannel := make(chan bool)
-	logrus.Tracef("сurrentRendezvous %v LEADER %v", n.NodeBLS.CurrentRendezvous, n.NodeBLS.Leader)
+	logrus.Tracef("сurrentRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
 	wg.Add(1)
-	go n.NodeBLS.AdvanceWithTopic(0, n.NodeBLS.CurrentRendezvous, wg)
+	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
 	wg.Add(1)
-	go n.NodeBLS.WaitForMsgNEW(consensusChannel, wg)
+	go nodeBls.WaitForMsgNEW(consensusChannel, wg)
 	consensus := <-consensusChannel
 	if consensus == true {
 		logrus.Tracef("Starting Leader election !!!")
-		leaderPeerId, err := libp2p.RelayerLeaderNode(n.NodeBLS.CurrentRendezvous, n.NodeBLS.Participants)
+		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)
 		if err != nil {
 			panic(err)
 		}
 		logrus.Infof("LEADER IS %v", leaderPeerId)
-		logrus.Debugf("LEADER id %s my ID %s", n.NodeBLS.Leader.Pretty(), n.Host.ID().Pretty())
+		logrus.Debugf("LEADER id %s my ID %s", nodeBls.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
 			_, err := n.ReceiveRequestV2(event)
@@ -119,16 +119,6 @@ func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, e
 		publicKeys = append(publicKeys, p)
 	}
 	return
-}
-
-func (n Node) AddPubkeyToNodeKeys(blsPubKey []byte) {
-	suite := pairing.NewSuiteBn256()
-	blsPKey := string(blsPubKey[:])
-	p, err := encoding.ReadHexPoint(suite, strings.NewReader(blsPKey))
-	if err != nil {
-		panic(err)
-	}
-	n.NodeBLS.PublicKeys = append(n.NodeBLS.PublicKeys, p)
 }
 
 func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err error) {
@@ -169,7 +159,6 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(3*time.Second))
 			defer cancel()
 			for {
-
 				topicParticipants := topic.ListPeers()
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
@@ -289,15 +278,16 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
 					logrus.Println("sendTopic.ListPeers(): ", sendTopic.ListPeers())
 
-					n.NodeBLS, err = n.NewBLSNode(sendTopic, client)
+					var nodeBls *modelBLS.Node
+					nodeBls, err = n.NewBLSNode(sendTopic, client)
 					if err != nil {
 						logrus.Error("NewBLSNode ", err)
 						return
 					}
-					if n.NodeBLS != nil {
+					if nodeBls != nil {
 						wg := new(sync.WaitGroup)
 						wg.Add(1)
-						go n.StartProtocolByOracleRequest(e, wg)
+						go n.StartProtocolByOracleRequest(e, wg, nodeBls)
 						wg.Wait()
 					}
 				}(sendTopic)
@@ -318,7 +308,6 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if err != nil {
 		return
 	}
-	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
 
 	logrus.Infof("going to make this call in %s chain", client.ChainCfg.ChainId.String())
 	/** Invoke bridge on another side */
@@ -326,13 +315,14 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	if err != nil {
 		logrus.Error(err)
 	}
-
+	n.nonceMx.Lock()
+	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
 	/** Invoke bridge on another side */
 	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {
 		logrus.Error("ReceiveRequestV2", err)
 	}
-
+	n.nonceMx.Unlock()
 	if tx != nil {
 		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {

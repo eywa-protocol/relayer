@@ -3,7 +3,7 @@ version: '3.6'
 services:
 # bootstrap nodes
   bsn1:
-    command: [ "./bsn", "-mode", "start" ]
+    command: [ "./bsn"]
     build:
       context: ../
       dockerfile: ./p2p-bridge/Dockerfile
@@ -16,7 +16,7 @@ services:
         ipv4_address: 172.20.64.11
 
   bsn2:
-    command: [ "./bsn", "-mode", "start" ]
+    command: [ "./bsn" ]
     image: p2p-bridge_img
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
@@ -26,7 +26,7 @@ services:
         ipv4_address: 172.20.64.12
 
   bsn3:
-    command: [ "./bsn", "-mode", "start" ]
+    command: [ "./bsn"]
     image: p2p-bridge_img
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
@@ -37,7 +37,7 @@ services:
 
   # protocol nodes
   node1:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -45,24 +45,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node1:/go/keys
-    environment:
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.11
 
   node2:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -70,25 +60,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node2:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.12
 
   node3:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -96,25 +75,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node3:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.13
 
   node4:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -122,25 +90,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node4:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.14
 
   node5:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -148,25 +105,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node5:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.15
 
   node6:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -174,25 +120,14 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node6:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.16
 
   node7:
-    command: ["./bridge", "-mode",  "start", "-cnf", "bootstrap.env"]
+    command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img
     depends_on:
       - bsn1
@@ -200,19 +135,8 @@ services:
       - bsn3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
-      - .data/bootstrap.env:/go/bootstrap.env
-      - .data/bsn.yaml:/go/bsn.yaml
+      - .data/bridge.yaml:/go/bridge.yaml
       - .data/keys/node7:/go/keys
-    environment:
-      - MODE=${MODE}
-      - PORT=0
-      - ECDSA_KEY_1={ECDSA_KEY_1}
-      - ECDSA_KEY_2={ECDSA_KEY_2}
-      - ECDSA_KEY_3={ECDSA_KEY_3}
-      - NETWORK_RPC_1=${NETWORK_RPC_1}
-      - NETWORK_RPC_2=${NETWORK_RPC_2}
-      - NETWORK_RPC_3=${NETWORK_RPC_3}
-      - RANDEVOUE=${RANDEVOUE}
     networks:
       static-network:
         ipv4_address: 172.20.32.17

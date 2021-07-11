@@ -365,7 +365,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 	for {
 		select {
 		case <-ticker.C:
-			logrus.Infof("Looking advertised peers by rendezvous %s....", rendezvous)
+			logrus.Tracef("Looking advertised peers by rendezvous %s....", rendezvous)
 			// TODO: enhance, because synchronous
 			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
 			if err != nil {
@@ -393,7 +393,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 				}
 
 			}
-			logrus.Infof("Total amout discovered and connected peers: %d", ctn)
+			logrus.Tracef("Total amout discovered and connected peers: %d", ctn)
 
 		case <-n.Ctx.Done():
 			return

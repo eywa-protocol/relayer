@@ -50,6 +50,10 @@ func ToHex(b Bytes32) string {
 	return "0x" + hex.EncodeToString(b[:])
 }
 
+func BytesToHex(b []byte) string {
+	return "0x" + hex.EncodeToString(b[:])
+}
+
 var ErrHexTooShort = errors.New("hex string is shorter than bytes32")
 
 func FromHex(s string) (Bytes32, error) {

@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build-all
 
-.PHONY: update-modules build key
+.PHONY: update-modules build key test_local_bridge
 
 deps:
 	go mod tidy

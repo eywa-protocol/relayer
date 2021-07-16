@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/digiu-ai/p2p-bridge/helpers"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 
-	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
+	wrappers "gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 func Connect(string2 string) (*ethclient.Client, error) {

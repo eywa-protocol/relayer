@@ -4,9 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
 	"net"
 	"time"
+
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"

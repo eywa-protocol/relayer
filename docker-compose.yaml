@@ -5,8 +5,8 @@ services:
   bsn1:
     command: [ "./bsn"]
     build:
-      context: ../
-      dockerfile: ./p2p-bridge/Dockerfile
+      context: ./
+      dockerfile: ./Dockerfile
     image: p2p-bridge_img
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584

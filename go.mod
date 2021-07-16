@@ -1,14 +1,13 @@
-module github.com/digiu-ai/p2p-bridge
+module gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge
 
 go 1.16
 
-replace github.com/digiu-ai/wrappers => ./external/eth-contracts/wrappers/
+replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contracts/wrappers/
 
-replace github.com/digiu-ai/p2p-bridge => ./
+replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
-	github.com/digiu-ai/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0
@@ -28,6 +27,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.2
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
+	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c

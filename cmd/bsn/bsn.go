@@ -7,9 +7,9 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
-	bootstrap2 "github.com/digiu-ai/p2p-bridge/node/bootstrap"
-	"github.com/digiu-ai/p2p-bridge/runa"
 	"github.com/sirupsen/logrus"
+	bootstrap2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bootstrap"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 )
 
 func initPprof() {

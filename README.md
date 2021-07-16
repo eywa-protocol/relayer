@@ -9,7 +9,7 @@ go, truffle, npx, docker, docker-compose
 ```shell
 mkdir digiu
 cd digiu
-git clone --recursive git@github.com:digiu-ai/p2p-bridge.git
+git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
 cd p2p-bridge
 git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
 make -C external/eth-contracts/

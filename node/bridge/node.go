@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/libp2p/go-flow-metrics"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,18 +46,19 @@ var ErrContextDone = errors.New("interrupt on context done")
 const minConsensusNodesCount = 5
 
 type Node struct {
-	Ctx       context.Context
-	nonceMx   *sync.Mutex
-	Router    *mux.Router
-	Server    bridges.Server
-	Host      host.Host
-	Dht       *dht.IpfsDHT
-	Service   *libp2p.Service
-	P2PPubSub *libp2p_pubsub.Libp2pPubSub
-	Routing   routing.PeerRouting
-	Discovery *discovery.RoutingDiscovery
-	PrivKey   kyber.Scalar
-	Clients   map[string]Client
+	Ctx            context.Context
+	nonceMx        *sync.Mutex
+	Router         *mux.Router
+	Server         bridges.Server
+	Host           host.Host
+	Dht            *dht.IpfsDHT
+	Service        *libp2p.Service
+	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
+	Routing        routing.PeerRouting
+	Discovery      *discovery.RoutingDiscovery
+	PrivKey        kyber.Scalar
+	Clients        map[string]Client
+	uptimeRegistry *flow.MeterRegistry
 }
 
 type Client struct {
@@ -388,6 +392,9 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 					} else {
 						logrus.Tracef("Discovery: connected to peer %s", p.ID.Pretty())
 					}
+				} else {
+					// store peer uptime
+					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.App.TickerInterval.Milliseconds() / 1000))
 				}
 
 				if n.Host.Network().Connectedness(p.ID) == network.Connected {
@@ -401,4 +408,90 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 			return
 		}
 	}
+}
+func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
+	go func() {
+		defer wg.Done()
+	uptimeLoop:
+		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.App.UptimeReportInterval) {
+			currentTopic := schedule.TimeToTopicName("uptime", t)
+			if uptimeTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
+				logrus.Error(fmt.Errorf("join uptime topic error: %w", err))
+				continue uptimeLoop
+			} else {
+				go func(topic *pubSub.Topic) {
+					defer func() {
+						if err := topic.Close(); err != nil {
+							logrus.Error(fmt.Errorf("close topic error: %w", err))
+						}
+						logrus.Tracef("uptime topic %s closed", topic.String())
+					}()
+					p2pSub, err := topic.Subscribe()
+					if err != nil {
+						logrus.Error("Subscribe ", err)
+						return
+					}
+					defer p2pSub.Cancel()
+					logrus.Infoln("uptime.Topic: ", p2pSub.Topic())
+					logrus.Infoln("uptime.ListPeers(): ", topic.ListPeers())
+
+					var nodeBls *modelBLS.Node
+					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.App.Chains[0].ChainId.String()])
+					if err != nil {
+						err = fmt.Errorf("can not create new bls node for uptime on error: %w ", err)
+						logrus.Error(err)
+						return
+					}
+					if nodeBls != nil {
+						wg := new(sync.WaitGroup)
+						wg.Add(1)
+						go n.startUptimeProtocol(t, wg, nodeBls)
+						wg.Wait()
+					}
+				}(uptimeTopic)
+			}
+		}
+
+	}()
+}
+
+func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
+	defer wg.Done()
+	consensusChannel := make(chan bool)
+	logrus.Tracef("uptimeRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
+	wg.Add(1)
+	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
+	wg.Add(1)
+	go nodeBls.WaitForMsgNEW(consensusChannel, wg)
+	consensus := <-consensusChannel
+	if consensus == true {
+		logrus.Tracef("Starting uptime Leader election !!!")
+		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)
+		if err != nil {
+			panic(err)
+		}
+		logrus.Debugf("LEADER id %s my ID %s", nodeBls.Leader.Pretty(), n.Host.ID().Pretty())
+		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
+			logrus.Infof("LEADER IS %s", leaderPeerId.Pretty())
+			time.Sleep(2 * time.Second)
+			logrus.Info("LEADER going to get uptime from over nodes")
+			uptimeLeader := uptime.NewLeader(n.Host, n.uptimeRegistry, nodeBls.Participants)
+			uptimeData := uptimeLeader.Uptime()
+			logrus.Infof("uptime data: %v", uptimeData)
+			logrus.Infof("LEADER going to reset uptime %s", t.String())
+			uptimeLeader.Reset()
+			logrus.Infof("The END of Protocol")
+		} else {
+			logrus.Debug("start uptime server")
+			if uptimeServer, err := uptime.NewServer(n.Host, leaderPeerId, n.uptimeRegistry); err != nil {
+				logrus.Error(fmt.Errorf("can not init uptime server on error: %w", err))
+			} else {
+				uptimeServer.WaitForReset()
+				logrus.Debug("uptime server stoped")
+
+			}
+			logrus.Debug("The END of Protocol")
+		}
+	}
+
 }

@@ -51,6 +51,9 @@ func Load(path string) error {
 		return fmt.Errorf("unmarshal config error: %w", err)
 	}
 
+	// todo: change to 24 hours
+	App.UptimeReportInterval = 5 * time.Minute
+
 	for _, chain := range App.Chains {
 		if chain.EcdsaKey, err = crypto.HexToECDSA(strings.TrimPrefix(chain.EcdsaKeyString, "0x")); err != nil {
 			return fmt.Errorf("decode chain [%d] ecdsa_key error: %w", chain.Id, err)

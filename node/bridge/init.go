@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/libp2p/go-flow-metrics"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
@@ -152,6 +153,9 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			}
 		}
 
+		wg.Add(1)
+		go n.UptimeSchedule(wg)
+
 		logrus.Info("bridge started")
 		runa.Host(n.Host, cancel, wg)
 		return nil
@@ -248,9 +252,10 @@ func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
 
 func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 	n = &Node{
-		Ctx:     ctx,
-		nonceMx: new(sync.Mutex),
-		Clients: make(map[string]Client, len(config.App.Chains)),
+		Ctx:            ctx,
+		nonceMx:        new(sync.Mutex),
+		Clients:        make(map[string]Client, len(config.App.Chains)),
+		uptimeRegistry: new(flow.MeterRegistry),
 	}
 	logrus.Print(len(config.App.Chains), " chains Length")
 	for _, chain := range config.App.Chains {

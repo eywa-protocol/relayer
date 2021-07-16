@@ -11,14 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/helpers"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigPb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
-	"github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -32,6 +24,14 @@ import (
 	pubSub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
@@ -382,12 +382,14 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
 					if err != nil {
-						logrus.Tracef("Connect to peer was unsuccessful: %s", p.ID)
+						logrus.WithField("peer_id", p.ID.Pretty()).
+							Error(errors.New("connect to peer was unsuccessful on discovery"))
 
 					} else {
-						logrus.Tracef("Connected to peer %s", p.ID.Pretty())
+						logrus.Tracef("Discovery: connected to peer %s", p.ID.Pretty())
 					}
 				}
+
 				if n.Host.Network().Connectedness(p.ID) == network.Connected {
 					ctn++
 				}

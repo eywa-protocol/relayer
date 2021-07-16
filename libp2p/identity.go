@@ -1,9 +1,9 @@
 package libp2p
 
 import (
-	"github.com/digiu-ai/p2p-bridge/common"
 	"github.com/libp2p/go-libp2p"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 )
 
 func IdentityFromKey(keyFile string) (identity libp2p.Option, err error) {

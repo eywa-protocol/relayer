@@ -2,14 +2,14 @@ package test
 
 import (
 	"context"
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/helpers"
-	"github.com/digiu-ai/p2p-bridge/node/bridge"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"github.com/digiu-ai/wrappers"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
+	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"math/big"
 	"testing"
 	"time"
@@ -66,4 +66,3 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	require.Equal(t, testData, res)
 	logrus.Print(res)
 }
-

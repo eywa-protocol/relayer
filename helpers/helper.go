@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	wrappers "github.com/digiu-ai/wrappers"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
+	wrappers "gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 type OracleRequest struct {

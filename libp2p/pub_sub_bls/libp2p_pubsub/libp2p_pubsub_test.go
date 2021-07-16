@@ -8,17 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigpb "github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/test_utils"
 	"github.com/stretchr/testify/require"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/test_utils"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
 	core "github.com/libp2p/go-libp2p-core"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
 )
 
 type FailureModel int

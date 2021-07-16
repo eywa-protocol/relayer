@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/digiu-ai/p2p-bridge/runa"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 
-	common2 "github.com/digiu-ai/p2p-bridge/common"
-	"github.com/digiu-ai/p2p-bridge/libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 )
 
 func NodeInit(keysPath, name, listen string, port uint) (err error) {

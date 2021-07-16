@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/digiu-ai/p2p-bridge/config"
-	"github.com/digiu-ai/p2p-bridge/node/bridge"
-	"github.com/digiu-ai/p2p-bridge/runa"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 )
 
 const defaultRendezvous = "mygroupofnodes"

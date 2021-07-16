@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/model"
-	"github.com/digiu-ai/p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"

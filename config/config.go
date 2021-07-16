@@ -22,10 +22,11 @@ import (
 var App Configuration
 
 type Configuration struct {
-	TickerInterval time.Duration `yaml:"ticker_interval"`
-	Rendezvous     string        `yaml:"rendezvous"`
-	Chains         []*Chain      `yaml:"chains"`
-	BootstrapAddrs []string      `yaml:"bootstrap-addrs"`
+	TickerInterval       time.Duration `yaml:"ticker_interval"`
+	UptimeReportInterval time.Duration
+	Rendezvous           string   `yaml:"rendezvous"`
+	Chains               []*Chain `yaml:"chains"`
+	BootstrapAddrs       []string `yaml:"bootstrap-addrs"`
 }
 
 type Chain struct {

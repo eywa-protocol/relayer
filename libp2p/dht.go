@@ -45,7 +45,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 			go func() {
 				defer wg.Done()
 				if err := host.Connect(ctx, *peerInfo); err != nil {
-					logrus.Errorf("Error while connecting to node %q: %-v", peerInfo, err)
+					logrus.WithFields(peerInfo.Loggable()).Error(fmt.Errorf("connecting to node error: %w", err))
 					mx.Lock()
 					retryPeers = append(retryPeers, peerInfo)
 					mx.Unlock()

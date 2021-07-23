@@ -50,7 +50,12 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 	msgChan := make(chan *[]byte, ChanLen)
 	nodeTimeStep := 0
 
-	for nodeTimeStep <= stop {
+	isNeedToStop := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return nodeTimeStep <= stop
+	}
+	for isNeedToStop() {
 		// For now we assume that the underlying receive function is blocking
 
 		mutex.Lock()

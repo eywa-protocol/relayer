@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	bootstrap2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bootstrap"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 )
 
 func initPprof() {
@@ -27,6 +30,7 @@ func main() {
 	var logLevel int
 	var pprofFlag bool
 	var keysPath string
+	var printVer bool
 	flag.BoolVar(&init, "init", false, "run \"./bsn -init\" to init node")
 	flag.StringVar(&listen, "listen", "0.0.0.0", "listen ip address")
 	flag.UintVar(&port, "port", 4001, "-port")
@@ -34,7 +38,13 @@ func main() {
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
 	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
+	flag.BoolVar(&printVer, "version", false, "print version and exit")
 	flag.Parse()
+
+	if printVer {
+		common.PrintVersion()
+		os.Exit(0)
+	}
 
 	if pprofFlag == true {
 		initPprof()
@@ -44,6 +54,8 @@ func main() {
 
 	// Toggle logrus log level between current logLevel and trace by USR2 os signal
 	runa.LogrusLevelHandler(logrus.Level(logLevel))
+
+	sentry.Init("bsn")
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("init: %v, name: %s, keys-path: %s", init, name, keysPath)

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -90,6 +92,9 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 	if err != nil {
 		logrus.Fatal(fmt.Errorf("new bootstrap host error: %w", err))
 	}
+	sentry.AddTags(map[string]string{
+		field.PeerId: h.ID().Pretty(),
+	})
 
 	_, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
 	if err != nil {

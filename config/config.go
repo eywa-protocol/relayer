@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gopkg.in/yaml.v3"
 	_ "gopkg.in/yaml.v3"
 )
@@ -77,16 +78,22 @@ func Load(path string) error {
 func (c *Chain) GetEthClient() (client *ethclient.Client, err error) {
 	for _, url := range c.RpcUrls {
 		if client, err = ethclient.Dial(url); err != nil {
-			logrus.Error(fmt.Errorf("chain [%d] connect to rpc url %s error: %w", c.Id, url, err))
+			logrus.WithFields(logrus.Fields{
+				field.CainId: c.Id,
+				field.EthUrl: url,
+			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
 			continue
 		} else {
 			balance, err := client.BalanceAt(context.Background(), c.EcdsaAddress, nil)
 			if err != nil {
-				logrus.Error(fmt.Errorf("chain [%d] get balance for address %s error: %w",
-					c.Id, c.EcdsaAddress.String(), err))
+				logrus.WithFields(logrus.Fields{
+					field.CainId:       c.Id,
+					field.EcdsaAddress: c.EcdsaAddress.String(),
+				}).Error(fmt.Errorf("get address balance error: %w", err))
 			}
 			if balance == big.NewInt(0) {
-				return nil, fmt.Errorf("you need balance on your chain [%d] wallet [%s]: %s to start node",
+
+				return nil, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
 					c.Id, c.EcdsaAddress.String(), balance.String())
 
 			}

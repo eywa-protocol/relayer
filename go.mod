@@ -8,11 +8,14 @@ replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/ethereum/go-ethereum v1.10.3
+	github.com/evalphobia/logrus_sentry v0.8.2
+	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0
 	github.com/ipfs/go-datastore v0.4.5
-	github.com/libp2p/go-flow-metrics v0.0.3 // indirect
+	github.com/libp2p/go-flow-metrics v0.0.3
 	github.com/libp2p/go-libp2p v0.14.2
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-discovery v0.5.0
@@ -31,6 +34,7 @@ require (
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )

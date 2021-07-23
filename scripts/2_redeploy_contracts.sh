@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+touch ../.env.sentry
+
 if [[ "$OSTYPE" == "darwin"* ]];then
   if [[ "$(ifconfig lo0 | grep 172.20)" == "" ]];then
     echo "run sudo ./macos_add_interfaces.sh before deploy"

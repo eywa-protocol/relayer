@@ -6,4 +6,5 @@ tmp
 node*.env
 .idea
 bsn.yaml
+.env.sentry
 

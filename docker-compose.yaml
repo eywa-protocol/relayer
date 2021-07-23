@@ -8,6 +8,8 @@ services:
       context: ./
       dockerfile: ./Dockerfile
     image: p2p-bridge_img
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - ./.data/keys/bsn1:/go/keys
@@ -18,6 +20,8 @@ services:
   bsn2:
     command: [ "./bsn" ]
     image: p2p-bridge_img
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - ./.data/keys/bsn2:/go/keys
@@ -28,6 +32,8 @@ services:
   bsn3:
     command: [ "./bsn"]
     image: p2p-bridge_img
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - ./.data/keys/bsn3:/go/keys
@@ -46,6 +52,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -64,6 +72,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -82,6 +92,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -100,6 +112,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -118,6 +132,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -136,6 +152,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
@@ -154,6 +172,8 @@ services:
       - bsn1
       - bsn2
       - bsn3
+    env_file:
+      - .env.sentry
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml

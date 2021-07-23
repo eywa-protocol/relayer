@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
+touch ../.env.sentry
+
 if [[ "$OSTYPE" == "darwin"* ]];then
   DC="../docker-compose-macos.yaml"
 else
   DC="../docker-compose.yaml"
 fi
 
-touch ../node/bsn.yaml
 echo "compose bsn for macos docker host"
 # stop and remove bootstrap nodes containers
 docker-compose -f $DC rm -s -f bsn1 bsn2 bsn3 && \

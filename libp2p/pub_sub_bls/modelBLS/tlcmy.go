@@ -50,7 +50,12 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 	msgChan := make(chan *[]byte, ChanLen)
 	nodeTimeStep := 0
 	stop := 1
-	for nodeTimeStep <= stop {
+	isNeedToStop := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return nodeTimeStep <= stop
+	}
+	for isNeedToStop() {
 		// For now we assume that the underlying receive function is blocking
 
 		mutex.Lock()

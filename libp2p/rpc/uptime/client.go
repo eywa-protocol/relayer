@@ -11,6 +11,7 @@ import (
 	rpc "github.com/libp2p/go-libp2p-gorpc"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 )
 
 type Client struct {
@@ -54,7 +55,7 @@ func (c *Client) Uptime() UpList {
 
 	c.uptimeRegistry.ForEach(func(s string, meter *flow.Meter) {
 		if pId, err := peer.Decode(s); err != nil {
-			logrus.WithField("peerId", s).Error(fmt.Errorf("decode peer id error: %w", err))
+			logrus.WithField(field.PeerId, s).Error(fmt.Errorf("decode peer id error: %w", err))
 		} else {
 			snapshot := meter.Snapshot()
 			if _, ok := uptimes[pId]; !ok {
@@ -67,7 +68,7 @@ func (c *Client) Uptime() UpList {
 
 	for i, err := range errs {
 		if err != nil {
-			logrus.WithField("peerId", c.pIds[i].Pretty()).Error(fmt.Errorf("can not get peer uptime on error: %w", err))
+			logrus.WithField(field.PeerId, c.pIds[i].Pretty()).Error(fmt.Errorf("can not get peer uptime on error: %w", err))
 		} else {
 			for _, uptime := range res[i].Uptimes {
 				if _, ok := uptimes[uptime.PeerId]; !ok {
@@ -117,7 +118,7 @@ func (c *Client) Reset() {
 	)
 	for i, err := range errs {
 		if err != nil {
-			logrus.WithField("peerId", c.pIds[i].Pretty()).Error(fmt.Errorf("can not reset peer uptime on error: %w", err))
+			logrus.WithField(field.PeerId, c.pIds[i].Pretty()).Error(fmt.Errorf("can not reset peer uptime on error: %w", err))
 		} else {
 			logrus.Debugf("uptime metrics reseted for pearId: %s", res[i].PeerId.Pretty())
 		}

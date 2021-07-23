@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	rpc "github.com/libp2p/go-libp2p-gorpc"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 )
 
 var ErrLeaderNotMatch = errors.New("request leader not match to node leader")
@@ -29,7 +30,7 @@ func (s *Server) UptimeHandler(leader peer.ID) (Result, error) {
 		s.uptimeRegistry.ForEach(func(s string, meter *flow.Meter) {
 			if peerId, err := peer.Decode(s); err != nil {
 				err = fmt.Errorf("decode peer Id error: %w", err)
-				logrus.WithField("peer_id_string", s).Error(err)
+				logrus.WithField(field.PeerId, s).Error(err)
 			} else {
 				snapshot := meter.Snapshot()
 				res = append(res, UpTime{
@@ -41,8 +42,8 @@ func (s *Server) UptimeHandler(leader peer.ID) (Result, error) {
 		})
 	} else {
 		logrus.WithFields(logrus.Fields{
-			"request_leader": leader,
-			"node_leader":    s.leader,
+			field.RequestLeader:   leader,
+			field.ConsensusLeader: s.leader,
 		}).Error(ErrLeaderNotMatch)
 		return Result{}, ErrLeaderNotMatch
 	}

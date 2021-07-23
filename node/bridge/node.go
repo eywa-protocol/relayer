@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-flow-metrics"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -263,19 +264,28 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				logrus.Debugf("currentTopic %s", currentTopic)
 				sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
 				if err != nil {
-					logrus.Error(fmt.Errorf("JoinTopic %s on chain %s error: %w", currentTopic, e.Chainid, err))
+					logrus.WithFields(logrus.Fields{
+						field.CainId:              e.Chainid,
+						field.ConsensusRendezvous: currentTopic,
+					}).Error(fmt.Errorf("join topic error: %w", err))
 					continue reqLoop
 				}
 				go func(topic *pubSub.Topic) {
 					defer func() {
 						if err := topic.Close(); err != nil {
-							logrus.Error(fmt.Errorf("close topic error: %w", err))
+							logrus.WithFields(logrus.Fields{
+								field.CainId:              e.Chainid,
+								field.ConsensusRendezvous: currentTopic,
+							}).Error(fmt.Errorf("close topic error: %w", err))
 						}
 						logrus.Tracef("chainId %s topic %s closed", e.Chainid.String(), topic.String())
 					}()
 					p2pSub, err := topic.Subscribe()
 					if err != nil {
-						logrus.Error("Subscribe ", err)
+						logrus.WithFields(logrus.Fields{
+							field.CainId:              e.Chainid,
+							field.ConsensusRendezvous: currentTopic,
+						}).Error(fmt.Errorf("subscribe error: %w", err))
 						return
 					}
 					defer p2pSub.Cancel()
@@ -285,7 +295,10 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					var nodeBls *modelBLS.Node
 					nodeBls, err = n.NewBLSNode(sendTopic, client)
 					if err != nil {
-						logrus.Error("NewBLSNode ", err)
+						logrus.WithFields(logrus.Fields{
+							field.CainId:              e.Chainid,
+							field.ConsensusRendezvous: currentTopic,
+						}).Error(fmt.Errorf("create bls node error: %w ", err))
 						return
 					}
 					if nodeBls != nil {
@@ -310,6 +323,9 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 
 	client, err := n.GetNodeClientByChainId(event.Chainid)
 	if err != nil {
+		logrus.WithFields(
+			field.ListFromBridgeOracleRequest(event),
+		).Error(fmt.Errorf("can not get client on error: %w", err))
 		return
 	}
 
@@ -317,20 +333,29 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	/** Invoke bridge on another side */
 	instance, err := wrappers.NewBridge(event.OppositeBridge, client.EthClient)
 	if err != nil {
-		logrus.Error(err)
+		logrus.WithFields(
+			field.ListFromBridgeOracleRequest(event),
+		).Error(fmt.Errorf("invoke opposite bridge error: %w", err))
 	}
 	n.nonceMx.Lock()
 	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
 	/** Invoke bridge on another side */
 	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {
-		logrus.Error("ReceiveRequestV2", err)
+		logrus.WithFields(
+			field.ListFromBridgeOracleRequest(event),
+		).Error(fmt.Errorf("ReceiveRequestV2 error:%w", err))
 	}
 	n.nonceMx.Unlock()
 	if tx != nil {
 		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {
-			return nil, fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
+			err = fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
+			logrus.WithFields(logrus.Fields{
+				field.BridgeRequest: field.ListFromBridgeOracleRequest(event),
+				field.TxId:          tx.Hash().Hex(),
+			}).Error()
+			return nil, err
 		}
 	}
 	return
@@ -386,7 +411,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 				if n.Host.Network().Connectedness(p.ID) != network.Connected {
 					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
 					if err != nil {
-						logrus.WithField("peer_id", p.ID.Pretty()).
+						logrus.WithField(field.PeerId, p.ID.Pretty()).
 							Error(errors.New("connect to peer was unsuccessful on discovery"))
 
 					} else {
@@ -416,19 +441,25 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.App.UptimeReportInterval) {
 			currentTopic := schedule.TimeToTopicName("uptime", t)
 			if uptimeTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
-				logrus.Error(fmt.Errorf("join uptime topic error: %w", err))
+				logrus.WithFields(logrus.Fields{
+					field.ConsensusRendezvous: currentTopic,
+				}).Error(fmt.Errorf("join uptime topic error: %w", err))
 				continue uptimeLoop
 			} else {
 				go func(topic *pubSub.Topic) {
 					defer func() {
 						if err := topic.Close(); err != nil {
-							logrus.Error(fmt.Errorf("close topic error: %w", err))
+							logrus.WithFields(logrus.Fields{
+								field.ConsensusRendezvous: currentTopic,
+							}).Error(fmt.Errorf("close uptime topic error: %w", err))
 						}
 						logrus.Tracef("uptime topic %s closed", topic.String())
 					}()
 					p2pSub, err := topic.Subscribe()
 					if err != nil {
-						logrus.Error("Subscribe ", err)
+						logrus.WithFields(logrus.Fields{
+							field.ConsensusRendezvous: currentTopic,
+						}).Error(fmt.Errorf("uptime subscribe error: %w", err))
 						return
 					}
 					defer p2pSub.Cancel()
@@ -438,8 +469,10 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 					var nodeBls *modelBLS.Node
 					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.App.Chains[0].ChainId.String()])
 					if err != nil {
-						err = fmt.Errorf("can not create new bls node for uptime on error: %w ", err)
-						logrus.Error(err)
+						err = fmt.Errorf("uptime create new bls node error: %w ", err)
+						logrus.WithFields(logrus.Fields{
+							field.ConsensusRendezvous: currentTopic,
+						}).Error(err)
 						return
 					}
 					if nodeBls != nil {
@@ -484,7 +517,9 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 		} else {
 			logrus.Debug("start uptime server")
 			if uptimeServer, err := uptime.NewServer(n.Host, leaderPeerId, n.uptimeRegistry); err != nil {
-				logrus.Error(fmt.Errorf("can not init uptime server on error: %w", err))
+				logrus.WithFields(logrus.Fields{
+					field.ConsensusRendezvous: nodeBls.CurrentRendezvous,
+				}).Error(fmt.Errorf("can not init uptime server on error: %w", err))
 			} else {
 				uptimeServer.WaitForReset()
 				logrus.Debug("uptime server stoped")

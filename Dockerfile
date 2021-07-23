@@ -17,8 +17,13 @@ COPY    ./libp2p ./libp2p
 COPY    ./node ./node
 COPY    ./runa ./runa
 COPY    ./Makefile .
+COPY    ./sentry ./sentry
+COPY    ./.git ./.git
 
-RUN make
+RUN APP_VERSION=$(git tag --sort=taggerdate | tail -1) && \
+    COMMIT_SHA=$(git rev-list -1 HEAD) && \
+    BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ') && \
+    go install -ldflags="-X gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common.Version=$APP_VERSION -X gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common.Commit=$COMMIT_SHA -X gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common.BuildTime=$BUILD_TIME"  ./cmd/...
 
 FROM golang:alpine
 
@@ -27,6 +32,6 @@ RUN mkdir -p ./keys
 RUN touch ./bsn.yaml
 RUN touch ./bootstrap.env
 
-COPY --from=build /p2p-bridge-b/bridge ./
+COPY --from=build /go/bin/bridge ./
 
-COPY --from=build /p2p-bridge-b/bsn ./
+COPY --from=build /go/bin/bsn ./

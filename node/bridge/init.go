@@ -22,6 +22,8 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -96,6 +98,12 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	}
 
 	NodeIdAddressFromFile := common.BytesToAddress([]byte(hostFromFile.ID()))
+	sentry.AddTags(map[string]string{
+		field.PeerId:         hostFromFile.ID().Pretty(),
+		field.NodeAddress:    NodeIdAddressFromFile.Hex(),
+		field.NodeRendezvous: config.App.Rendezvous,
+	})
+
 	c1, ok := n.Clients[config.App.Chains[0].ChainId.String()]
 	if !ok {
 		return fmt.Errorf("node  client 0 not initialized")
@@ -220,10 +228,10 @@ func NewClient(chain *config.Chain) (client Client, err error) {
 	}, nil
 }
 
-func (n Node) GetNodeClientByChainId(chainIdFromClient *big.Int) (Client, error) {
+func (n Node) GetNodeClientByChainId(chainId *big.Int) (Client, error) {
 
-	if client, ok := n.Clients[chainIdFromClient.String()]; !ok {
-		return Client{}, fmt.Errorf("not found node client for chainId %s", chainIdFromClient.String())
+	if client, ok := n.Clients[chainId.String()]; !ok {
+		return Client{}, errors.New("eth client for chain ID not found")
 	} else {
 		return client, nil
 	}

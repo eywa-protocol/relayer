@@ -15,6 +15,7 @@ git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gi
 make -C external/eth-contracts/
 make
 cd scripts
+
 # for macos only run before deploy sudo ./macos_add_interfaces.sh
 ./deploy.sh
 ```
@@ -63,3 +64,13 @@ cd scripts
 ```shell
 for (( c=0; c<=10; c++ )) do go test -count=1 test/testnets_test.go; done
 ```
+
+### Sentry
+Для включения отправки ошибок в Sentry выполните ```./init_env_sentry.sh``` из папки скрипт с параметром имя разработчика
+
+Пример
+```shell
+cd scripts
+./init_env_sentry.sh dkh
+```
+

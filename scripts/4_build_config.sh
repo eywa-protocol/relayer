@@ -13,7 +13,7 @@ EOF
 cat >> ../.data/bridge.yaml <<EOF
 chains:
 EOF
-for f in ../external/eth-contracts/truffle/networks_env/env_connect_to_network*.env
+for f in ../external/eth-contracts/hardhat/networks_env/env_connect_to_network*.env
 do
 
     set -o allexport

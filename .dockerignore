@@ -7,3 +7,5 @@ docker-compose-testnet.yaml
 docker-compose.yaml
 docker-compose.yaml.OLD
 .dockerignore
+./external
+!./external/eth-contracts/wrappers

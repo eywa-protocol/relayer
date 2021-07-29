@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+HARDHAT="../external/eth-contracts/hardhat"
+EXAMPLE="/.env.example"
+CONFIG="/.env"
+
+function copyConfigs() {
+  echo $HARDHAT$EXAMPLE $HARDHAT$CONFIG
+  cp $HARDHAT$EXAMPLE $HARDHAT$CONFIG
+}
+
+copyConfigs
+
 if [[ "$OSTYPE" == "darwin"* ]];then
   export RANDEVOUE=$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)
 else
@@ -35,6 +46,8 @@ do
     rpc_urls:
       - $RPC_URL
 EOF
+CONFIG_KEY=PRIVATE_KEY_NETWORK${NETWORK_ID: -1}
+sed -i "s/$CONFIG_KEY.*/$CONFIG_KEY=$ECDSA_KEY/" "$HARDHAT$CONFIG"
 done
 cat ../.data/bsn.yaml >> ../.data/bridge.yaml
 

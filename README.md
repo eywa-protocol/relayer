@@ -2,7 +2,7 @@
 
 #### пререквизиты
 
-go, truffle, npx, docker, docker-compose
+go, hardhat, npx, docker, docker-compose
 
 ### локальный деплой
 

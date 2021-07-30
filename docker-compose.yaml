@@ -205,7 +205,7 @@ services:
   ganache_net1:
     build:
       context: ./
-      dockerfile: ./external/eth-contracts/truffle/docker/network1/ganache/Dockerfile
+      dockerfile: ./external/eth-contracts/hardhat/docker/network1/ganache/Dockerfile
     volumes:
       - ./.data/chaindata_ganache_net1:/chaindata
 
@@ -218,7 +218,7 @@ services:
   ganache_net2:
     build:
       context: ./
-      dockerfile: ./external/eth-contracts/truffle/docker/network2/ganache/Dockerfile
+      dockerfile: ./external/eth-contracts/hardhat/docker/network2/ganache/Dockerfile
     volumes:
       - ./.data/chaindata_ganache_net2:/chaindata
     networks:
@@ -230,7 +230,7 @@ services:
   ganache_net3:
     build:
       context: ./
-      dockerfile: ./external/eth-contracts/truffle/docker/network3/ganache/Dockerfile
+      dockerfile: ./external/eth-contracts/hardhat/docker/network3/ganache/Dockerfile
     volumes:
       - ./.data/chaindata_ganache_net3:/chaindata
     networks:

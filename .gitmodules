@@ -1,3 +1,4 @@
 [submodule "external/eth-contracts"]
 	path = external/eth-contracts
 	url = git@gitlab.digiu.ai:blockchainlaboratory/eywa-contracts.git
+        branch = develop

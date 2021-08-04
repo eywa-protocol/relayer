@@ -20,4 +20,3 @@ if [[ "$(docker images p2p-bridge_img | grep p2p-bridge_img)" == "" ]];then
 else
   docker rmi -f p2p-bridge_img
 fi
-rm -rf ../.data/*

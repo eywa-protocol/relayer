@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-if [[ "$OSTYPE" == "linux"* ]];then
-  sudo chown -R $USER:$USER ../.data/
+DIRECTORY="../.data"
+
+if [[ "$OSTYPE" == "linux"* ]] && [[ -d "$DIRECTORY" ]];then
+  sudo chown -R $USER:$USER $DIRECTORY
 fi

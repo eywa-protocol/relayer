@@ -75,8 +75,11 @@ func Load(path string) error {
 	return nil
 }
 
-func (c *Chain) GetEthClient() (client *ethclient.Client, err error) {
+func (c *Chain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
 	for _, url := range c.RpcUrls {
+		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
+			continue
+		}
 		if client, err = ethclient.Dial(url); err != nil {
 			logrus.WithFields(logrus.Fields{
 				field.CainId: c.Id,
@@ -93,13 +96,13 @@ func (c *Chain) GetEthClient() (client *ethclient.Client, err error) {
 			}
 			if balance == big.NewInt(0) {
 
-				return nil, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
+				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
 					c.Id, c.EcdsaAddress.String(), balance.String())
 
 			}
 
-			return client, nil
+			return client, url, nil
 		}
 	}
-	return nil, fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
+	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
 }

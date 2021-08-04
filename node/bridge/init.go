@@ -52,9 +52,11 @@ func InitNode(name, keysPath string) (err error) {
 	_ = libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
 
 	for _, chain := range config.App.Chains {
-		client, err := chain.GetEthClient()
+		client, url, err := chain.GetEthClient("")
 		if err != nil {
 			return fmt.Errorf("%w", err)
+		} else {
+			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
 		}
 		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.NodeListAddress, h.ID(), []byte(pub)); err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
@@ -152,7 +154,7 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			err = n.ListenNodeOracleRequest(
 				eventChan,
 				wg,
-				client)
+				client.ChainCfg.ChainId)
 			if errors.Is(err, ErrContextDone) {
 				logrus.Info(err)
 				return nil
@@ -171,9 +173,9 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	return
 }
 
-func NewClient(chain *config.Chain) (client Client, err error) {
+func NewClient(chain *config.Chain, skipUrl string) (client Client, err error) {
 
-	c, err := chain.GetEthClient()
+	c, url, err := chain.GetEthClient(skipUrl)
 	if err != nil {
 		err = fmt.Errorf("get eth client error: %w", err)
 		return
@@ -225,16 +227,61 @@ func NewClient(chain *config.Chain) (client Client, err error) {
 		},
 		BridgeFilterer:   *bridgeFilterer,
 		NodeListFilterer: *nodeListFilterer,
+		currentUrl:       url,
 	}, nil
 }
 
-func (n Node) GetNodeClientByChainId(chainId *big.Int) (Client, error) {
-
-	if client, ok := n.Clients[chainId.String()]; !ok {
-		return Client{}, errors.New("eth client for chain ID not found")
-	} else {
-		return client, nil
+func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
+	n.cMx.Lock()
+	clientRecreated := false
+	client, ok := n.Clients[chainId.String()]
+	if !ok {
+		n.cMx.Unlock()
+		return Client{}, false, errors.New("eth client for chain ID not found")
 	}
+	n.cMx.Unlock()
+
+	netChainId, err := client.EthClient.ChainID(n.Ctx)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			field.CainId: chainId,
+		}).Error(fmt.Errorf("recreate network client on error: %w", err))
+
+		client, err = NewClient(client.ChainCfg, client.currentUrl)
+		if err != nil {
+			err = fmt.Errorf("can not create client on error:%w", err)
+			return Client{}, false, err
+		} else {
+			// replace network client in clients map
+			clientRecreated = true
+			n.cMx.Lock()
+			n.Clients[chainId.String()] = client
+			n.cMx.Unlock()
+		}
+	}
+
+	if netChainId != nil && netChainId.Cmp(chainId) != 0 {
+		err = errors.New("chain id not match to network")
+		logrus.WithFields(logrus.Fields{
+			field.CainId:         chainId,
+			field.NetworkChainId: netChainId,
+		}).Error(err)
+		return Client{}, false, err
+	}
+
+	return client, clientRecreated, nil
+}
+
+func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
+	n.cMx.Lock()
+	defer n.cMx.Unlock()
+
+	client, ok := n.Clients[chainId.String()]
+	if !ok {
+		return Client{}, errors.New("eth client for chain ID not found")
+	}
+
+	return client, nil
 }
 
 func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
@@ -262,13 +309,14 @@ func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 	n = &Node{
 		Ctx:            ctx,
 		nonceMx:        new(sync.Mutex),
+		cMx:            new(sync.Mutex),
 		Clients:        make(map[string]Client, len(config.App.Chains)),
 		uptimeRegistry: new(flow.MeterRegistry),
 	}
 	logrus.Print(len(config.App.Chains), " chains Length")
 	for _, chain := range config.App.Chains {
 		logrus.Print("CHAIN ", chain, "chain")
-		client, err := NewClient(chain)
+		client, err := NewClient(chain, "")
 		if err != nil {
 			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
 		}

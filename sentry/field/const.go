@@ -9,10 +9,10 @@ const (
 	NodeAddress    = "nodeAddress"
 	NodeRendezvous = "nodeRendezvous"
 
-	CainId       = "chainID"
-	EthUrl       = "ethUrl"
-	EcdsaAddress = "ecdsaAddress"
-	Balance      = "balance"
+	CainId         = "chainID"
+	NetworkChainId = "networkChainID"
+	EthUrl         = "ethUrl"
+	EcdsaAddress   = "ecdsaAddress"
 
 	RequestType    = "requestType"
 	BridgeAddress  = "bridgeAddress"

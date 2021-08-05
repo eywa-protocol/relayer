@@ -65,14 +65,6 @@ func FromHex(s string) (Bytes32, error) {
 	return b, err
 }
 
-func FromOGRN(ogrn string) Bytes32 {
-	return B32("OGRN:" + ogrn)
-}
-
-func ToOGRN(orgId Bytes32) string {
-	return strings.TrimRight(strings.TrimPrefix(string(orgId[:]), "OGRN:"), "\000")
-}
-
 func Bytes32Enum(in interface{}) interface{} {
 	out := reflect.ValueOf(in).Elem()
 	for i := out.NumField() - 1; i >= 0; i-- {
@@ -80,4 +72,13 @@ func Bytes32Enum(in interface{}) interface{} {
 		out.Field(i).Set(reflect.ValueOf(fieldValue))
 	}
 	return out.Interface()
+}
+
+func BytesToBytes32(b []byte) (r Bytes32, err error) {
+	if len(b) > 32 {
+		err = ErrStringTooLong
+	} else {
+		copy(r[:], b)
+	}
+	return
 }

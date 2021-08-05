@@ -1,4 +1,4 @@
-package test
+package networks
 
 import (
 	"context"
@@ -21,7 +21,7 @@ var err error
 var random int
 
 func init() {
-	err = config.Load("../.data/bridge.yaml")
+	err = config.Load("../../.data/bridge.yaml")
 	if err != nil {
 		logrus.Fatal(err)
 	}

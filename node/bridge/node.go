@@ -120,7 +120,7 @@ func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, e
 		return
 	}
 	for _, node := range nodes {
-		p, err := encoding.ReadHexPoint(suite, strings.NewReader(string(node.BlsPubKey)))
+		p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
 		if err != nil {
 			panic(err)
 		}

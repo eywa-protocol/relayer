@@ -1,4 +1,4 @@
-package test
+package networks
 
 import (
 	"github.com/stretchr/testify/require"
@@ -6,9 +6,6 @@ import (
 	"math/rand"
 	"testing"
 )
-
-
-
 
 func Test_SendRequestV2_FromRinkebyToMumbai(t *testing.T) {
 	SendRequestV2FromChainToChain(t, big.NewInt(4), big.NewInt(80001), big.NewInt(rand.Int63()))
@@ -39,4 +36,3 @@ func Test_SendRequestV2_FromMumbaiToBsc(t *testing.T) {
 	SendRequestV2FromChainToChain(t, big.NewInt(80001), big.NewInt(97), big.NewInt(rand.Int63()))
 	require.NoError(t, err)
 }
-

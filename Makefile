@@ -1,15 +1,10 @@
 .DEFAULT_GOAL := build-all
 
-.PHONY: update-modules build key test_local_bridge
+.PHONY: update-modules build key test_local_bridge build-bsn
 
 deps:
 	go mod tidy
 	go mod download
-
-build:	deps
-	go build -o bridge  cmd/bridge/bridge.go
-
-.PHONY: build-bsn
 
 build-bsn: deps
 	go build -o bsn  cmd/bsn/bsn.go
@@ -32,3 +27,6 @@ custom_bls_test:
 
 test_local_bridge:
 	go test -v ./test/networks -run Test_Local_SendRequestV2
+
+wrappers:
+	make -C external/eth-contracts/ eth-local-migrate

@@ -16,9 +16,14 @@ git checkout integration
 git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
 cd ./external/eth-contracts/hardhat
 npm i
-./scripts/deploy.sh rinkeby,bsctestnet
-...
-...
+cp helper-hardhat-config.json.example helper-hardhat-config.json
+cp .env.example .env
+cd ../../..
+make -C external/eth-contracts/
+make
+cd scripts
+# for macos only run before deploy sudo ./macos_add_interfaces.sh
+./deploy.sh
 ...
 ```
 

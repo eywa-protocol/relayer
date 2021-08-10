@@ -18,5 +18,5 @@ else
   docker-compose -f ../docker-compose-testnet.yaml stop rinkeby bsctestnet && \
   docker-compose -f ../docker-compose-testnet.yaml up -d --no-deps --build --force-recreate rinkeby && \
   docker-compose -f ../docker-compose-testnet.yaml up -d --no-deps --build --force-recreate bsctestnet && \
-  make -C ../external/eth-contracts migrate
+  make -C ../external/eth-contracts eth-testnet-migrate
 fi

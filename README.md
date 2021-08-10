@@ -11,10 +11,12 @@ mkdir digiu
 cd digiu
 git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
 cd eywa-p2p-bridge
+git fetch origin integration:integration
+git checkout integration
 git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
 cd ./external/eth-contracts/hardhat
 npm i
-./scripts/deploy.sh
+./scripts/deploy.sh rinkeby,bsctestnet
 ...
 ...
 ...

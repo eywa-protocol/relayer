@@ -8,6 +8,9 @@ deps:
 
 build-bsn: deps
 	go build -o bsn  cmd/bsn/bsn.go
+build: deps
+	go build -o bridge  cmd/bridge/bridge.go
+
 
 clean:
 	rm -f ./bridge ./bsn keys/*.key keys/*.env

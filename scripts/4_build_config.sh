@@ -26,7 +26,7 @@ EOF
 cat >> ../.data/bridge.yaml <<EOF
 chains:
 EOF
-for f in ../external/eth-contracts/hardhat/networks_env/env_connect_to_network*.env
+for f in ../external/eth-contracts/hardhat/networks_env/env_connect_to_*.env
 do
 
     set -o allexport
@@ -38,6 +38,12 @@ do
       export ECDSA_KEY=0x72a21bf9881eff3ab6e4bd245074cdbb6631388e22318bd4f5df2752b69222cc
     elif [ "$NETWORK_ID" == "1113" ];then
       export ECDSA_KEY=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7
+    elif [ "$NETWORK_ID" == "4" ];then
+      export ECDSA_KEY=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7  # 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
+    elif [ "$NETWORK_ID" == "97" ];then
+      export ECDSA_KEY=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7  # 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
+    elif [ "$NETWORK_ID" == "80001" ];then
+      export ECDSA_KEY=0x3fdb56439eb7c05074586993925c6e06103a5b770b46aa29e399cc693d44ddf7  # 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
     fi
     cat >> ../.data/bridge.yaml <<EOF
   - id: $NETWORK_ID

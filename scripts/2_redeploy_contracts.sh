@@ -15,9 +15,8 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   make -C ../external/eth-contracts eth-local-migrate
 else
   echo "compose for linux docker host"
-  docker-compose -f ../docker-compose.yaml stop ganache_net1 ganache_net2 ganache_net3 && \
-  docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net1 && \
-  docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net2 && \
-  docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net3 && \
-  make -C ../external/eth-contracts eth-local-migrate
+  docker-compose -f ../docker-compose-testnet.yaml stop rinkeby bsctestnet && \
+  docker-compose -f ../docker-compose-testnet.yaml up -d --no-deps --build --force-recreate rinkeby && \
+  docker-compose -f ../docker-compose-testnet.yaml up -d --no-deps --build --force-recreate bsctestnet && \
+  make -C ../external/eth-contracts migrate
 fi

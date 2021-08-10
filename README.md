@@ -4,6 +4,23 @@
 
 go, hardhat, npx, docker, docker-compose
 
+### тестнет деплой
+
+```shell
+mkdir digiu
+cd digiu
+git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
+cd eywa-p2p-bridge
+git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
+cd ./external/eth-contracts/hardhat
+npm i
+./scripts/deploy.sh
+...
+...
+...
+```
+
+
 ### локальный деплой
 
 ```shell

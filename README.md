@@ -6,6 +6,8 @@ go, hardhat, npx, docker, docker-compose
 
 ### тестнет деплой
 
+- Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
+
 ```shell
 mkdir digiu
 cd digiu
@@ -20,6 +22,8 @@ make
 cd scripts
 
 ./deploy.sh testnet
+## зпуск теста
+make -C external/eth-contracts testnet-test
 ```
 
 

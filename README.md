@@ -22,7 +22,8 @@ make
 cd scripts
 
 ./deploy.sh testnet
-## зпуск теста
+## запуск теста
+cd ..
 make -C external/eth-contracts testnet-test
 ```
 

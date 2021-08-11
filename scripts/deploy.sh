@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-./fix_docker_perms.sh && \
+type=${1}
 ./1_clean_nodes.sh && \
-./2_redeploy_contracts.sh && \
-./fix_docker_perms.sh && \
-./3_build_bsn.sh && \
+./2_redeploy_contracts.sh ${type} && \
+./3_build_bsn.sh ${type} && \
 ./4_build_config.sh && \
-./5_build_nodes.sh
+./5_build_nodes.sh  ${type}
 
 
 

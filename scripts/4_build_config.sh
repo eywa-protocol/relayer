@@ -15,7 +15,7 @@ if [[ "$OSTYPE" == "darwin"* ]];then
   export RANDEVOUE=$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)
   export SED=gsed
 else
-  export RANDEVOUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)
+  export RANDEVOUE=$(head -80 /dev/urandom | LC_ALL=c tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
   export SED=sed
 fi
 

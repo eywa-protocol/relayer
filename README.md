@@ -4,52 +4,65 @@
 
 go, hardhat, npx, docker, docker-compose
 
+
+### настройка репозитория
+```shell
+mkdir digiu
+cd digiu
+git clone git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
+cd eywa-p2p-bridge
+```
+
+
 ### тестнет деплой
 
 - Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
 
 ```shell
-mkdir digiu
-cd digiu
-git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
-cd eywa-p2p-bridge
-git fetch origin integration:integration
-git checkout integration
-git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
-make -C external/eth-contracts/
-make -C external/eth-contracts/ eth-testnet-migrate
-make
 cd scripts
-
 ./deploy.sh testnet
-## запуск теста
-cd ..
-make -C external/eth-contracts testnet-test
 ```
+
 
 
 ### локальный деплой
 
 ```shell
-mkdir digiu
-cd digiu
-git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
-cd p2p-bridge
-git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
-make -C external/eth-contracts/
-make
 cd scripts
 
 # for macos only run before deploy sudo ./macos_add_interfaces.sh
 ./deploy.sh local
 ```
 
-### запуск теста
+### запуск тестов
 
-```shell
-make -C external/eth-contracts local-test
- 
+- e2e тест js
 ```
+make -C external/eth-contracts testnet-test
+make -C external/eth-contracts local-test
+```
+- e2e тест golang
+```
+./run_go_test.sh testnet
+./run_go_test.sh local
+```
+
+### Работа с репозиторием
+Чтобы зафиксировать версию подмодуля в родительском репозитории:
+```
+cd external/eth-contracts
+git checkout develop (или другая необходимая ветка)
+*ВНОCИМ ИЗМЕНЕНИЯ В КОНТРАКТЫ*
+git add .
+git commit -m "commit message"
+git push
+cd ../../
+git submodule update —remote
+git add external/eth-contracts
+git commit -m "submodule eth-contracts update"
+git push
+```
+
 
 ### Переключение loglevel
 
@@ -86,7 +99,7 @@ cd scripts
 ### Запуск теста
 
 ```shell
-for (( c=0; c<=10; c++ )) do go test -count=1 test/testnets_test.go; done
+for (( c=0; c<=10; c++ )) do go test -count=1 test/testnets_test.go $(date +%s); done
 ```
 
 ### Sentry
@@ -97,4 +110,6 @@ for (( c=0; c<=10; c++ )) do go test -count=1 test/testnets_test.go; done
 cd scripts
 ./init_env_sentry.sh dkh
 ```
+
+
 

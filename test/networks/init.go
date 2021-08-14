@@ -11,6 +11,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 )
@@ -18,7 +19,8 @@ import (
 var node *bridge.Node
 var err error
 
-var random int
+var qwe big.Int
+var testData *big.Int
 
 func init() {
 	err = config.Load("../../.data/bridge.yaml")
@@ -29,7 +31,7 @@ func init() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-
+	testData, _ = qwe.SetString(os.Args[5], 10)
 }
 
 func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testData *big.Int) {

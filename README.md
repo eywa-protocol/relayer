@@ -4,6 +4,30 @@
 
 go, hardhat, npx, docker, docker-compose
 
+### тестнет деплой
+
+- Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
+
+```shell
+mkdir digiu
+cd digiu
+git clone --recursive git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
+cd eywa-p2p-bridge
+git fetch origin integration:integration
+git checkout integration
+git submodule foreach -q --recursive 'git checkout $(git config -f $toplevel/.gitmodules submodule.$name.branch || echo main)'
+make -C external/eth-contracts/
+make -C external/eth-contracts/ eth-testnet-migrate
+make
+cd scripts
+
+./deploy.sh testnet
+## запуск теста
+cd ..
+make -C external/eth-contracts testnet-test
+```
+
+
 ### локальный деплой
 
 ```shell
@@ -17,7 +41,7 @@ make
 cd scripts
 
 # for macos only run before deploy sudo ./macos_add_interfaces.sh
-./deploy.sh
+./deploy.sh local
 ```
 
 ### запуск теста

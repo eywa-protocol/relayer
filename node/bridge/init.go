@@ -28,21 +28,33 @@ import (
 
 func InitNode(name, keysPath string) (err error) {
 
-	if common2.FileExists(keysPath + name + "-ecdsa.key") {
+	if common2.FileExists(keysPath + "/" + name + "-ecdsa.key") {
 		return errors.New("node already registered! ")
 	}
 
-	err = common2.GenAndSaveECDSAKey(keysPath, name)
+	privKey, err := common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		panic(err)
 	}
 
-	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	_, _, err = common2.GenAndSaveBN256Key(keysPath, name)
 	if err != nil {
 		return
 	}
 
 	logrus.Tracef("keyfile %v", keysPath+"/"+name+"-ecdsa.key")
+
+	fmt.Println("Generated address: ", common2.AddressFromCryptoPrivKey(privKey).String(), ".")
+	fmt.Println("Please transfer the collateral there and restart me with -register flag.")
+	return
+}
+
+func RegisterNode(name, keysPath string) (err error) {
+
+	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
 
 	h, err := libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
 	if err != nil {

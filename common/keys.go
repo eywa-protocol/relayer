@@ -183,21 +183,21 @@ func Keccak256(data ...[]byte) []byte {
 	return d.Sum(nil)
 }
 
-func GenAndSaveECDSAKey(keysPath, prefix string) (err error) {
+func GenAndSaveECDSAKey(keysPath, prefix string) (ecdsa crypto.PrivKey, err error) {
 	nodeKeyFile := keysPath + "/" + prefix + "-ecdsa.key"
 	if !FileExists(nodeKeyFile) {
-		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+		ecdsa, _, err = crypto.GenerateECDSAKeyPair(rand.Reader)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa")
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
-		_, err = ReadHostKey(nodeKeyFile)
+		ecdsa, err = ReadHostKey(nodeKeyFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -231,5 +231,12 @@ func AddressFromPrivKey(skey string) (address common.Address) {
 	}
 	address = ecrypto.PubkeyToAddress(*publicKeyECDSA)
 	return
+}
 
+func AddressFromCryptoPrivKey(privKey crypto.PrivKey) (address common.Address) {
+	keyBytes, err := crypto.MarshalPublicKey(privKey.GetPublic())
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	return common.BytesToAddress(keyBytes)
 }

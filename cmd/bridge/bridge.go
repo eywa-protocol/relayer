@@ -29,6 +29,7 @@ func initPprof() {
 
 func main() {
 	var init bool
+	var register bool
 	var path string
 	var port uint
 	var logLevel int
@@ -38,6 +39,7 @@ func main() {
 	var printVer bool
 
 	flag.BoolVar(&init, "init", false, "run \"./bridge -init\" to init node")
+	flag.BoolVar(&register, "register", false, "run \"./bridge -register\" to register node")
 	flag.StringVar(&path, "cnf", "bridge.yaml", "config file absolute path")
 	flag.UintVar(&port, "port", 0, "-port")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
@@ -86,6 +88,11 @@ func main() {
 
 	if init {
 		err := bridge.InitNode(name, keysPath)
+		if err != nil {
+			logrus.Error(fmt.Errorf("node init error %w", err))
+		}
+	} else if register {
+		err := bridge.RegisterNode(name, keysPath)
 		if err != nil {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}

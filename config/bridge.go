@@ -45,6 +45,7 @@ type BridgeChain struct {
 	EcdsaAddress    common.Address
 	BridgeAddress   common.Address `yaml:"bridge_address"`
 	NodeListAddress common.Address `yaml:"node_list_address"`
+	RewardAddress   common.Address `yaml:"reward_address"`
 	DexPoolAddress  common.Address `yaml:"dex_pool_address"`
 }
 

@@ -84,7 +84,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 }
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
+	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeRegistryAddress, nodeIdAddress)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -95,7 +95,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
+	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
 		return
 	}
@@ -134,7 +134,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 
 	} else {
 		logrus.Tracef("Host.ID() %v ", n.Host.ID())
-		node, err := client.NodeList.GetNode(nodeIdAddress)
+		node, err := client.NodeRegistry.GetNode(nodeIdAddress)
 		if err != nil {
 			return nil, err
 		}

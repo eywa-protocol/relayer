@@ -69,7 +69,7 @@ func RegisterNode(name, keysPath string) (err error) {
 		} else {
 			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
 		}
-		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.RewardAddress, h.ID(), pub); err != nil {
+		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.NodeRegistryAddress, h.ID(), pub); err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
 		}
 	}
@@ -130,10 +130,10 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	if !ok {
 		return fmt.Errorf("node  client 0 not initialized")
 	}
-	res, err := c1.NodeList.NodeExists(NodeIdAddressFromFile)
+	res, err := c1.NodeRegistry.NodeExists(NodeIdAddressFromFile)
 
 	if res {
-		nodeFromContract, err := c1.NodeList.GetNode(NodeIdAddressFromFile)
+		nodeFromContract, err := c1.NodeRegistry.GetNode(NodeIdAddressFromFile)
 		if err != nil {
 			return err
 		}

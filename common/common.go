@@ -116,7 +116,7 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 	}
 }
 
-func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContractAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
+func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 
@@ -124,11 +124,11 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContrac
 	if err != nil {
 		return fmt.Errorf("get chain id error: %w", err)
 	}
-	rewardsContract, err := wrappers.NewMyRewards(rewardsContractAddress, client)
-	res, err := rewardsContract.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+	nodeRegistry, err := wrappers.NewNodeRegistry(nodeRegistryAddress, client)
+	res, err := nodeRegistry.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
 	if err != nil {
-		err = fmt.Errorf("node not exists rewardsContractAddress: %s, client.Id: %s, error: %w",
-			rewardsContractAddress.String(), chainId.String(), err)
+		err = fmt.Errorf("node not exists nodeRegistryAddress: %s, client.Id: %s, error: %w",
+			nodeRegistryAddress.String(), chainId.String(), err)
 	}
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
@@ -139,15 +139,15 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContrac
 		for {
 			select {
 			case <-ticker.C:
-				created, err := rewardsContract.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+				created, err := nodeRegistry.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
 				if err != nil {
 					logrus.Errorf("NodeExists: %v", err)
 				}
 				if created == false {
-					token, err := rewardsContract.Token(&bind.CallOpts{})
+					token, err := nodeRegistry.EYWA(&bind.CallOpts{})
 
 					txOpts1 := CustomAuth(client, pk)
-					node := wrappers.MyRewardsNode{
+					node := wrappers.NodeRegistryNode{
 						Owner:         fromAddress,
 						NodeWallet:    fromAddress,
 						NodeIdAddress: common.BytesToAddress([]byte(peerId)),
@@ -190,7 +190,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContrac
 						PrimaryType: "Permit",
 						Message: core.TypedDataMessage{
 							"owner":    fromAddress.String(),
-							"spender":  rewardsContractAddress.String(),
+							"spender":  nodeRegistryAddress.String(),
 							"value":    "100000000000000000000",
 							"nonce":    "0",
 							"deadline": fmt.Sprintf("%d", deadline),
@@ -202,7 +202,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContrac
 					}
 					v, r, s := signature[64], common.BytesToHash(signature[0:32]), common.BytesToHash(signature[32:64])
 					logrus.Warn(signature, hash, v, r, s)
-					tx, err := rewardsContract.CreateRelayer(txOpts1, node, big.NewInt(deadline), v, r, s)
+					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, big.NewInt(deadline), v, r, s)
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())
 						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)
@@ -234,8 +234,8 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, rewardsContrac
 	return
 }
 
-func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeListNode, err error) {
-	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeRegistryNode, err error) {
+	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
 	if err != nil {
 		return
 	}
@@ -250,7 +250,7 @@ func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress comm
 }
 
 func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address) {
-	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
 	if err != nil {
 		return
 	}
@@ -266,8 +266,8 @@ func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address
 
 }
 
-func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeListNode, err error) {
-	nodeList, err := wrappers.NewNodeList(nodeListContractAddress, client)
+func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeRegistryNode, err error) {
+	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
 	if err != nil {
 		return
 	}

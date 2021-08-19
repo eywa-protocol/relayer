@@ -19,43 +19,49 @@ import (
 	_ "gopkg.in/yaml.v3"
 )
 
-// App is global object that holds all application level variables.
-var App Configuration
+// Bridge is global object that holds all bridge configuration variables.
+var Bridge Configuration
 
 type Configuration struct {
 	TickerInterval       time.Duration `yaml:"ticker_interval"`
 	UptimeReportInterval time.Duration
-	Rendezvous           string   `yaml:"rendezvous"`
-	Chains               []*Chain `yaml:"chains"`
-	BootstrapAddrs       []string `yaml:"bootstrap-addrs"`
+	Rendezvous           string         `yaml:"rendezvous"`
+	Chains               []*BridgeChain `yaml:"chains"`
+	BootstrapAddrs       []string       `yaml:"bootstrap-addrs"`
 }
 
-type Chain struct {
+type BridgeKeys struct {
+}
+
+type BridgeContract struct {
+}
+
+type BridgeChain struct {
 	Id              uint `yaml:"id"`
 	ChainId         *big.Int
-	EcdsaKeyString  string `yaml:"ecdsa_key"`
+	RpcUrls         []string `yaml:"rpc_urls"`
+	EcdsaKeyString  string   `yaml:"ecdsa_key"`
 	EcdsaKey        *ecdsa.PrivateKey
 	EcdsaAddress    common.Address
 	BridgeAddress   common.Address `yaml:"bridge_address"`
 	NodeListAddress common.Address `yaml:"node_list_address"`
 	DexPoolAddress  common.Address `yaml:"dex_pool_address"`
-	RpcUrls         []string       `yaml:"rpc_urls"`
 }
 
-func Load(path string) error {
+func LoadBridgeConfig(path string) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read config file [%s] error: %w",
 			path, err)
 	}
-	if err := yaml.Unmarshal(data, &App); err != nil {
+	if err := yaml.Unmarshal(data, &Bridge); err != nil {
 		return fmt.Errorf("unmarshal config error: %w", err)
 	}
 
 	// todo: change to 24 hours
-	App.UptimeReportInterval = 5 * time.Minute
+	Bridge.UptimeReportInterval = 5 * time.Minute
 
-	for _, chain := range App.Chains {
+	for _, chain := range Bridge.Chains {
 		if chain.EcdsaKey, err = crypto.HexToECDSA(strings.TrimPrefix(chain.EcdsaKeyString, "0x")); err != nil {
 			return fmt.Errorf("decode chain [%d] ecdsa_key error: %w", chain.Id, err)
 		}
@@ -69,13 +75,13 @@ func Load(path string) error {
 
 	// override config fields from env
 	if rendezvous := os.Getenv("RANDEVOUE"); rendezvous != "" {
-		App.Rendezvous = rendezvous
+		Bridge.Rendezvous = rendezvous
 	}
 
 	return nil
 }
 
-func (c *Chain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
+func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
 	for _, url := range c.RpcUrls {
 		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
 			continue

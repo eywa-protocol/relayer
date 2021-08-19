@@ -2,14 +2,15 @@ package sim
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	"testing"
 )
 
 func Test_AddNodeSignRawTx(t *testing.T) {
 	countBefore := getNodesCount()
-	signedTx2, err := common2.RawSimTx(*backend, owner, &nodeListAddress, nodeListAddNodeABIPacked)
+	signedTx2, err := common2.RawSimTx(backend, owner, &nodeListAddress, nodeListAddNodeABIPacked)
 	require.NoError(t, err)
 
 	v, r, s := signedTx2.RawSignatureValues()

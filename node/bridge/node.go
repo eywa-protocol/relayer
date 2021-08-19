@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,22 +11,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gorilla/mux"
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubSub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
@@ -48,31 +45,14 @@ var ErrContextDone = errors.New("interrupt on context done")
 const minConsensusNodesCount = 5
 
 type Node struct {
-	Ctx            context.Context
-	nonceMx        *sync.Mutex
-	Router         *mux.Router
-	Server         bridges.Server
-	Host           host.Host
-	Dht            *dht.IpfsDHT
-	Service        *libp2p.Service
-	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
-	Routing        routing.PeerRouting
-	Discovery      *discovery.RoutingDiscovery
-	PrivKey        kyber.Scalar
+	base.Node
 	cMx            *sync.Mutex
 	Clients        map[string]Client
+	nonceMx        *sync.Mutex
+	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
+	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
-}
-
-type Client struct {
-	EthClient        *ethclient.Client
-	ChainCfg         *config.Chain
-	EcdsaKey         *ecdsa.PrivateKey
-	Bridge           wrappers.BridgeSession
-	BridgeFilterer   wrappers.BridgeFilterer
-	NodeList         wrappers.NodeListSession
-	NodeListFilterer wrappers.NodeListFilterer
-	currentUrl       string
+	gsnClient      *gsn.Client
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
@@ -171,7 +151,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.App.Rendezvous))/2+1 {
+				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
@@ -457,7 +437,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
 	logrus.Printf("Successfully announced! n.Host.ID():%s ", n.Host.ID().Pretty())
 
-	ticker := time.NewTicker(config.App.TickerInterval)
+	ticker := time.NewTicker(config.Bridge.TickerInterval)
 	defer ticker.Stop()
 
 	for {
@@ -488,7 +468,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 					}
 				} else {
 					// store peer uptime
-					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.App.TickerInterval.Milliseconds() / 1000))
+					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.Bridge.TickerInterval.Milliseconds() / 1000))
 				}
 
 				if n.Host.Network().Connectedness(p.ID) == network.Connected {
@@ -507,7 +487,7 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 	uptimeLoop:
-		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.App.UptimeReportInterval) {
+		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.Bridge.UptimeReportInterval) {
 			currentTopic := schedule.TimeToTopicName("uptime", t)
 			if uptimeTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
 				logrus.WithFields(logrus.Fields{
@@ -536,7 +516,7 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 					logrus.Infoln("uptime.ListPeers(): ", topic.ListPeers())
 
 					var nodeBls *modelBLS.Node
-					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.App.Chains[0].ChainId.String()])
+					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.Bridge.Chains[0].ChainId.String()])
 					if err != nil {
 						err = fmt.Errorf("uptime create new bls node error: %w ", err)
 						logrus.WithFields(logrus.Fields{
@@ -598,4 +578,8 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 		}
 	}
 
+}
+
+func (n *Node) GetDht() *dht.IpfsDHT {
+	return n.Dht
 }

@@ -144,7 +144,13 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 					logrus.Errorf("NodeExists: %v", err)
 				}
 				if created == false {
-					token, err := nodeRegistry.EYWA(&bind.CallOpts{})
+					eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
+					minCollateral, _ := nodeRegistry.MINCOLLATERAL(&bind.CallOpts{})
+					eywa, err := wrappers.NewIERC20Permit(eywaAddress, client)
+					if err != nil {
+						logrus.Errorf("EYWA contract: %v", err)
+					}
+					fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
 
 					txOpts1 := CustomAuth(client, pk)
 					node := wrappers.NodeRegistryNode{
@@ -185,14 +191,14 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 							Name:              "MyEYWA",
 							Version:           "1",
 							ChainId:           (*math.HexOrDecimal256)(chainId),
-							VerifyingContract: token.String(),
+							VerifyingContract: eywaAddress.String(),
 						},
 						PrimaryType: "Permit",
 						Message: core.TypedDataMessage{
 							"owner":    fromAddress.String(),
 							"spender":  nodeRegistryAddress.String(),
-							"value":    "100000000000000000000",
-							"nonce":    "0",
+							"value":    minCollateral.String(),
+							"nonce":    fromNonce.String(),
 							"deadline": fmt.Sprintf("%d", deadline),
 						},
 					}
@@ -201,11 +207,11 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 						logrus.Fatal(err)
 					}
 					v, r, s := signature[64], common.BytesToHash(signature[0:32]), common.BytesToHash(signature[32:64])
-					logrus.Warn(signature, hash, v, r, s)
+					logrus.Warn(data.Message, signature, hash, v, r, s)
 					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, big.NewInt(deadline), v, r, s)
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())
-						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)
+						logrus.Errorf("CreateRelayer chainId %d ERROR: %v", chainId, err)
 						if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance") {
 							ticker.Stop()
 							return err
@@ -227,9 +233,6 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 				return
 			}
 		}
-		time.Sleep(15 * time.Second)
-		ticker.Stop()
-		mychannel <- true
 	}
 	return
 }

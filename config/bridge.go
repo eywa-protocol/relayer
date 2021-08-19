@@ -44,7 +44,6 @@ type BridgeChain struct {
 	EcdsaKey            *ecdsa.PrivateKey
 	EcdsaAddress        common.Address
 	BridgeAddress       common.Address `yaml:"bridge_address"`
-	EywaTokenAddress    common.Address `yaml:"eywa_token_address"`
 	NodeRegistryAddress common.Address `yaml:"node_registry_address"`
 	DexPoolAddress      common.Address `yaml:"dex_pool_address"`
 }

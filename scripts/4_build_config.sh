@@ -58,7 +58,6 @@ do
   - id: $NETWORK_ID
     ecdsa_key: $ECDSA_KEY
     bridge_address: $BRIDGE_ADDRESS
-    eywa_token_address: $EYWA_TOKEN_ADDRESS
     node_registry_address: $NODEREGISTRY_ADDRESS
     dex_pool_address: $DEXPOOL_ADDRESS
     reward_address: $REWARDS_ADDRESS

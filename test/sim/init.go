@@ -4,6 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"math/big"
+	"math/rand"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -14,9 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-	"math/big"
-	"math/rand"
-	"time"
 )
 
 var backend *backends.SimulatedBackend

@@ -2,9 +2,10 @@ package sim
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	"testing"
 )
 
 func Test_AddNodeSignRawTx(t *testing.T) {

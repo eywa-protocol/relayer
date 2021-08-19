@@ -93,18 +93,23 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 
 	ipFromFile := words[2]
 	logrus.Info("IP ADDRESS", ipFromFile)
-	hostFromFile, err := libp2p.NewHostFromKeyFila(n.Ctx, keyFile, portFromFile, ipFromFile)
+	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, keyFile, portFromFile, ipFromFile)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	if n.gsnClient, err = gsn.NewClient(n.Ctx, hostFromFile, n, config.Bridge.TickerInterval); err != nil {
+	n.Dht, err = n.InitDHT(config.Bridge.BootstrapAddrs)
+	if err != nil {
+		return err
+	}
+
+	if n.gsnClient, err = gsn.NewClient(n.Ctx, n.Host, n, config.Bridge.TickerInterval); err != nil {
 		logrus.Fatal(err)
 	}
 
-	NodeIdAddressFromFile := common.BytesToAddress([]byte(hostFromFile.ID()))
+	NodeIdAddressFromFile := common.BytesToAddress([]byte(n.Host.ID()))
 	sentry.AddTags(map[string]string{
-		field.PeerId:         hostFromFile.ID().Pretty(),
+		field.PeerId:         n.Host.ID().Pretty(),
 		field.NodeAddress:    NodeIdAddressFromFile.Hex(),
 		field.NodeRendezvous: config.Bridge.Rendezvous,
 	})
@@ -122,17 +127,10 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		}
 		logrus.Infof("PORT %d", portFromFile)
 
-		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(hostFromFile.ID())), nodeFromContract.NodeIdAddress)
+		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(n.Host.ID())), nodeFromContract.NodeIdAddress)
 
-		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(hostFromFile.ID())) {
-			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(hostFromFile.ID())))
-		}
-
-		n.Host = hostFromFile
-
-		n.Dht, err = n.InitDHT()
-		if err != nil {
-			return err
+		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(n.Host.ID())) {
+			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(n.Host.ID())))
 		}
 
 		//

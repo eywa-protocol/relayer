@@ -74,6 +74,9 @@ func (c *Client) discovery() {
 	for {
 		select {
 		case <-ticker.C:
+			if c.gsnPeerId != "" && c.host.Network().Connectedness(c.gsnPeerId) == network.Connected {
+				continue
+			}
 			gsnCh := c.routingDiscovery.FindProvidersAsync(c.ctx, c.cid, 1)
 			for gsnPeer := range gsnCh {
 				if c.host.Network().Connectedness(gsnPeer.ID) != network.Connected {
@@ -87,6 +90,11 @@ func (c *Client) discovery() {
 				}
 				if c.host.Network().Connectedness(gsnPeer.ID) == network.Connected {
 					c.mx.Lock()
+					if c.gsnPeerId == "" {
+						logrus.Infof("gsn peer discovered: %s", gsnPeer.ID.Pretty())
+					} else if c.gsnPeerId != gsnPeer.ID {
+						logrus.Infof("gsn peer changed to: %s", gsnPeer.ID.Pretty())
+					}
 					c.gsnPeerId = gsnPeer.ID
 					c.mx.Unlock()
 				}

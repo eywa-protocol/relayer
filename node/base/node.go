@@ -7,7 +7,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 )
 
@@ -17,11 +16,11 @@ type Node struct {
 	Dht  *dht.IpfsDHT
 }
 
-func (n Node) InitDHT() (dht *dht.IpfsDHT, err error) {
+func (n Node) InitDHT(bootstrapPeerAddrs []string) (dht *dht.IpfsDHT, err error) {
 
-	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(config.Bridge.BootstrapAddrs))
+	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(bootstrapPeerAddrs))
 
-	for _, addr := range config.Bridge.BootstrapAddrs {
+	for _, addr := range bootstrapPeerAddrs {
 		logrus.Infof("add bootstrap peer: %s", addr)
 		nAddr, err := multiaddr.NewMultiaddr(addr)
 		if err != nil {

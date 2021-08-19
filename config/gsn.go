@@ -70,7 +70,11 @@ func (c *GsnChain) GetEthClient(skipUrl string) (client *ethclient.Client, url s
 				field.CainId: c.Id,
 				field.EthUrl: url,
 			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
+		} else {
+
+			return client, url, nil
 		}
 	}
+
 	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
 }

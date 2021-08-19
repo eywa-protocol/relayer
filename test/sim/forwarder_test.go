@@ -2,12 +2,13 @@ package sim
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	"testing"
 )
 
 func TestForwarderVerify(t *testing.T) {

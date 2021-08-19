@@ -56,8 +56,8 @@ func RunNode(name, keysPath, listen string, port uint) (err error) {
 	}()
 	n := &Node{
 		Node:    base.Node{Ctx: ctx, Host: h},
-		cMx:     nil,
-		Clients: nil,
+		cMx:     new(sync.Mutex),
+		Clients: make(map[string]Client, len(config.Gsn.Chains)),
 	}
 
 	logrus.Print(len(config.Gsn.Chains), " chains Length")
@@ -78,7 +78,7 @@ func RunNode(name, keysPath, listen string, port uint) (err error) {
 		n.Clients[client.ChainCfg.ChainId.String()] = client
 	}
 
-	n.Dht, err = n.InitDHT()
+	n.Dht, err = n.InitDHT(config.Gsn.BootstrapAddrs)
 	if err != nil {
 		return fmt.Errorf("init DHT error: %w", err)
 	}

@@ -30,4 +30,4 @@ else
   docker rmi -f p2p-bridge_img
 fi
 
-make clean
+make -C ./.. clean

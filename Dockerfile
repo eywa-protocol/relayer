@@ -35,3 +35,5 @@ RUN touch ./bootstrap.env
 COPY --from=build /go/bin/bridge ./
 
 COPY --from=build /go/bin/bsn ./
+
+COPY --from=build /go/bin/gsn ./

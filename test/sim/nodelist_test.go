@@ -9,7 +9,7 @@ import (
 
 func Test_AddNodeSignRawTx(t *testing.T) {
 	countBefore := getNodesCount()
-	signedTx2, err := common2.RawSimTx(*backend, owner, &nodeListAddress, nodeListAddNodeABIPacked)
+	signedTx2, err := common2.RawSimTx(backend, owner, &nodeListAddress, nodeListAddNodeABIPacked)
 	require.NoError(t, err)
 
 	v, r, s := signedTx2.RawSignatureValues()

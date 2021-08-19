@@ -2,6 +2,10 @@ package networks
 
 import (
 	"context"
+	"math/big"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -10,9 +14,6 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-	"math/big"
-	"testing"
-	"time"
 )
 
 var node *bridge.Node
@@ -21,7 +22,7 @@ var err error
 var random int
 
 func init() {
-	err = config.Load("../../.data/bridge.yaml")
+	err = config.LoadBridgeConfig("../../.data/bridge.yaml")
 	if err != nil {
 		logrus.Fatal(err)
 	}

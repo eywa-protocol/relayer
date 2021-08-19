@@ -204,6 +204,21 @@ func GenAndSaveECDSAKey(keysPath, prefix string) (err error) {
 	return
 }
 
+func GetOrSaveECDSAKey(keysPath, prefix string) (hostKey crypto.PrivKey, err error) {
+	nodeKeyFile := keysPath + "/" + prefix + "-ecdsa.key"
+	if !FileExists(nodeKeyFile) {
+		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ReadHostKey(nodeKeyFile)
+}
+
 func AddressFromPrivKey(skey string) (address common.Address) {
 	privateKey, err := ToECDSAFromHex(skey)
 	if err != nil {

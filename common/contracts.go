@@ -1,9 +1,13 @@
 package common
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,12 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core"
 	"github.com/sirupsen/logrus"
-	"math/big"
-	"strings"
-)
-
-import (
-	"context"
 )
 
 /*
@@ -106,7 +104,7 @@ func SignTypedData(key ecdsa.PrivateKey, addr common.MixedcaseAddress, typedData
 	return signature, req.Hash, nil
 }
 
-func RawSimTx(client backends.SimulatedBackend, opts *bind.TransactOpts, contractAddr *common.Address, input []byte) (*types.Transaction, error) {
+func RawSimTx(client *backends.SimulatedBackend, opts *bind.TransactOpts, contractAddr *common.Address, input []byte) (*types.Transaction, error) {
 	var err error
 
 	// Ensure a valid value field and resolve the account nonce

@@ -6,6 +6,15 @@ else
   docker rm $nodes
 fi
 
+gsns=$(docker ps -a --format "{{.Names}}" | grep gsn | sort -n)
+if [[ "$bsns" == "" ]] ;then
+  echo "gsn nodes containers not found"
+else
+  docker stop $gsns
+  docker rm $gsns
+fi
+
+
 bsns=$(docker ps -a --format "{{.Names}}" | grep bsn | sort -n)
 if [[ "$bsns" == "" ]] ;then
   echo "bootstrap nodes containers not found"

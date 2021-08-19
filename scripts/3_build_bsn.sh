@@ -4,6 +4,8 @@ touch ../.env.sentry
 
 if [[ "$OSTYPE" == "darwin"* ]];then
   DC="../docker-compose-macos.yaml"
+elif [ "${1}" == "testnet" ];then
+  DC="../docker-compose-testnet.yaml"
 else
   DC="../docker-compose.yaml"
 fi
@@ -27,6 +29,8 @@ export BSN_URL2=$(docker-compose -f ../docker-compose-macos.yaml exec bsn2 cat k
 export BSN_URL3=$(docker-compose -f ../docker-compose-macos.yaml exec bsn3 cat keys/bootstrap-peer.env)
 
 # build shared bootstrap nodes config for use in bridge nodes
+mkdir -p ../.data
+sudo chown -R $USER:$USER ../.data
 cat > ../.data/bsn.yaml <<EOF
 bootstrap-addrs:
   - "${BSN_URL1}"

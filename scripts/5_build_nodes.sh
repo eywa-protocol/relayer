@@ -4,9 +4,11 @@ touch ../.env.sentry
 
 if [[ "$OSTYPE" == "darwin"* ]];then
   DC="../docker-compose-macos.yaml"
-else 
+elif [ "${1}" == "testnet" ];then
+  DC="../docker-compose-testnet.yaml"
+else
   DC="../docker-compose.yaml"
-fi 
+fi
   # stop and remove nodes
   docker-compose -f $DC rm -f -s gsn1 node1 node2 node3 node4 node5 node6 node7 &&\
   # init nodes

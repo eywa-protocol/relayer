@@ -19,6 +19,7 @@ cd eywa-p2p-bridge
 - Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
 
 ```shell
+make -C external/eth-contracts eth-testnet-migrate
 cd scripts
 ./deploy.sh testnet
 ```

@@ -28,30 +28,36 @@ import (
 
 func InitNode(name, keysPath string) (err error) {
 
-	if common2.FileExists(keysPath + "/" + name + "-ecdsa.key") {
-		return errors.New("node already registered! ")
-	}
+	common2.MakeKeyDir(keysPath)
 
-	privKey, err := common2.GenAndSaveECDSAKey(keysPath, name)
-	if err != nil {
-		panic(err)
-	}
-
-	_, _, err = common2.GenAndSaveBN256Key(keysPath, name)
+	_, err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	logrus.Tracef("keyfile %v", keysPath+"/"+name+"-ecdsa.key")
+	_, err = common2.GenAndSaveBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
 
-	fmt.Println("Generated address: ", common2.AddressFromCryptoPrivKey(privKey).String(), ".")
+	privKey, err := common2.GenAndSaveSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("Generated address: ", common2.AddressFromSecp256k1PrivKey(privKey))
 	fmt.Println("Please transfer the collateral there and restart me with -register flag.")
 	return
 }
 
 func RegisterNode(name, keysPath string) (err error) {
 
-	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	privKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	pub, err := common2.LoadBN256Key(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -69,7 +75,7 @@ func RegisterNode(name, keysPath string) (err error) {
 		} else {
 			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
 		}
-		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.NodeRegistryAddress, h.ID(), pub); err != nil {
+		if err := common2.RegisterNode(client, privKey, chain.NodeRegistryAddress, h.ID(), pub); err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
 		}
 	}

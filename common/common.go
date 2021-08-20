@@ -118,7 +118,7 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
-	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
+	fromAddress := AddressFromSecp256k1PrivKey(pk)
 
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
@@ -133,17 +133,20 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
 	} else {
+		peerIdAsAddress := common.BytesToAddress([]byte(peerId))
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		mychannel := make(chan bool)
 		for {
 			select {
 			case <-ticker.C:
-				created, err := nodeRegistry.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+				created, err := nodeRegistry.NodeExists(&bind.CallOpts{}, peerIdAsAddress)
 				if err != nil {
 					logrus.Errorf("NodeExists: %v", err)
 				}
 				if created == false {
+					const EywaPermitName = "EYWA"
+					const EywaPermitVersion = "1"
 					eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
 					minCollateral, _ := nodeRegistry.MINCOLLATERAL(&bind.CallOpts{})
 					eywa, err := wrappers.NewIERC20Permit(eywaAddress, client)
@@ -154,13 +157,16 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 
 					txOpts1 := CustomAuth(client, pk)
 					node := wrappers.NodeRegistryNode{
-						Owner:         fromAddress,
-						NodeWallet:    fromAddress,
-						NodeIdAddress: common.BytesToAddress([]byte(peerId)),
-						BlsPubKey:     blsPubkey,
-						NodeId:        0,
-						Version:       big.NewInt(0),
-						Status:        0}
+						Owner:                 fromAddress,
+						NodeWallet:            fromAddress,
+						NodeIdAddress:         peerIdAsAddress,
+						Pool:                  fromAddress,
+						BlsPubKey:             blsPubkey,
+						NodeId:                0,
+						Version:               big.NewInt(0),
+						RelayerFeeNumerator:   big.NewInt(100),
+						EmissionRateNumerator: big.NewInt(0),
+						Status:                0}
 					deadline := time.Now().Unix() + 100
 					data := core.TypedData{
 						Types: core.Types{
@@ -188,8 +194,8 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 							},
 						},
 						Domain: core.TypedDataDomain{
-							Name:              "MyEYWA",
-							Version:           "1",
+							Name:              EywaPermitName,
+							Version:           EywaPermitVersion,
 							ChainId:           (*math.HexOrDecimal256)(chainId),
 							VerifyingContract: eywaAddress.String(),
 						},

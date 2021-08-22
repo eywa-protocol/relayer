@@ -145,8 +145,6 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 					logrus.Errorf("NodeExists: %v", err)
 				}
 				if created == false {
-					const EywaPermitName = "EYWA"
-					const EywaPermitVersion = "1"
 					eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
 					minCollateral, _ := nodeRegistry.MINCOLLATERAL(&bind.CallOpts{})
 					eywa, err := wrappers.NewIERC20Permit(eywaAddress, client)
@@ -155,7 +153,11 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 					}
 					fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
 
-					txOpts1 := CustomAuth(client, pk)
+					deadline := big.NewInt(time.Now().Unix() + 100)
+					const EywaPermitName = "EYWA"
+					const EywaPermitVersion = "1"
+					v, r, s := signErc20Permit(pk, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, minCollateral, fromNonce, deadline)
+
 					node := wrappers.NodeRegistryNode{
 						Owner:                 fromAddress,
 						NodeWallet:            fromAddress,
@@ -167,54 +169,9 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 						RelayerFeeNumerator:   big.NewInt(100),
 						EmissionRateNumerator: big.NewInt(0),
 						Status:                0}
-					deadline := time.Now().Unix() + 100
-					data := core.TypedData{
-						Types: core.Types{
-							"EIP712Domain": []core.Type{
-								{
-									Name: "name", Type: "string"},
-								{
-									Name: "version", Type: "string"},
-								{
-									Name: "chainId", Type: "uint256"},
-								{
-									Name: "verifyingContract", Type: "address"},
-							},
-							"Permit": []core.Type{
-								{
-									Name: "owner", Type: "address"},
-								{
-									Name: "spender", Type: "address"},
-								{
-									Name: "value", Type: "uint256"},
-								{
-									Name: "nonce", Type: "uint256"},
-								{
-									Name: "deadline", Type: "uint256"},
-							},
-						},
-						Domain: core.TypedDataDomain{
-							Name:              EywaPermitName,
-							Version:           EywaPermitVersion,
-							ChainId:           (*math.HexOrDecimal256)(chainId),
-							VerifyingContract: eywaAddress.String(),
-						},
-						PrimaryType: "Permit",
-						Message: core.TypedDataMessage{
-							"owner":    fromAddress.String(),
-							"spender":  nodeRegistryAddress.String(),
-							"value":    minCollateral.String(),
-							"nonce":    fromNonce.String(),
-							"deadline": fmt.Sprintf("%d", deadline),
-						},
-					}
-					signature, hash, err := SignTypedData(*pk, common.MixedcaseAddress{}, data)
-					if err != nil {
-						logrus.Fatal(err)
-					}
-					v, r, s := signature[64], common.BytesToHash(signature[0:32]), common.BytesToHash(signature[32:64])
-					logrus.Warn(data.Message, signature, hash, v, r, s)
-					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, big.NewInt(deadline), v, r, s)
+
+					txOpts1 := CustomAuth(client, pk)
+					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, deadline, v, r, s)
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())
 						logrus.Errorf("CreateRelayer chainId %d ERROR: %v", chainId, err)
@@ -241,6 +198,56 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 		}
 	}
 	return
+}
+
+func signErc20Permit(pk *ecdsa.PrivateKey, name, version string, chainId *big.Int, verifyingContract, owner, spender common.Address, value, nonce, deadline *big.Int) (v uint8, r [32]byte, s [32]byte) {
+	data := core.TypedData{
+		Types: core.Types{
+			"EIP712Domain": []core.Type{
+				{
+					Name: "name", Type: "string"},
+				{
+					Name: "version", Type: "string"},
+				{
+					Name: "chainId", Type: "uint256"},
+				{
+					Name: "verifyingContract", Type: "address"},
+			},
+			"Permit": []core.Type{
+				{
+					Name: "owner", Type: "address"},
+				{
+					Name: "spender", Type: "address"},
+				{
+					Name: "value", Type: "uint256"},
+				{
+					Name: "nonce", Type: "uint256"},
+				{
+					Name: "deadline", Type: "uint256"},
+			},
+		},
+		Domain: core.TypedDataDomain{
+			Name:              name,
+			Version:           version,
+			ChainId:           (*math.HexOrDecimal256)(chainId),
+			VerifyingContract: verifyingContract.String(),
+		},
+		PrimaryType: "Permit",
+		Message: core.TypedDataMessage{
+			"owner":    owner.String(),
+			"spender":  spender.String(),
+			"value":    value.String(),
+			"nonce":    nonce.String(),
+			"deadline": deadline.String(),
+		},
+	}
+	signature, hash, err := SignTypedData(*pk, common.MixedcaseAddress{}, data)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	v, r, s = signature[64], common.BytesToHash(signature[0:32]), common.BytesToHash(signature[32:64])
+	logrus.Warn(data.Message, signature, hash, v, r, s)
+	return v, r, s
 }
 
 func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeRegistryNode, err error) {

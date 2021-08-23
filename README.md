@@ -53,12 +53,12 @@ make -C external/eth-contracts local-test
 ```
 cd external/eth-contracts
 git checkout develop (или другая необходимая ветка)
-*ВНОCBV ИЗМЕНЕНИЯ*
+*ВНОCИМ ИЗМЕНЕНИЯ*
 git add .
 git commit -m "commit message"
 git push
 cd ../../
-git submodule update —remote
+git submodule update --remote
 git add external/eth-contracts
 git commit -m "submodule eth-contracts update"
 git push

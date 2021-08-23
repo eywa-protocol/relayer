@@ -45,8 +45,9 @@ func InitNode(name, keysPath string) (err error) {
 		return
 	}
 
-	fmt.Println("Generated address: ", common2.AddressFromSecp256k1PrivKey(privKey))
-	fmt.Println("Please transfer the collateral there and restart me with -register flag.")
+	logrus.Infoln("Generated address:")
+	fmt.Println(common2.AddressFromSecp256k1PrivKey(privKey))
+	logrus.Infoln("Please transfer the collateral there and restart me with -register flag.")
 	return
 }
 

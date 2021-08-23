@@ -167,7 +167,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 						NodeId:                big.NewInt(0),
 						Version:               big.NewInt(0),
 						RelayerFeeNumerator:   big.NewInt(100),
-						EmissionRateNumerator: big.NewInt(0),
+						EmissionRateNumerator: big.NewInt(4000),
 						Status:                0}
 
 					txOpts1 := CustomAuth(client, pk)

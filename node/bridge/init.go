@@ -76,7 +76,7 @@ func RegisterNode(name, keysPath string) (err error) {
 		} else {
 			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
 		}
-		if err := common2.RegisterNode(client, privKey, chain.NodeRegistryAddress, h.ID(), pub); err != nil {
+		if err := common2.RegisterNode(client, privKey, chain.EcdsaKey, chain.NodeRegistryAddress, h.ID(), pub); err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
 		}
 	}

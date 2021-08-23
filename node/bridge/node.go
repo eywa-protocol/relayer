@@ -207,7 +207,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			case _ = <-sub.Err():
 				break
 			case e := <-channel:
-				logrus.Infof("ReceiveRequest: %v %v %v %v", e.ReqId, e.ReceiveSide, e.BridgeFrom, e.SenderSide)
+				logrus.Infof("ReceiveRequest: %v %v", e.ReqId, e.ReceiveSide)
 				// TODO disconnect from topic
 				/** TODO:
 				Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)

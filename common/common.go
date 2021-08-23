@@ -116,16 +116,18 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 	}
 }
 
-func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
+func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
-	fromAddress := AddressFromSecp256k1PrivKey(pk)
+	fromAddress := AddressFromSecp256k1PrivKey(from)
+	walletAddress := AddressFromSecp256k1PrivKey(wallet)
+	peerIdAsAddress := common.BytesToAddress([]byte(peerId))
 
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
 		return fmt.Errorf("get chain id error: %w", err)
 	}
 	nodeRegistry, err := wrappers.NewNodeRegistry(nodeRegistryAddress, client)
-	res, err := nodeRegistry.NodeExists(&bind.CallOpts{}, common.BytesToAddress([]byte(peerId)))
+	res, err := nodeRegistry.NodeExists(&bind.CallOpts{}, peerIdAsAddress)
 	if err != nil {
 		err = fmt.Errorf("node not exists nodeRegistryAddress: %s, client.Id: %s, error: %w",
 			nodeRegistryAddress.String(), chainId.String(), err)
@@ -133,7 +135,6 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
 	} else {
-		peerIdAsAddress := common.BytesToAddress([]byte(peerId))
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		mychannel := make(chan bool)
@@ -156,11 +157,11 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 					deadline := big.NewInt(time.Now().Unix() + 100)
 					const EywaPermitName = "EYWA"
 					const EywaPermitVersion = "1"
-					v, r, s := signErc20Permit(pk, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, value, fromNonce, deadline)
+					v, r, s := signErc20Permit(from, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, value, fromNonce, deadline)
 
 					node := wrappers.NodeRegistryNode{
 						Owner:                 fromAddress,
-						NodeWallet:            fromAddress,
+						NodeWallet:            walletAddress,
 						NodeIdAddress:         peerIdAsAddress,
 						Pool:                  fromAddress,
 						BlsPubKey:             blsPubkey,
@@ -170,7 +171,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 						EmissionRateNumerator: big.NewInt(4000),
 						Status:                0}
 
-					txOpts1 := CustomAuth(client, pk)
+					txOpts1 := CustomAuth(client, from)
 					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, deadline, v, r, s)
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())

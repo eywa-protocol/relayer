@@ -16,8 +16,7 @@ if [[ "${1}" == "local" ]];then
     make -C ../external/eth-contracts eth-local-migrate
   else
     echo "compose for linux docker host"
-    docker-compose -f ../docker-compose.yaml rm -f -s -v ganache_net1 ganache_net2 ganache_net3
-    sudo rm -rf ../.data/chaindata_ganache*
+    docker-compose -f ../docker-compose.yaml stop ganache_net1 ganache_net2 ganache_net3 && \
     docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net1 && \
     docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net2 && \
     docker-compose -f ../docker-compose.yaml up -d --no-deps --build --force-recreate ganache_net3 && \

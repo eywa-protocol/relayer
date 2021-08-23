@@ -12,7 +12,11 @@ cd digiu
 git clone git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
 cd eywa-p2p-bridge
 ```
-
+Добавление submodule (если необходимо)
+```shell
+git submodule init
+git submodule update
+```
 
 ### тестнет деплой
 

@@ -146,17 +146,17 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 				}
 				if created == false {
 					eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
-					minCollateral, _ := nodeRegistry.MINCOLLATERAL(&bind.CallOpts{})
-					eywa, err := wrappers.NewIERC20Permit(eywaAddress, client)
+					eywa, err := wrappers.NewERC20Permit(eywaAddress, client)
 					if err != nil {
 						logrus.Errorf("EYWA contract: %v", err)
 					}
 					fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
+					value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
 
 					deadline := big.NewInt(time.Now().Unix() + 100)
 					const EywaPermitName = "EYWA"
 					const EywaPermitVersion = "1"
-					v, r, s := signErc20Permit(pk, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, minCollateral, fromNonce, deadline)
+					v, r, s := signErc20Permit(pk, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, value, fromNonce, deadline)
 
 					node := wrappers.NodeRegistryNode{
 						Owner:                 fromAddress,
@@ -164,7 +164,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeRegistryAd
 						NodeIdAddress:         peerIdAsAddress,
 						Pool:                  fromAddress,
 						BlsPubKey:             blsPubkey,
-						NodeId:                0,
+						NodeId:                big.NewInt(0),
 						Version:               big.NewInt(0),
 						RelayerFeeNumerator:   big.NewInt(100),
 						EmissionRateNumerator: big.NewInt(0),

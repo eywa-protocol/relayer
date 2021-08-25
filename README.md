@@ -15,11 +15,11 @@ cd eywa-p2p-bridge
 Добавление submodule (если необходимо)
 ```shell
 git submodule init
-git submodule update
+git submodule update (--remote - если необходимо получить последние изменения)
 ```
 
 ### тестнет деплой
-
+- Рекомендуется предварительно очищать каталог external/eth-contracts/hardhat/networks_env, если он существует (возможны конфликты с настройками нод)
 - Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
 
 ```shell
@@ -28,9 +28,8 @@ cd scripts
 ./deploy.sh testnet
 ```
 
-
-
 ### локальный деплой
+- Рекомендуется предварительно очищать каталог external/eth-contracts/hardhat/networks_env, если он существует (возможны конфликты с настройками нод)
 
 ```shell
 cd scripts
@@ -67,7 +66,6 @@ git add external/eth-contracts
 git commit -m "submodule eth-contracts update"
 git push
 ```
-
 
 ### Переключение loglevel
 

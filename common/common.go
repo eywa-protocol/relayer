@@ -163,13 +163,14 @@ func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, node
 						Owner:                 fromAddress,
 						NodeWallet:            walletAddress,
 						NodeIdAddress:         peerIdAsAddress,
-						Pool:                  fromAddress,
+						Vault:                 fromAddress, // fixme
+						Pool:                  common.Address{},
 						BlsPubKey:             blsPubkey,
 						NodeId:                big.NewInt(0),
 						Version:               big.NewInt(0),
-						RelayerFeeNumerator:   big.NewInt(100),
-						EmissionRateNumerator: big.NewInt(4000),
-						Status:                0}
+						RelayerFeeNumerator:   big.NewInt(100),  // fixme
+						EmissionRateNumerator: big.NewInt(4000), // fixme
+						Status:                0}                // online
 
 					txOpts1 := CustomAuth(client, from)
 					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, deadline, v, r, s)

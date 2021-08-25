@@ -116,7 +116,7 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 	}
 }
 
-func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
+func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, nodeRegistryAddress common.Address, peerId peer.ID, blsPubkey string) (id *big.Int, relayerPool *common.Address, err error) {
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := AddressFromSecp256k1PrivKey(from)
 	walletAddress := AddressFromSecp256k1PrivKey(wallet)
@@ -124,7 +124,7 @@ func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, node
 
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
-		return fmt.Errorf("get chain id error: %w", err)
+		return nil, nil, fmt.Errorf("get chain id error: %w", err)
 	}
 	nodeRegistry, err := wrappers.NewNodeRegistry(nodeRegistryAddress, client)
 	res, err := nodeRegistry.NodeExists(&bind.CallOpts{}, peerIdAsAddress)
@@ -134,72 +134,77 @@ func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, node
 	}
 	if res == true {
 		logrus.Infof("Node %x allready exists", peerId)
-	} else {
-		ticker := time.NewTicker(3 * time.Second)
-		defer ticker.Stop()
-		mychannel := make(chan bool)
-		for {
-			select {
-			case <-ticker.C:
-				created, err := nodeRegistry.NodeExists(&bind.CallOpts{}, peerIdAsAddress)
-				if err != nil {
-					logrus.Errorf("NodeExists: %v", err)
-				}
-				if created == false {
-					eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
-					eywa, err := wrappers.NewERC20Permit(eywaAddress, client)
-					if err != nil {
-						logrus.Errorf("EYWA contract: %v", err)
-					}
-					fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
-					value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
-
-					deadline := big.NewInt(time.Now().Unix() + 100)
-					const EywaPermitName = "EYWA"
-					const EywaPermitVersion = "1"
-					v, r, s := signErc20Permit(from, EywaPermitName, EywaPermitVersion, chainId, eywaAddress, fromAddress, nodeRegistryAddress, value, fromNonce, deadline)
-
-					node := wrappers.NodeRegistryNode{
-						Owner:                 fromAddress,
-						NodeWallet:            walletAddress,
-						NodeIdAddress:         peerIdAsAddress,
-						Vault:                 fromAddress, // fixme
-						Pool:                  common.Address{},
-						BlsPubKey:             blsPubkey,
-						NodeId:                big.NewInt(0),
-						Version:               big.NewInt(0),
-						RelayerFeeNumerator:   big.NewInt(100),  // fixme
-						EmissionRateNumerator: big.NewInt(4000), // fixme
-						Status:                0}                // online
-
-					txOpts1 := CustomAuth(client, from)
-					tx, err := nodeRegistry.CreateRelayer(txOpts1, node, deadline, v, r, s)
-					if err != nil {
-						chainId, _ := client.ChainID(context.Background())
-						logrus.Errorf("CreateRelayer chainId %d ERROR: %v", chainId, err)
-						if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance") {
-							ticker.Stop()
-							return err
-						}
-					} else {
-						recept, _ := helpers.WaitTransaction(client, tx)
-						logrus.Print("recept.Status ", recept.Status)
-						ticker.Stop()
-						return nil
-
-					}
-
-				} else {
-
-					ticker.Stop()
-					return nil
-				}
-			case <-mychannel:
-				return
+		return
+	}
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	timeout := make(chan bool)
+	go func() {
+		time.Sleep(15 * time.Second)
+		timeout <- true
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
+			eywa, err := wrappers.NewERC20Permit(eywaAddress, client)
+			if err != nil {
+				return nil, nil, fmt.Errorf("EYWA contract: %w", err)
 			}
+			fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
+			value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
+
+			deadline := big.NewInt(time.Now().Unix() + 100)
+			const EywaPermitName = "EYWA"
+			const EywaPermitVersion = "1"
+			v, r, s := signErc20Permit(from, EywaPermitName, EywaPermitVersion, chainId,
+				eywaAddress, fromAddress, nodeRegistryAddress, value, fromNonce, deadline)
+
+			node := wrappers.NodeRegistryNode{
+				Owner:                 fromAddress,
+				NodeWallet:            walletAddress,
+				NodeIdAddress:         peerIdAsAddress,
+				Vault:                 fromAddress, // fixme
+				Pool:                  common.Address{},
+				BlsPubKey:             blsPubkey,
+				NodeId:                big.NewInt(0),
+				Version:               big.NewInt(0),
+				RelayerFeeNumerator:   big.NewInt(100),  // fixme
+				EmissionRateNumerator: big.NewInt(4000), // fixme
+				Status:                0}                // online
+
+			txOpts1 := CustomAuth(client, from)
+			tx, err := nodeRegistry.CreateRelayer(txOpts1, node, deadline, v, r, s)
+			if err != nil {
+				logrus.Errorf("CreateRelayer chainId %d ERROR: %v", chainId, err)
+				if strings.Contains(err.Error(), "allready exists") || strings.Contains(err.Error(), "gas required exceeds allowance") {
+					return nil, nil, err
+				}
+				break
+			}
+			recept, err := helpers.WaitTransaction(client, tx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("WaitTransaction: %w", err)
+			}
+			logrus.Tracef("recept.Status ", recept.Status)
+
+			blockNum := recept.BlockNumber.Uint64()
+			filterer, err := wrappers.NewNodeRegistryFilterer(nodeRegistryAddress, client)
+			if err != nil {
+				return nil, nil, fmt.Errorf("NodeRegistry filterer: %w", err)
+			}
+			it, _ := filterer.FilterCreatedRelayer(&bind.FilterOpts{Start: blockNum, End: &blockNum},
+				[]common.Address{node.NodeIdAddress}, []*big.Int{}, []common.Address{})
+			defer it.Close()
+			for it.Next() {
+				return it.Event.NodeId, &it.Event.RelayerPool, nil
+			}
+			return nil, nil, nil
+
+		case <-timeout:
+			return nil, nil, errors.New("Timeout")
 		}
 	}
-	return
 }
 
 func signErc20Permit(pk *ecdsa.PrivateKey, name, version string, chainId *big.Int, verifyingContract, owner, spender common.Address, value, nonce, deadline *big.Int) (v uint8, r [32]byte, s [32]byte) {
@@ -243,12 +248,11 @@ func signErc20Permit(pk *ecdsa.PrivateKey, name, version string, chainId *big.In
 			"deadline": deadline.String(),
 		},
 	}
-	signature, hash, err := SignTypedData(*pk, common.MixedcaseAddress{}, data)
+	signature, _, err := SignTypedData(*pk, common.MixedcaseAddress{}, data)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 	v, r, s = signature[64], common.BytesToHash(signature[0:32]), common.BytesToHash(signature[32:64])
-	logrus.Warn(data.Message, signature, hash, v, r, s)
 	return v, r, s
 }
 

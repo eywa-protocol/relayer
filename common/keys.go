@@ -16,6 +16,14 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+func MakeKeyDir(keysPath string) {
+	if !FileExists(keysPath) {
+		os.MkdirAll(keysPath, os.ModePerm)
+	} else {
+		logrus.Warnf("Key directory %s already exists.", keysPath)
+	}
+}
+
 // We pass in both the private keys of host and peer.
 // We never use the private key of the peer though.
 // That's why this function returns the peer's public key.
@@ -97,10 +105,7 @@ func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
 	return
 }
 
-func GenAndSaveBN256Key(keysPath, name string) (blsAddr common.Address, strPub string, err error) {
-	if !FileExists(keysPath) {
-		os.MkdirAll(keysPath, os.ModePerm)
-	}
+func GenAndSaveBN256Key(keysPath, name string) (strPub string, err error) {
 	suite := pairing.NewSuiteBn256()
 
 	nodeKeyFile := keysPath + "/" + name + "-bn256.key"
@@ -113,39 +118,43 @@ func GenAndSaveBN256Key(keysPath, name string) (blsAddr common.Address, strPub s
 		// blsAddr = common.BytesToAddress([]byte(pubKey.String()))
 		str, err := encoding.ScalarToStringHex(suite, prvKey)
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 		err = os.WriteFile(nodeKeyFile, []byte(str), 0644)
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		strPub, err = encoding.PointToStringHex(suite, pubKey)
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		err = os.WriteFile(keysPath+"/"+name+"-bn256.pub.key", []byte(strPub), 0644)
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 	} else {
-		p, err := ReadScalarFromFile(nodeKeyFile)
-		if err != nil {
-			panic(err)
-		}
-		pubKey := suite.Point().Mul(p, nil)
-		strPub, err = encoding.PointToStringHex(suite, pubKey)
-		if err != nil {
-			panic(err)
-		}
-
+		logrus.Warnf("Key %s exists, reusing it!", nodeKeyFile)
+		strPub, err = LoadBN256Key(keysPath, name)
 	}
-	blsAddr, err = BLSAddrFromKeyFile(nodeKeyFile)
+	return
+}
+
+func LoadBN256Key(keysPath, name string) (strPub string, err error) {
+	suite := pairing.NewSuiteBn256()
+
+	nodeKeyFile := keysPath + "/" + name + "-bn256.key"
+
+	p, err := ReadScalarFromFile(nodeKeyFile)
+	if err != nil {
+		return
+	}
+	pubKey := suite.Point().Mul(p, nil)
+	strPub, err = encoding.PointToStringHex(suite, pubKey)
 	if err != nil {
 		panic(err)
 	}
-
 	return
 }
 
@@ -183,21 +192,22 @@ func Keccak256(data ...[]byte) []byte {
 	return d.Sum(nil)
 }
 
-func GenAndSaveECDSAKey(keysPath, prefix string) (err error) {
+func GenAndSaveECDSAKey(keysPath, prefix string) (ecdsa crypto.PrivKey, err error) {
 	nodeKeyFile := keysPath + "/" + prefix + "-ecdsa.key"
 	if !FileExists(nodeKeyFile) {
-		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+		ecdsa, _, err = crypto.GenerateECDSAKeyPair(rand.Reader)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa")
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
-		_, err = ReadHostKey(nodeKeyFile)
+		logrus.Warnf("Key %s exists, reusing it!", nodeKeyFile)
+		ecdsa, err = ReadHostKey(nodeKeyFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -231,5 +241,27 @@ func AddressFromPrivKey(skey string) (address common.Address) {
 	}
 	address = ecrypto.PubkeyToAddress(*publicKeyECDSA)
 	return
+}
 
+func GenAndSaveSecp256k1Key(keysPath, prefix string) (pk *ecdsa.PrivateKey, err error) {
+	nodeKeyFile := keysPath + "/" + prefix + "-secp256k1.key"
+	if !FileExists(nodeKeyFile) {
+		pk, err = ecrypto.GenerateKey()
+		if err != nil {
+			return nil, err
+		}
+		err = ecrypto.SaveECDSA(nodeKeyFile, pk)
+	} else {
+		logrus.Warnf("Key %s exists, reusing it!", nodeKeyFile)
+		pk, err = ecrypto.LoadECDSA(nodeKeyFile)
+	}
+	return
+}
+
+func LoadSecp256k1Key(keysPath, prefix string) (*ecdsa.PrivateKey, error) {
+	return ecrypto.LoadECDSA(keysPath + "/" + prefix + "-secp256k1" + ".key")
+}
+
+func AddressFromSecp256k1PrivKey(pk *ecdsa.PrivateKey) common.Address {
+	return ecrypto.PubkeyToAddress(pk.PublicKey)
 }

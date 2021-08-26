@@ -84,7 +84,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 }
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
+	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeRegistryAddress, nodeIdAddress)
 	if err != nil || node.NodeWallet == common.HexToAddress("0") {
 		return false
 	}
@@ -95,7 +95,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
+	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
 		return
 	}
@@ -134,7 +134,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 
 	} else {
 		logrus.Tracef("Host.ID() %v ", n.Host.ID())
-		node, err := client.NodeList.GetNode(nodeIdAddress)
+		node, err := client.NodeRegistry.GetNode(nodeIdAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
-						Id:                int(node.NodeId),
+						Id:                int(node.NodeId.Int64()),
 						TimeStep:          0,
 						ThresholdWit:      len(topicParticipants)/2 + 1,
 						ThresholdAck:      len(topicParticipants)/2 + 1,
@@ -207,7 +207,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			case _ = <-sub.Err():
 				break
 			case e := <-channel:
-				logrus.Infof("ReceiveRequest: %v %v %v %v", e.ReqId, e.ReceiveSide, e.BridgeFrom, e.SenderSide)
+				logrus.Infof("ReceiveRequest: %v %v", e.ReqId, e.ReceiveSide)
 				// TODO disconnect from topic
 				/** TODO:
 				Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)

@@ -13,15 +13,16 @@ import (
 )
 
 type Client struct {
-	EthClient        *ethclient.Client
-	ChainCfg         *config.BridgeChain
-	EcdsaKey         *ecdsa.PrivateKey
-	Bridge           wrappers.BridgeSession
-	BridgeFilterer   wrappers.BridgeFilterer
-	NodeList         wrappers.NodeListSession
-	NodeListFilterer wrappers.NodeListFilterer
+	EthClient            *ethclient.Client
+	ChainCfg             *config.BridgeChain
+	EcdsaKey             *ecdsa.PrivateKey
+	Bridge               wrappers.BridgeSession
+	BridgeFilterer       wrappers.BridgeFilterer
+	NodeRegistry         wrappers.NodeRegistrySession
+	NodeRegistryFilterer wrappers.NodeRegistryFilterer
 	Forwarder        wrappers.Forwarder
-	currentUrl       string
+
+	currentUrl string
 }
 
 func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err error) {
@@ -48,15 +49,15 @@ func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err er
 		err = fmt.Errorf("init bridge filter [%s] error: %w", chain.BridgeAddress, err)
 		return
 	}
-	nodeList, err := wrappers.NewNodeList(chain.NodeListAddress, c)
+	nodeRegistry, err := wrappers.NewNodeRegistry(chain.NodeRegistryAddress, c)
 	if err != nil {
-		err = fmt.Errorf("init nodelist [%s] error: %w", chain.BridgeAddress, err)
+		err = fmt.Errorf("init node registry [%s] error: %w", chain.NodeRegistryAddress, err)
 		return
 	}
 
-	nodeListFilterer, err := wrappers.NewNodeListFilterer(chain.NodeListAddress, c)
+	nodeListFilterer, err := wrappers.NewNodeRegistryFilterer(chain.NodeRegistryAddress, c)
 	if err != nil {
-		err = fmt.Errorf("init nodelist filter [%s] error: %w", chain.BridgeAddress, err)
+		err = fmt.Errorf("init nodelist filter [%s] error: %w", chain.NodeRegistryAddress, err)
 		return
 	}
 
@@ -77,14 +78,14 @@ func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err er
 			CallOpts:     bind.CallOpts{},
 			TransactOpts: *txOpts,
 		},
-		NodeList: wrappers.NodeListSession{
-			Contract:     nodeList,
+		NodeRegistry: wrappers.NodeRegistrySession{
+			Contract:     nodeRegistry,
 			CallOpts:     bind.CallOpts{},
 			TransactOpts: *txOpts,
 		},
-		BridgeFilterer:   *bridgeFilterer,
-		NodeListFilterer: *nodeListFilterer,
+		BridgeFilterer:       *bridgeFilterer,
+		NodeRegistryFilterer: *nodeListFilterer,
 		Forwarder:        *forwarder,
-		currentUrl:       url,
+		currentUrl:           url,
 	}, nil
 }

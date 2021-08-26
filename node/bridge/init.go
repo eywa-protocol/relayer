@@ -28,21 +28,40 @@ import (
 
 func InitNode(name, keysPath string) (err error) {
 
-	if common2.FileExists(keysPath + name + "-ecdsa.key") {
-		return errors.New("node already registered! ")
-	}
+	common2.MakeKeyDir(keysPath)
 
-	err = common2.GenAndSaveECDSAKey(keysPath, name)
-	if err != nil {
-		panic(err)
-	}
-
-	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	_, err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	logrus.Tracef("keyfile %v", keysPath+"/"+name+"-ecdsa.key")
+	_, err = common2.GenAndSaveBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	privKey, err := common2.GenAndSaveSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	logrus.Infoln("Generated address:")
+	fmt.Println(common2.AddressFromSecp256k1PrivKey(privKey))
+	logrus.Infoln("Please transfer the collateral there and restart me with -register flag.")
+	return
+}
+
+func RegisterNode(name, keysPath string) (err error) {
+
+	privKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	pub, err := common2.LoadBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
 
 	h, err := libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
 	if err != nil {
@@ -57,9 +76,11 @@ func InitNode(name, keysPath string) (err error) {
 		} else {
 			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
 		}
-		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.NodeListAddress, h.ID(), pub); err != nil {
+		id, relayerPool, err := common2.RegisterNode(client, privKey, chain.EcdsaKey, chain.NodeRegistryAddress, h.ID(), pub)
+		if err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
 		}
+		logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
 	}
 
 	return
@@ -118,10 +139,10 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	if !ok {
 		return fmt.Errorf("node  client 0 not initialized")
 	}
-	res, err := c1.NodeList.NodeExists(NodeIdAddressFromFile)
+	res, err := c1.NodeRegistry.NodeExists(NodeIdAddressFromFile)
 
 	if res {
-		nodeFromContract, err := c1.NodeList.GetNode(NodeIdAddressFromFile)
+		nodeFromContract, err := c1.NodeRegistry.GetNode(NodeIdAddressFromFile)
 		if err != nil {
 			return err
 		}

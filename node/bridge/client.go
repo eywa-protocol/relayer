@@ -20,8 +20,8 @@ type Client struct {
 	BridgeFilterer   wrappers.BridgeFilterer
 	NodeList         wrappers.NodeListSession
 	NodeListFilterer wrappers.NodeListFilterer
-
-	currentUrl string
+	Forwarder        wrappers.Forwarder
+	currentUrl       string
 }
 
 func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err error) {
@@ -60,6 +60,12 @@ func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err er
 		return
 	}
 
+	forwarder, err := wrappers.NewForwarder(chain.ForwarderAddress, c)
+	if err != nil {
+		err = fmt.Errorf("init forwarder caller [%s] error: %w", chain.BridgeAddress, err)
+		return
+	}
+
 	txOpts := common2.CustomAuth(c, chain.EcdsaKey)
 
 	return Client{
@@ -78,6 +84,7 @@ func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err er
 		},
 		BridgeFilterer:   *bridgeFilterer,
 		NodeListFilterer: *nodeListFilterer,
+		Forwarder:        *forwarder,
 		currentUrl:       url,
 	}, nil
 }

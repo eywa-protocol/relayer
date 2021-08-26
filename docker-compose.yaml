@@ -16,6 +16,8 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.11
+    ports:
+      - "4001:4001"
 
   bsn2:
     command: [ "./bsn" ]
@@ -28,6 +30,8 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.12
+    ports:
+      - "4001:4001"
 
   bsn3:
     command: [ "./bsn"]
@@ -40,7 +44,10 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.13
-#gsn nodes
+    ports:
+      - "4001:4001"
+
+  #gsn nodes
   gsn1:
     command: [ "./gsn", "-cnf", "gsn.yaml" ]
     image: p2p-bridge_img
@@ -60,7 +67,8 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.30.11
-
+    ports:
+      - "4002:4002"
   # protocol nodes
   node1:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
@@ -72,6 +80,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -92,6 +101,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -112,6 +122,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -132,6 +143,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -152,6 +164,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -172,6 +185,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -192,6 +206,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:

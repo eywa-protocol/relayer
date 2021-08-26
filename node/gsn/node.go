@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
@@ -143,10 +142,6 @@ func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	}
 
 	return client, nil
-}
-
-func (n *Node) GetDht() *dht.IpfsDHT {
-	return n.Dht
 }
 
 func (n *Node) GetOwner(chainId *big.Int) (*bind.TransactOpts, error) {

@@ -7,7 +7,7 @@ else
 fi
 
 gsns=$(docker ps -a --format "{{.Names}}" | grep gsn | sort -n)
-if [[ "$bsns" == "" ]] ;then
+if [[ "$gsns" == "" ]] ;then
   echo "gsn nodes containers not found"
 else
   docker stop $gsns

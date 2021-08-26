@@ -2,12 +2,11 @@ package gsn
 
 import (
 	"context"
+	"fmt"
 	"math/big"
-	"strings"
 
-	"github.com/ipfs/go-cid"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	mh "github.com/multiformats/go-multihash"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
@@ -20,9 +19,56 @@ const (
 	RpcServiceFuncExecute = "Execute"
 )
 
+type RpcForwarderForwardRequest struct {
+	From  common.Address
+	To    common.Address
+	Value string
+	Gas   string
+	Nonce string
+	Data  []byte
+}
+
+func NewRpcForwarderForwardRequest(req *wrappers.IForwarderForwardRequest) RpcForwarderForwardRequest {
+	return RpcForwarderForwardRequest{
+		From:  req.From,
+		To:    req.To,
+		Value: req.Value.String(),
+		Gas:   req.Gas.String(),
+		Nonce: req.Nonce.String(),
+		Data:  req.Data,
+	}
+}
+
+func (r RpcForwarderForwardRequest) DumpToIForwarderForwardRequest() (*wrappers.IForwarderForwardRequest, error) {
+
+	dump := &wrappers.IForwarderForwardRequest{
+		From: r.From,
+		To:   r.To,
+		Data: r.Data,
+	}
+
+	var ok bool
+	if dump.Value, ok = new(big.Int).SetString(r.Value, 10); !ok {
+
+		return nil, fmt.Errorf("can not parse request value [%s]",
+			dump.Value)
+	} else if dump.Gas, ok = new(big.Int).SetString(r.Gas, 10); !ok {
+
+		return nil, fmt.Errorf("can not parse request gas [%s]",
+			dump.Gas)
+	} else if dump.Nonce, ok = new(big.Int).SetString(r.Nonce, 10); !ok {
+
+		return nil, fmt.Errorf("can not parse request nonce [%s]",
+			dump.Nonce)
+	} else {
+		return dump, nil
+	}
+
+}
+
 type ExecuteRequest struct {
-	ChainId         *big.Int
-	ForwardRequest  wrappers.IForwarderForwardRequest
+	ChainId         string
+	ForwardRequest  RpcForwarderForwardRequest
 	DomainSeparator common2.Bytes32
 	RequestTypeHash common2.Bytes32
 	SuffixData      []byte
@@ -30,7 +76,7 @@ type ExecuteRequest struct {
 }
 
 type ExecuteResult struct {
-	ChainId *big.Int
+	ChainId string
 	TxId    string
 }
 
@@ -43,22 +89,8 @@ func (r *RpcApiGsn) Execute(_ context.Context, in ExecuteRequest, out *ExecuteRe
 		logrus.WithField("gsnRequest", in).Error(err)
 		return err
 	} else {
-		out = res
+		*out = *res
 		return nil
 	}
 
-}
-
-func GetCid(chainId *big.Int) (cid.Cid, error) {
-	var builder strings.Builder
-
-	builder.WriteString(chainId.String())
-	builder.WriteString(string(ProtocolId))
-
-	h, err := mh.Sum([]byte(builder.String()), mh.SHA2_256, -1)
-	if err != nil {
-		return cid.Undef, err
-	}
-
-	return cid.NewCidV1(cid.Raw, h), nil
 }

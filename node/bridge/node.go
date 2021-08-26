@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
@@ -580,6 +579,22 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 
 }
 
-func (n *Node) GetDht() *dht.IpfsDHT {
-	return n.Dht
+func (n *Node) GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error) {
+	if c, _, err := n.GetNodeClientOrRecreate(chainId); err != nil {
+
+		return nil, err
+	} else {
+
+		return &c.Forwarder, err
+	}
+}
+
+func (n *Node) GetForwarderAddress(chainId *big.Int) (common.Address, error) {
+	if c, ok := n.Clients[chainId.String()]; !ok {
+
+		return common.Address{}, fmt.Errorf("invalid chain [%s]", chainId.String())
+	} else {
+
+		return c.ChainCfg.ForwarderAddress, nil
+	}
 }

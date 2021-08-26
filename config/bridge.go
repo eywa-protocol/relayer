@@ -37,15 +37,16 @@ type BridgeContract struct {
 }
 
 type BridgeChain struct {
-	Id              uint `yaml:"id"`
-	ChainId         *big.Int
-	RpcUrls         []string `yaml:"rpc_urls"`
-	EcdsaKeyString  string   `yaml:"ecdsa_key"`
-	EcdsaKey        *ecdsa.PrivateKey
-	EcdsaAddress    common.Address
-	BridgeAddress   common.Address `yaml:"bridge_address"`
-	NodeListAddress common.Address `yaml:"node_list_address"`
-	DexPoolAddress  common.Address `yaml:"dex_pool_address"`
+	Id               uint `yaml:"id"`
+	ChainId          *big.Int
+	RpcUrls          []string `yaml:"rpc_urls"`
+	EcdsaKeyString   string   `yaml:"ecdsa_key"`
+	EcdsaKey         *ecdsa.PrivateKey
+	EcdsaAddress     common.Address
+	BridgeAddress    common.Address `yaml:"bridge_address"`
+	NodeListAddress  common.Address `yaml:"node_list_address"`
+	DexPoolAddress   common.Address `yaml:"dex_pool_address"`
+	ForwarderAddress common.Address `yaml:"forwarder_address"`
 }
 
 func LoadBridgeConfig(path string) error {

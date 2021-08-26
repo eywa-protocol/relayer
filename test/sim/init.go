@@ -111,17 +111,18 @@ func init() {
 	}
 	backend.Commit()
 
-	mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
+	// mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
+	_, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	_, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
-	if err != nil {
-		panic(err)
-	}
-	backend.Commit()
+	// _, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// backend.Commit()
 
 	logrus.Info("nodeListAddress: ", nodeListAddress)
 	initForwarderContractCall()

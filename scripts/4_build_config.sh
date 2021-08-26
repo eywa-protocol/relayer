@@ -60,6 +60,7 @@ do
     bridge_address: $BRIDGE_ADDRESS
     node_list_address: $NODELIST_ADDRESS
     dex_pool_address: $DEXPOOL_ADDRESS
+    forwarder_address: $FORWARDER_ADDRESS
     rpc_urls:
       - $RPC_URL
 EOF

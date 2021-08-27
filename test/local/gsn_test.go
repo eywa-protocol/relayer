@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -88,6 +89,9 @@ func (n *gsnClientNodeType) WaitForDiscovery(timeout time.Duration) error {
 }
 
 func (n *gsnClientNodeType) Execute(chainId *big.Int) (txId string, err error) {
+	// todo: refactoring to NodeRegistry.CreateNode
+	return "", errors.New("not implemented")
+
 	chainCfg, err := n.getChainCfg(chainId)
 	if err != nil {
 		return
@@ -99,7 +103,7 @@ func (n *gsnClientNodeType) Execute(chainId *big.Int) (txId string, err error) {
 	}
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 
-	return forward.NodeListAddNode(n.gsnClient, chainId, n.ecdsaPriv, chainCfg.NodeListAddress, nodeIdAddress, blsPub)
+	return forward.NodeListAddNode(n.gsnClient, chainId, n.ecdsaPriv, chainCfg.NodeRegistryAddress, nodeIdAddress, blsPub)
 }
 
 func (n *gsnClientNodeType) getChainCfg(chainId *big.Int) (*config.BridgeChain, error) {

@@ -11,6 +11,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
+// NodeListAddNode todo: replace to NodeRegistry.CreateNode
 func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeListAddress, nodeListIdAddress common.Address, blsPub string) (txId string, err error) {
 
 	forwarder, err := gsnCaller.GetForwarder(chainId)
@@ -83,3 +84,7 @@ func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.Privat
 
 	return gsnCaller.Execute(chainId, *req, domainSeparatorHash, reqTypeHash, nil, typedDataSignature)
 }
+
+// func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeRegistryAddress, nodeListIdAddress common.Address, blsPub string) (txId string, err error) {
+//
+// }

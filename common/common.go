@@ -186,7 +186,7 @@ func RegisterNode(client *ethclient.Client, from, wallet *ecdsa.PrivateKey, node
 			if err != nil {
 				return nil, nil, fmt.Errorf("WaitTransaction: %w", err)
 			}
-			logrus.Tracef("recept.Status ", recept.Status)
+			logrus.Tracef("recept.Status %d", recept.Status)
 
 			blockNum := recept.BlockNumber.Uint64()
 			filterer, err := wrappers.NewNodeRegistryFilterer(nodeRegistryAddress, client)

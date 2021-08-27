@@ -30,7 +30,7 @@ type Node struct {
 
 func RunNode(name, keysPath, listen string, port uint) (err error) {
 
-	nodeKey, err := common2.GetOrSaveECDSAKey(keysPath, name)
+	nodeKey, err := common2.GetOrGenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		panic(err)
 	}

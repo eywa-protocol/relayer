@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -49,6 +50,7 @@ type Node struct {
 	Clients        map[string]Client
 	nonceMx        *sync.Mutex
 	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
+	signerKey      *ecdsa.PrivateKey
 	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
@@ -386,7 +388,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 		).Error(fmt.Errorf("invoke opposite bridge error: %w", err))
 	}
 	n.nonceMx.Lock()
-	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
+	txOpts := common2.CustomAuth(client.EthClient, n.signerKey)
 	/** Invoke bridge on another side */
 	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {

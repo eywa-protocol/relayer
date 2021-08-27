@@ -29,7 +29,7 @@ func init() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	node, err = bridge.NewNodeWithClients(context.Background())
+	node, err = bridge.NewNodeWithClients(context.Background(), nil)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	dexPoolFrom := node.Clients[chainidFrom.String()].ChainCfg.DexPoolAddress
 	dexPoolTo := node.Clients[chainIdTo.String()].ChainCfg.DexPoolAddress
 	bridgeTo := node.Clients[chainIdTo.String()].ChainCfg.BridgeAddress
-	pKeyFrom := clientFrom.EcdsaKey
+	pKeyFrom := clientFrom.ChainCfg.EcdsaKey
 	require.NoError(t, err)
 	logrus.Print("(dexPoolFrom, clientFrom.EthClient)", dexPoolFrom, clientFrom.EthClient)
 

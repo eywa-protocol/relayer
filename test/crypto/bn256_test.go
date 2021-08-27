@@ -1,12 +1,13 @@
 package crypto
 
 import (
-	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"testing"
+
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 )
 
 func TestBN256Pubkey(t *testing.T) {
-	_, pub, err := common2.GenAndSaveBN256Key(".", "test")
+	pub, err := common2.GenAndSaveBN256Key(".", "test")
 	if err != nil {
 		return
 	}

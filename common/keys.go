@@ -214,15 +214,14 @@ func GenAndSaveECDSAKey(keysPath, prefix string) (ecdsa crypto.PrivKey, err erro
 	return
 }
 
-func GetOrSaveECDSAKey(keysPath, prefix string) (hostKey crypto.PrivKey, err error) {
+func GetOrGenAndSaveECDSAKey(keysPath, prefix string) (hostKey crypto.PrivKey, err error) {
 	nodeKeyFile := keysPath + "/" + prefix + "-ecdsa.key"
 	if !FileExists(nodeKeyFile) {
-		ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
-		if err != nil {
+		if ecdsa, _, err := crypto.GenerateECDSAKeyPair(rand.Reader); err != nil {
+
 			return nil, err
-		}
-		err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa")
-		if err != nil {
+		} else if err = WriteKey(ecdsa, keysPath, prefix+"-ecdsa"); err != nil {
+
 			return nil, err
 		}
 	}
@@ -243,19 +242,18 @@ func AddressFromPrivKey(skey string) (address common.Address) {
 	return
 }
 
-func GenAndSaveSecp256k1Key(keysPath, prefix string) (pk *ecdsa.PrivateKey, err error) {
+func GetOrGenAndSaveSecp256k1Key(keysPath, prefix string) (pk *ecdsa.PrivateKey, err error) {
 	nodeKeyFile := keysPath + "/" + prefix + "-secp256k1.key"
 	if !FileExists(nodeKeyFile) {
-		pk, err = ecrypto.GenerateKey()
-		if err != nil {
+		if pk, err = ecrypto.GenerateKey(); err != nil {
+
+			return nil, err
+		} else if err = ecrypto.SaveECDSA(nodeKeyFile, pk); err != nil {
+
 			return nil, err
 		}
-		err = ecrypto.SaveECDSA(nodeKeyFile, pk)
-	} else {
-		logrus.Warnf("Key %s exists, reusing it!", nodeKeyFile)
-		pk, err = ecrypto.LoadECDSA(nodeKeyFile)
 	}
-	return
+	return ecrypto.LoadECDSA(nodeKeyFile)
 }
 
 func LoadSecp256k1Key(keysPath, prefix string) (*ecdsa.PrivateKey, error) {

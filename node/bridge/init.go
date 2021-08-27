@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -40,7 +41,7 @@ func InitNode(name, keysPath string) (err error) {
 		return
 	}
 
-	privKey, err := common2.GenAndSaveSecp256k1Key(keysPath, name)
+	privKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -53,10 +54,18 @@ func InitNode(name, keysPath string) (err error) {
 
 func RegisterNode(name, keysPath string) (err error) {
 
-	privKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
 	if err != nil {
 		return
 	}
+
+	n, err := NewNodeWithClients(context.Background(), signerKey)
+	if err != nil {
+		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
+	}
+
+	// //Secp256k1 node key
+	// nodeKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name+"-signer")
 
 	pub, err := common2.LoadBN256Key(keysPath, name)
 	if err != nil {
@@ -69,16 +78,11 @@ func RegisterNode(name, keysPath string) (err error) {
 	}
 	_ = libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
 
-	for _, chain := range config.Bridge.Chains {
-		client, url, err := chain.GetEthClient("")
+	for _, client := range n.Clients {
+
+		id, relayerPool, err := client.RegisterNode(signerKey, h.ID(), pub)
 		if err != nil {
-			return fmt.Errorf("%w", err)
-		} else {
-			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
-		}
-		id, relayerPool, err := common2.RegisterNode(client, privKey, chain.EcdsaKey, chain.NodeRegistryAddress, h.ID(), pub)
-		if err != nil {
-			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
+			return fmt.Errorf("register node on chain [%d] error: %w ", client.ChainCfg.Id, err)
 		}
 		logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
 	}
@@ -93,7 +97,13 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			cancel()
 		}
 	}()
-	n, err := NewNodeWithClients(ctx)
+	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	if err != nil {
+
+		return err
+	}
+
+	n, err := NewNodeWithClients(ctx, signerKey)
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
 	}
@@ -211,7 +221,7 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 			field.CainId: chainId,
 		}).Error(fmt.Errorf("recreate network client on error: %w", err))
 
-		client, err = NewClient(client.ChainCfg, client.currentUrl)
+		client, err = NewClient(client.ChainCfg, client.currentUrl, n.signerKey)
 		if err != nil {
 			err = fmt.Errorf("can not create client on error:%w", err)
 			return Client{}, false, err
@@ -248,7 +258,7 @@ func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	return client, nil
 }
 
-func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
+func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *Node, err error) {
 	n = &Node{
 		Node: base.Node{
 			Ctx: ctx,
@@ -256,12 +266,14 @@ func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 		nonceMx:        new(sync.Mutex),
 		cMx:            new(sync.Mutex),
 		Clients:        make(map[string]Client, len(config.Bridge.Chains)),
+		signerKey:      signerKey,
 		uptimeRegistry: new(flow.MeterRegistry),
 	}
+
 	logrus.Print(len(config.Bridge.Chains), " chains Length")
 	for _, chain := range config.Bridge.Chains {
 		logrus.Print("CHAIN ", chain, "chain")
-		client, err := NewClient(chain, "")
+		client, err := NewClient(chain, "", signerKey)
 		if err != nil {
 			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
 		}

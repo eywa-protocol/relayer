@@ -115,10 +115,11 @@ func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common
 }
 
 func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContractAddress common.Address, peerId peer.ID, blsPubkey string) (err error) {
-	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
+	
 	fromAddress := crypto.PubkeyToAddress(*(pk.Public().(*ecdsa.PublicKey)))
 
 	chainId, err := client.ChainID(context.Background())
+
 	if err != nil {
 		return fmt.Errorf("get chain id error: %w", err)
 	}
@@ -144,6 +145,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 				if created == false {
 					txOpts1 := CustomAuth(client, pk)
 					tx, err := nodeListContract1.AddNode(txOpts1, fromAddress, common.BytesToAddress([]byte(peerId)), blsPubkey)
+					logrus.Infof("Adding Node %s it's NodeidAddress %x ChainID: %s tx %s", peerId, common.BytesToAddress([]byte(peerId.String())), chainId.String(), tx.Hash().Hex())
 					if err != nil {
 						chainId, _ := client.ChainID(context.Background())
 						logrus.Errorf("AddNode chainId %d ERROR: %v", chainId, err)

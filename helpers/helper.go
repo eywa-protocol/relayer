@@ -84,7 +84,7 @@ func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Re
 func WaitTransactionDeadline(client *ethclient.Client, txHash common.Hash, timeout time.Duration) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	for {
 		select {

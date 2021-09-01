@@ -55,8 +55,10 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 
 	txOptsFrom := common2.CustomAuth(clientFrom.EthClient, pKeyFrom)
 	dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, clientFrom.EthClient)
+	require.NoError(t, err)
 
 	dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
+	require.NoError(t, err)
 
 	tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
 		testData,

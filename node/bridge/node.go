@@ -274,7 +274,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				}
 			case err := <-(*subPtr).Err():
 				if err != nil {
-					logrus.Error(fmt.Errorf("OracleRequest subscription error: %w", err))
+					logrus.Error(fmt.Errorf("OracleRequest subscription error: %w chainId: %s", err, chainId.String()))
 					clientRecreated := false
 					client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
 					if err != nil {

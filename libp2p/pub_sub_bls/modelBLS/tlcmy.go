@@ -80,7 +80,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
 			if nodeTimeStep == stop {
-				logrus.Infof(" Consensus achieved by node %v", node.Id)
+			//	logrus.Tracef(" Consensus achieved by node %v", node.Id)
 				mutex.Lock()
 				end = true
 				node.TimeStep++
@@ -131,13 +131,16 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				msgHash := calculateHash(*msg, node.ConvertMsg)
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Error("node.verifyAckSignature ", err)
+                                        return
+
 				}
 				//fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
 					logrus.Error(err)
+					return
 				}
 				//fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
@@ -147,14 +150,17 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				err = keyMask.SetMask(msg.Mask)
 				if err != nil {
 					logrus.Errorf(err.Error())
+					mutex.Unlock()
+					return
 				}
 				index := keyMask.IndexOfNthEnabled(0)
 				// Add signature to the list of signatures
 				if index == -1 {
 					logrus.Error("no such pubkey")
 					mutex.Unlock()
-					break
+					return
 				}
+				if index >= len(node.Signatures) { index = index - 1 }
 				node.Signatures[index] = msg.Signature
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold

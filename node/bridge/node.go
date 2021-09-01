@@ -86,7 +86,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeRegistryAddress, nodeIdAddress)
-	if err != nil || node.NodeWallet == common.HexToAddress("0") {
+	if err != nil || node.Owner == common.HexToAddress("0") {
 		return false
 	}
 	return true

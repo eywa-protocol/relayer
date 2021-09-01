@@ -14,7 +14,9 @@ import (
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -31,8 +33,13 @@ type Client struct {
 }
 
 func NewClient(chain *config.BridgeChain, skipUrl string, signerKey *ecdsa.PrivateKey) (client Client, err error) {
-
-	c, url, err := chain.GetEthClient(skipUrl)
+	var signerAddress common.Address
+	if signerKey != nil {
+		signerAddress = common2.AddressFromSecp256k1PrivKey(signerKey)
+	} else {
+		signerAddress = chain.EcdsaAddress
+	}
+	c, url, err := chain.GetEthClient(skipUrl, signerAddress)
 	if err != nil {
 		err = fmt.Errorf("get eth client error: %w", err)
 		return
@@ -87,22 +94,21 @@ func NewClient(chain *config.BridgeChain, skipUrl string, signerKey *ecdsa.Priva
 			CallOpts:     bind.CallOpts{},
 			TransactOpts: *txOpts,
 		},
+		BridgeFilterer: *bridgeFilterer,
 		NodeRegistry: wrappers.NodeRegistrySession{
 			Contract:     nodeRegistry,
 			CallOpts:     bind.CallOpts{},
 			TransactOpts: *txOpts,
 		},
-		BridgeFilterer:       *bridgeFilterer,
 		NodeRegistryFilterer: *nodeListFilterer,
 		Forwarder:            *forwarder,
 		currentUrl:           url,
 	}, nil
 }
 
-func (c *Client) RegisterNode(ownerPrivKey *ecdsa.PrivateKey, peerId peer.ID, blsPubkey string) (id *big.Int, relayerPool *common.Address, err error) {
+func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.PrivateKey, peerId peer.ID, blsPubkey string) (id *big.Int, relayerPool *common.Address, err error) {
 	logrus.Infof("Adding Node %s it's NodeidAddress %x", peerId, common.BytesToAddress([]byte(peerId.String())))
 	fromAddress := common2.AddressFromSecp256k1PrivKey(ownerPrivKey)
-	walletAddress := common2.AddressFromSecp256k1PrivKey(ownerPrivKey)
 	nodeIdAsAddress := common.BytesToAddress([]byte(peerId))
 
 	res, err := c.NodeRegistry.NodeExists(nodeIdAsAddress)
@@ -114,6 +120,7 @@ func (c *Client) RegisterNode(ownerPrivKey *ecdsa.PrivateKey, peerId peer.ID, bl
 		logrus.Infof("Node %x allready exists", peerId)
 		return
 	}
+
 	eywaAddress, _ := c.NodeRegistry.EYWA()
 	eywa, err := wrappers.NewERC20Permit(eywaAddress, c.EthClient)
 	if err != nil {
@@ -130,27 +137,37 @@ func (c *Client) RegisterNode(ownerPrivKey *ecdsa.PrivateKey, peerId peer.ID, bl
 
 	node := wrappers.NodeRegistryNode{
 		Owner:         fromAddress,
-		NodeWallet:    walletAddress,
 		NodeIdAddress: nodeIdAsAddress,
 		Pool:          common.Address{},
 		BlsPubKey:     blsPubkey,
-		NodeId:        big.NewInt(0),
+		NodeId:        nodeIdAsAddress.Hash().Big(),
 	}
 
-	tx, err := c.NodeRegistry.CreateRelayer(node, deadline, v, r, s)
-	if err != nil {
-		err = fmt.Errorf("CreateRelayer chainId %d ERROR: %v", c.ChainCfg.ChainId, err)
-		logrus.Error(err)
-		return nil, nil, err
+	var txHash common.Hash
+	if c.ChainCfg.UseGsn && gsnClient != nil {
+		if txHash, err = forward.NodeRegistryCreateNode(gsnClient, c.ChainCfg.ChainId, ownerPrivKey, c.ChainCfg.NodeRegistryAddress, node, deadline, v, r, s); err != nil {
+			err = fmt.Errorf("CreateRelayer over gsn chainId %d ERROR: %v", c.ChainCfg.ChainId, err)
+			logrus.Error(err)
+			return nil, nil, err
+		}
+	} else {
+		tx, err := c.NodeRegistry.CreateRelayer(node, deadline, v, r, s)
+		if err != nil {
+			err = fmt.Errorf("CreateRelayer chainId %d ERROR: %v", c.ChainCfg.ChainId, err)
+			logrus.Error(err)
+			return nil, nil, err
+		}
+		txHash = tx.Hash()
 	}
-	recept, err := helpers.WaitTransactionDeadline(c.EthClient, tx, 100*time.Second)
+
+	receipt, err := helpers.WaitTransactionDeadline(c.EthClient, txHash, 100*time.Second)
 	if err != nil {
 
 		return nil, nil, fmt.Errorf("WaitTransaction error: %w", err)
 	}
-	logrus.Tracef("recept.Status %d", recept.Status)
+	logrus.Tracef("recept.Status %d", receipt.Status)
 
-	blockNum := recept.BlockNumber.Uint64()
+	blockNum := receipt.BlockNumber.Uint64()
 
 	it, err := c.NodeRegistryFilterer.FilterCreatedRelayer(&bind.FilterOpts{Start: blockNum, End: &blockNum},
 		[]common.Address{node.NodeIdAddress}, []*big.Int{}, []common.Address{})

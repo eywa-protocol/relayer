@@ -4,18 +4,19 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
@@ -44,7 +45,7 @@ func NewGsnClientNode(ctx context.Context) (node *gsnClientNodeType, err error) 
 		},
 	}
 
-	if err := config.LoadBridgeConfig("../../.data/bridge.yaml"); err != nil {
+	if err := config.LoadBridgeConfig("../../.data/bridge.yaml", true); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -88,9 +89,7 @@ func (n *gsnClientNodeType) WaitForDiscovery(timeout time.Duration) error {
 	return n.gsnClient.WaitForDiscoveryGsn(timeout)
 }
 
-func (n *gsnClientNodeType) Execute(chainId *big.Int) (txId string, err error) {
-	// todo: refactoring to NodeRegistry.CreateNode
-	return "", errors.New("not implemented")
+func (n *gsnClientNodeType) ExecuteNodeRegistryCreateNode(chainId *big.Int) (txHash common.Hash, err error) {
 
 	chainCfg, err := n.getChainCfg(chainId)
 	if err != nil {
@@ -103,7 +102,45 @@ func (n *gsnClientNodeType) Execute(chainId *big.Int) (txId string, err error) {
 	}
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 
-	return forward.NodeListAddNode(n.gsnClient, chainId, n.ecdsaPriv, chainCfg.NodeRegistryAddress, nodeIdAddress, blsPub)
+	fromAddress := common2.AddressFromSecp256k1PrivKey(n.ecdsaPriv)
+
+	ethClient, _, err := chainCfg.GetEthClient("", fromAddress)
+	if err != nil {
+		err = fmt.Errorf("init eth client [%s] error: %w", chainId.String(), err)
+		return
+	}
+
+	nodeRegistry, err := wrappers.NewNodeRegistry(chainCfg.NodeRegistryAddress, ethClient)
+	if err != nil {
+		err = fmt.Errorf("init node registry [%s] error: %w", chainCfg.NodeRegistryAddress, err)
+		return
+	}
+
+	eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
+	eywa, err := wrappers.NewERC20Permit(eywaAddress, ethClient)
+	if err != nil {
+		err = fmt.Errorf("EYWA contract: %w", err)
+		return
+	}
+
+	fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
+	value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
+
+	deadline := big.NewInt(time.Now().Unix() + 100)
+	const EywaPermitName = "EYWA"
+	const EywaPermitVersion = "1"
+	v, r, s := common2.SignErc20Permit(n.ecdsaPriv, EywaPermitName, EywaPermitVersion, chainId,
+		eywaAddress, fromAddress, chainCfg.NodeRegistryAddress, value, fromNonce, deadline)
+
+	node := wrappers.NodeRegistryNode{
+		Owner:         fromAddress,
+		NodeIdAddress: nodeIdAddress,
+		Pool:          fromAddress,
+		BlsPubKey:     blsPub,
+		NodeId:        nodeIdAddress.Hash().Big(),
+	}
+
+	return forward.NodeRegistryCreateNode(n.gsnClient, chainId, n.ecdsaPriv, chainCfg.NodeRegistryAddress, node, deadline, v, r, s)
 }
 
 func (n *gsnClientNodeType) getChainCfg(chainId *big.Int) (*config.BridgeChain, error) {
@@ -123,7 +160,7 @@ func (n *gsnClientNodeType) GetForwarder(chainId *big.Int) (*wrappers.Forwarder,
 		return nil, err
 	}
 
-	ethClient, _, err := chainCfg.GetEthClient("")
+	ethClient, _, err := chainCfg.GetEthClient("", common2.AddressFromSecp256k1PrivKey(n.ecdsaPriv))
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +192,10 @@ func TestGsnClient(t *testing.T) {
 
 	for _, chainCfg := range config.Bridge.Chains {
 
-		txId, err := n.Execute(big.NewInt(int64(chainCfg.Id)))
+		txHash, err := n.ExecuteNodeRegistryCreateNode(big.NewInt(int64(chainCfg.Id)))
 		assert.NoError(t, err)
-		assert.NotEmpty(t, txId)
-		fmt.Println(txId)
+		assert.NotEmpty(t, txHash)
+		fmt.Println(txHash)
 
 	}
 

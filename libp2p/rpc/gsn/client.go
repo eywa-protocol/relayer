@@ -132,7 +132,7 @@ func (c *Client) discovery() {
 
 }
 
-func (c *Client) Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (string, error) {
+func (c *Client) Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (common.Hash, error) {
 
 	var res ExecuteResult
 
@@ -149,14 +149,14 @@ func (c *Client) Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest
 
 	if peerId, err := c.getGsnPeerId(); err != nil {
 
-		return "", fmt.Errorf("get gsn peer ID error: %w", err)
+		return common.Hash{}, fmt.Errorf("get gsn peer ID error: %w", err)
 	} else if err := c.rpcClient.CallContext(context.Background(), peerId, RpcService, RpcServiceFuncExecute, callReq, &res); err != nil {
 
-		return "", fmt.Errorf("call rpc service [%s] method [%s] error: %w",
+		return common.Hash{}, fmt.Errorf("call rpc service [%s] method [%s] error: %w",
 			RpcService, RpcServiceFuncExecute, err)
 	} else {
 
-		return res.TxId, nil
+		return res.TxHash, nil
 	}
 }
 

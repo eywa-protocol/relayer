@@ -11,8 +11,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
-// NodeListAddNode todo: replace to NodeRegistry.CreateNode
-func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeListAddress, nodeListIdAddress common.Address, blsPub string) (txId string, err error) {
+func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeRegistryAddress common.Address, node wrappers.NodeRegistryNode, deadline *big.Int, v uint8, r [32]byte, s [32]byte) (txHash common.Hash, err error) {
 
 	forwarder, err := gsnCaller.GetForwarder(chainId)
 	if err != nil {
@@ -27,12 +26,11 @@ func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.Privat
 	}
 
 	logrus.Infof("forwarderAddress: %s", forwarderAddress.String())
-	logrus.Infof("nodeListAddress: %s", nodeListAddress.String())
-	logrus.Infof("nodeListIdAddress: %s", nodeListIdAddress.String())
+	logrus.Infof("nodeRegistryAddress: %s", nodeRegistryAddress.String())
 
 	signerAddress := crypto.PubkeyToAddress(signer.PublicKey)
 
-	logrus.Infof("signerAddress: %s", signerAddress.String())
+	logrus.Infof("ownerAddress: %s", signerAddress.String())
 
 	nonce, err := forwarder.GetNonce(&bind.CallOpts{}, signerAddress)
 	if err != nil {
@@ -42,7 +40,7 @@ func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.Privat
 
 	req := &wrappers.IForwarderForwardRequest{
 		From:  signerAddress,
-		To:    nodeListAddress,
+		To:    nodeRegistryAddress,
 		Value: big.NewInt(0),
 		Gas:   big.NewInt(1e6),
 		Nonce: nonce,
@@ -51,8 +49,8 @@ func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.Privat
 	typedData, err := NewForwardRequestTypedData(
 		req,
 		forwarderAddress.String(),
-		wrappers.NodeListABI,
-		"addNode", signerAddress, nodeListIdAddress, blsPub)
+		wrappers.NodeRegistryABI,
+		"createRelayer", node, deadline, v, r, s)
 	if err != nil {
 
 		return
@@ -84,7 +82,3 @@ func NodeListAddNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.Privat
 
 	return gsnCaller.Execute(chainId, *req, domainSeparatorHash, reqTypeHash, nil, typedDataSignature)
 }
-
-// func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeRegistryAddress, nodeListIdAddress common.Address, blsPub string) (txId string, err error) {
-//
-// }

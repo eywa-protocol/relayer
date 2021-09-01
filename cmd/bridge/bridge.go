@@ -18,7 +18,10 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 )
 
-const defaultRendezvous = "mygroupofnodes"
+const (
+	appName           = "bridge"
+	defaultRendezvous = "mygroupofnodes"
+)
 
 func initPprof() {
 
@@ -28,15 +31,19 @@ func initPprof() {
 }
 
 func main() {
-	var init bool
-	var register bool
-	var path string
-	var port uint
-	var logLevel int
-	var pprofFlag bool
-	var keysPath string
-	var commonRendezvous string
-	var printVer bool
+
+	var (
+		init             bool
+		register         bool
+		path             string
+		port             uint
+		logLevel         int
+		pprofFlag        bool
+		keysPath         string
+		commonRendezvous string
+		printVer         bool
+		notUseGsn        bool
+	)
 
 	flag.BoolVar(&init, "init", false, "run \"./bridge -init\" to init node")
 	flag.BoolVar(&register, "register", false, "run \"./bridge -register\" to register node")
@@ -47,6 +54,7 @@ func main() {
 	flag.StringVar(&commonRendezvous, "randevoue", "", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
 	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
 	flag.BoolVar(&printVer, "version", false, "print version and exit")
+	flag.BoolVar(&notUseGsn, "no-gsn", false, "not use gsn for transactions if forwarder address set in config")
 
 	flag.Parse()
 
@@ -64,12 +72,13 @@ func main() {
 	// Toggle logrus log level between current logLevel and trace by USR2 os signal
 	runa.LogrusLevelHandler(logrus.Level(logLevel))
 
-	sentry.Init("bridge")
+	sentry.Init(appName)
+	defer runa.MainRecoveryExit(appName)
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("init: %v, path: %s, keys-path: %s", init, path, keysPath)
 
-	if err := config.LoadBridgeConfig(path); err != nil {
+	if err := config.LoadBridgeConfig(path, !notUseGsn); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -99,7 +108,7 @@ func main() {
 	} else {
 		err := bridge.NewNode(name, keysPath, config.Bridge.Rendezvous)
 		if err != nil {
-			logrus.Fatalf("not registered Node or no keyfile: %v", err)
+			logrus.Fatalf("node stoped on error: %v", err)
 		}
 	}
 

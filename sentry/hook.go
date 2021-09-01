@@ -17,11 +17,13 @@ var (
 )
 
 func Init(appName string) {
+	sentryEnv := os.Getenv("SENTRY_ENVIRONMENT")
 	dsn := os.Getenv("SENTRY_DSN")
-	if dsn == "" {
+	if dsn == "" || sentryEnv == "" {
 		return
 	}
 
+	logrus.Infof("Initialize SENTRY Hook")
 	mx.Lock()
 	defer mx.Unlock()
 	if hook != nil {

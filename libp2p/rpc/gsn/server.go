@@ -79,7 +79,7 @@ func (s *Server) ExecuteRequestHandler(request *ExecuteRequest) (*ExecuteResult,
 	} else {
 		return &ExecuteResult{
 			ChainId: request.ChainId,
-			TxId:    tx.Hash().Hex(),
+			TxHash:  tx.Hash(),
 		}, nil
 	}
 }

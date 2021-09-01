@@ -81,7 +81,7 @@ func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Re
 	return receipt, nil
 }
 
-func WaitTransactionDeadline(client *ethclient.Client, tx *types.Transaction, timeout time.Duration) (*types.Receipt, error) {
+func WaitTransactionDeadline(client *ethclient.Client, txHash common.Hash, timeout time.Duration) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
@@ -90,20 +90,20 @@ func WaitTransactionDeadline(client *ethclient.Client, tx *types.Transaction, ti
 		select {
 		case <-ctx.Done():
 
-			return nil, fmt.Errorf("wait for transaction %s timed out", tx.Hash().Hex())
+			return nil, fmt.Errorf("wait for transaction %s timed out", txHash.Hex())
 		default:
 
-			if receipt, err = client.TransactionReceipt(context.Background(), tx.Hash()); receipt == nil ||
+			if receipt, err = client.TransactionReceipt(context.Background(), txHash); receipt == nil ||
 				errors.Is(err, ethereum.NotFound) {
 
 				time.Sleep(time.Millisecond * 500)
 				continue
 			} else if err != nil {
 
-				return nil, fmt.Errorf("transaction %s failed: %v", tx.Hash().Hex(), err)
+				return nil, fmt.Errorf("transaction %s failed: %v", txHash.Hex(), err)
 			} else if receipt.Status != 1 {
 
-				return nil, fmt.Errorf("failed transaction: %s", tx.Hash().Hex())
+				return nil, fmt.Errorf("failed transaction: %s", txHash.Hex())
 			} else {
 
 				return receipt, nil

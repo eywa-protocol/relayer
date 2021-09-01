@@ -23,7 +23,7 @@ const (
 type GsnCaller interface {
 	GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error)
 	GetForwarderAddress(chainId *big.Int) (common.Address, error)
-	Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (string, error)
+	Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (common.Hash, error)
 }
 
 func NewForwardRequestTypedData(req *wrappers.IForwarderForwardRequest, forwarderAddress, abiJson, methodName string, args ...interface{}) (*signer.TypedData, error) {

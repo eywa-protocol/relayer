@@ -27,6 +27,10 @@ func Connect(string2 string) (*ethclient.Client, error) {
 	return ethclient.Dial(string2)
 }
 
+func AddressIsZero(address common.Address) bool {
+	return address.String() == common.Address{}.String()
+}
+
 func Health(helper *bridges.Helper, rpcUrl string) (out *Output, err error) {
 	out = &Output{}
 	client, err := Connect(rpcUrl)
@@ -71,8 +75,8 @@ func CreateNode(duration time.Duration, creaateNode func(time.Time) bool) chan b
 		defer log.Println("CreateNode ticker stopped")
 		for {
 			select {
-			case time := <-ticker.C:
-				if !creaateNode(time) {
+			case t := <-ticker.C:
+				if !creaateNode(t) {
 					stop <- true
 				}
 			case <-stop:

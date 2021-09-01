@@ -77,7 +77,7 @@ type ExecuteRequest struct {
 
 type ExecuteResult struct {
 	ChainId string
-	TxId    string
+	TxHash  common.Hash
 }
 
 type RpcApiGsn struct {

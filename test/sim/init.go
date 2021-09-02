@@ -32,7 +32,7 @@ var testForward *wrappers.TestForward
 var mockDexPool *wrappers.MockDexPool
 var testForwardAddNodeABIPacked []byte
 
-var testForwardABI = common2.MustGetABI(wrappers.TestForwarderABI)
+var testForwardABI = common2.MustGetABI(wrappers.TestForwardABI)
 var testTargetABI = common2.MustGetABI(wrappers.TestTargetABI)
 
 var fwdRequestTypedData signer.TypedData
@@ -49,7 +49,7 @@ var testTargetAddress,
 	bridgeAddress,
 	mockDexPooolAddress common.Address
 var forwarederRequest *wrappers.IForwarderForwardRequest
-
+var blsPubKey string
 var err error
 var ownerKey, signerKey *ecdsa.PrivateKey
 
@@ -130,7 +130,7 @@ func init() {
 
 func initForwarderContractCall() {
 
-	blsPubKey := string(GenRandomBytes(256))
+	blsPubKey = string(GenRandomBytes(256))
 	randWallet := common.BytesToAddress(GenRandomBytes(3))
 
 	createNodeData = &createNodeDataTypw{
@@ -143,10 +143,13 @@ func initForwarderContractCall() {
 	logrus.Print("createNodeData.nodeIdAddress ", createNodeData.nodeIdAddress)
 	logrus.Print("createNodeData.nodeWallet ", createNodeData.nodeWallet)
 
-	testForwardAddNodeABIPacked, err = testForwardABI.Pack("foo", big.NewInt(42))
+
+	testForwardAddNodeABIPacked, err = testForwardABI.Pack("foo", big.NewInt(42), blsPubKey)
 	if err != nil {
 		panic(err)
 	}
+
+	logrus.Print("LENGTH ", len(testForwardAddNodeABIPacked))
 
 	nonce, err := forwarder.GetNonce(&bind.CallOpts{}, signerAddress)
 	if err != nil {

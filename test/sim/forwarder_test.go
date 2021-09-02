@@ -26,6 +26,8 @@ func TestForwarderVerify(t *testing.T) {
 	require.NoError(t, err)
 }
 
+
+
 func TestForwarderExecute(t *testing.T) {
 	addr, _ := common.NewMixedcaseAddressFromString(signerAddress.String())
 	typedDataSignature, _, err := common2.SignTypedData(*signerKey, *addr, fwdRequestTypedData)
@@ -43,12 +45,23 @@ func TestForwarderExecute(t *testing.T) {
 	reqTypeHashBytes32, err := common2.BytesToBytes32(reqTypeHash)
 	require.NoError(t, err)
 
-	_, err = forwarder.Execute(owner, *forwarederRequest, dsep, reqTypeHashBytes32, nil, typedDataSignature)
+	//_, err := testForward.Foo(owner, big.NewInt(42))
+	//require.NoError(t, err)
+
+	resW, err := forwarder.Execute(owner, *forwarederRequest, dsep, reqTypeHashBytes32, nil, typedDataSignature)
 	backend.Commit()
 	require.NoError(t, err)
 
 	t.Log(testForward.Val(&bind.CallOpts{}))
 	t.Log(testForward.Sender(&bind.CallOpts{}))
+	sAddr, _ := testForward.Sender(&bind.CallOpts{})
+	require.Equal(t, signerAddress, sAddr)
+	strRes , _ := testForward.Str(&bind.CallOpts{})
+	require.Equal(t, strRes, blsPubKey)
+	t.Log("GAS USED", resW.Gas())
+
+
+
 	// node, err := testForward.Val(&bind.CallOpts{}, createNodeData.nodeIdAddress)
 	// require.NotNil(t, node)
 	// t.Log(createNodeData.nodeIdAddress)

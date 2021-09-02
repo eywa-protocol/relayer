@@ -28,11 +28,11 @@ var forwarder *wrappers.Forwarder
 var testTarget *wrappers.TestTarget
 
 var bridge *wrappers.Bridge
-var nodeList *wrappers.NodeList
+var testForward *wrappers.TestForward
 var mockDexPool *wrappers.MockDexPool
-var nodeListAddNodeABIPacked []byte
+var testForwardAddNodeABIPacked []byte
 
-var nodeListABI = common2.MustGetABI(wrappers.NodeListABI)
+var testForwardABI = common2.MustGetABI(wrappers.TestForwarderABI)
 var testTargetABI = common2.MustGetABI(wrappers.TestTargetABI)
 
 var fwdRequestTypedData signer.TypedData
@@ -44,7 +44,7 @@ var testTargetAddress,
 	miniForwarderAddress,
 	forwarderAddress,
 	signerAddress,
-	nodeListAddress,
+	testForwardAddress,
 	forwarderTestAddress,
 	bridgeAddress,
 	mockDexPooolAddress common.Address
@@ -99,20 +99,20 @@ func init() {
 	}
 	backend.Commit()
 
-	nodeListAddress, _, nodeList, err = wrappers.DeployNodeList(owner, backend)
+	testForwardAddress, _, testForward, err = wrappers.DeployTestForward(owner, backend, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeListAddress)
+	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, testForwardAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	// mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
-	_, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
+	// mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, testForwardAddress)
+	_, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, testForwardAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +124,7 @@ func init() {
 	// }
 	// backend.Commit()
 
-	logrus.Info("nodeListAddress: ", nodeListAddress)
+	logrus.Info("testForwardAddress: ", testForwardAddress)
 	initForwarderContractCall()
 }
 
@@ -143,11 +143,7 @@ func initForwarderContractCall() {
 	logrus.Print("createNodeData.nodeIdAddress ", createNodeData.nodeIdAddress)
 	logrus.Print("createNodeData.nodeWallet ", createNodeData.nodeWallet)
 
-	nodeListAddNodeABIPacked, err = nodeListABI.Pack("addNode",
-		createNodeData.nodeWallet,
-		createNodeData.nodeIdAddress,
-		createNodeData.blsPubKey)
-
+	testForwardAddNodeABIPacked, err = testForwardABI.Pack("foo", big.NewInt(42))
 	if err != nil {
 		panic(err)
 	}
@@ -159,11 +155,11 @@ func initForwarderContractCall() {
 
 	forwarederRequest = &wrappers.IForwarderForwardRequest{
 		From:  signerAddress,
-		To:    nodeListAddress,
+		To:    testForwardAddress,
 		Value: big.NewInt(0),
 		Gas:   big.NewInt(1e6),
 		Nonce: nonce,
-		Data:  nodeListAddNodeABIPacked,
+		Data:  testForwardAddNodeABIPacked,
 	}
 
 	fwdRequestTypedData = signer.TypedData{
@@ -195,18 +191,10 @@ func initForwarderContractCall() {
 			"value": forwarederRequest.Value.String(),
 			"gas":   forwarederRequest.Gas.String(),
 			"nonce": forwarederRequest.Nonce.String(),
-			"data":  nodeListAddNodeABIPacked,
+			"data":  testForwardAddNodeABIPacked,
 		},
 	}
 
-}
-
-func getNodesCount() int {
-	nodes, err := nodeList.GetNodes(&bind.CallOpts{})
-	if err != nil {
-		panic(err)
-	}
-	return len(nodes)
 }
 
 func GenRandomBytes(size int) (blk []byte) {

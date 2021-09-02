@@ -23,10 +23,10 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/test/sim"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/util/encoding"
 )
 
 type gsnClientNodeType struct {
@@ -96,11 +96,13 @@ func (n *gsnClientNodeType) ExecuteNodeRegistryCreateNode(chainId *big.Int) (txH
 	if err != nil {
 		return
 	}
-	suite := pairing.NewSuiteBn256()
-	blsPub, err := encoding.PointToStringHex(suite, n.blsPub)
-	if err != nil {
-		return
-	}
+	//suite := pairing.NewSuiteBn256()
+	//blsPub, err := encoding.PointToStringHex(suite, n.blsPub)
+	//if err != nil {
+	//	return
+	//}
+	blsPub := string(sim.GenRandomBytes(3))
+
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 
 	fromAddress := common2.AddressFromSecp256k1PrivKey(n.ecdsaPriv)

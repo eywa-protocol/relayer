@@ -19,6 +19,7 @@ import (
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
@@ -117,15 +118,30 @@ func (n *gsnClientNodeType) ExecuteNodeRegistryCreateNode(chainId *big.Int) (txH
 	}
 
 	eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
-	eywa, err := wrappers.NewERC20Permit(eywaAddress, ethClient)
+	eywa, err := wrappers.NewTestTokenPermit(eywaAddress, ethClient)
 	if err != nil {
 		err = fmt.Errorf("EYWA contract: %w", err)
 		return
 	}
 
 	fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
-	value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
+	fmt.Println(fromNonce)
 
+	pk, err := crypto2.HexToECDSA("60cc6f7a3b09e5080dc86cc0fd80e29545683ad4336012b221998b448d2d57bb")
+	if err != nil {
+		err = fmt.Errorf("HexToECDSA: %w", err)
+		return
+	}
+	txOpts := common2.CustomAuth(ethClient, pk)
+	tx, err := eywa.Mint(txOpts, fromAddress, big.NewInt(1e18))
+	if err != nil {
+		err = fmt.Errorf("Mint: %w", err)
+		return
+	}
+	rec, err := helpers.WaitTransactionDeadline(ethClient, tx.Hash(), 3*time.Second)
+	fmt.Println(rec)
+	value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
+	fmt.Println("value", value)
 	deadline := big.NewInt(time.Now().Unix() + 100)
 	const EywaPermitName = "EYWA"
 	const EywaPermitVersion = "1"

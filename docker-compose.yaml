@@ -16,8 +16,9 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.11
-    ports:
-      - "4001:4001"
+    expose:
+      - "4001"
+
 
   bsn2:
     command: [ "./bsn" ]
@@ -30,8 +31,10 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.12
-    ports:
-      - "4001:4001"
+    expose:
+      - "4001"
+
+
 
   bsn3:
     command: [ "./bsn"]
@@ -44,8 +47,10 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.13
-    ports:
-      - "4001:4001"
+    expose:
+      - "4001"
+
+
 
   #gsn nodes
   gsn1:
@@ -67,8 +72,8 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.30.11
-    ports:
-      - "4002:4002"
+    expose:
+      - "4002"
   # protocol nodes
   node1:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]

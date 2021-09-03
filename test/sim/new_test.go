@@ -2,10 +2,6 @@ package sim
 
 import (
 	"fmt"
-	"math/big"
-	"testing"
-	"time"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -13,6 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+	"math/big"
+	"testing"
+	"time"
 )
 
 func Test_methods(t *testing.T) {
@@ -133,7 +132,7 @@ func Test_methods(t *testing.T) {
 	t.Log(nodesCountBeforeTest)
 	t.Log(nodesCountAfterTest)
 
-	//require.True(t, (nodesCountAfterTest-nodesCountBeforeTest == 1))
+	require.True(t, (nodesCountAfterTest-nodesCountBeforeTest == 1))
 
 }
 

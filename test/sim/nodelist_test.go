@@ -50,7 +50,7 @@ func Test_AddNodeSignRawTx(t *testing.T) {
 
 }
 
-func Test_AddNodeSimple(t *testing.T) {
+/*func Test_AddNodeSimple(t *testing.T) {
 	countBefore := getNodesCount()
 	_, err := nodeRegistry.AddNode(
 		owner,
@@ -62,7 +62,7 @@ func Test_AddNodeSimple(t *testing.T) {
 	t.Log(countAfter)
 	require.True(t, (countAfter-countBefore == 1))
 
-}
+}*/
 
 /*func Test_AddNodeThroughForwarder1(t *testing.T) {
 	qwe := GenRandomBytes(20)

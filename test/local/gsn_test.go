@@ -5,10 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"math/big"
-	"testing"
-	"time"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
@@ -27,6 +23,9 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
+	"math/big"
+	"testing"
+	"time"
 )
 
 type gsnClientNodeType struct {
@@ -144,9 +143,10 @@ func (n *gsnClientNodeType) ExecuteNodeRegistryCreateNode(chainId *big.Int) (txH
 	fmt.Println(rec)
 	value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
 	fmt.Println("value", value)
-	deadline := big.NewInt(time.Now().Unix() + 100)
+	deadline := big.NewInt(time.Now().Unix() + 1000000)
 	const EywaPermitName = "EYWA"
 	const EywaPermitVersion = "1"
+	//value := big.NewInt(1e18)
 
 	v, r, s := common2.SignErc20Permit(n.ecdsaPriv, EywaPermitName, EywaPermitVersion, chainId,
 		eywaAddress, fromAddress, chainCfg.NodeRegistryAddress, value, fromNonce, deadline)

@@ -137,8 +137,10 @@ func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.Private
 
 	node := wrappers.NodeRegistryNode{
 		Owner:         fromAddress,
+		Pool:          common.Address{},
 		NodeIdAddress: nodeIdAsAddress,
 		BlsPubKey:     blsPubkey,
+		NodeId:        big.NewInt(0),
 	}
 
 	var txHash common.Hash

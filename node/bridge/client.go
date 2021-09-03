@@ -165,7 +165,7 @@ func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.Private
 
 		return nil, nil, fmt.Errorf("WaitTransaction error: %w", err)
 	}
-	logrus.Tracef("recept.Status %d", receipt.Status)
+	logrus.Infof("recept.Status %d", receipt.Status)
 
 	blockNum := receipt.BlockNumber.Uint64()
 
@@ -182,14 +182,11 @@ func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.Private
 		}
 	}()
 
-	if it.Next() {
-
+	for it.Next() {
+		logrus.Info("CreatedRelayer Event", it.Event.NodeIdAddress)
 		return it.Event.NodeId, &it.Event.RelayerPool, nil
-	} else {
-		err = fmt.Errorf("ge registry created rellayer iterator event error: %w", err)
-		logrus.Error(err)
-
-		return nil, nil, it.Error()
 	}
 
+return
 }
+

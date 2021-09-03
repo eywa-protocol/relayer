@@ -2,15 +2,37 @@ package sim
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 func Test_AddNodeSignRawTx(t *testing.T) {
+
+	blsPubKey = string(GenRandomBytes(256))
+	randWallet = common.BytesToAddress(GenRandomBytes(20))
+	pool = common.BytesToAddress(GenRandomBytes(20))
+	bridgeOwner = common.BytesToAddress(GenRandomBytes(20))
+
+	node := wrappers.NodeRegistryNode{
+		Owner:         bridgeOwner,
+		Pool:          pool,
+		NodeIdAddress: randWallet,
+		BlsPubKey:     blsPubKey,
+		NodeId:        big.NewInt(0),
+	}
+
+	testForwardCreateNodeRegistryABIPacked, err = nodeRegistryABI.Pack("addNode", &node)
+	if err != nil {
+		panic(err)
+	}
+
 	countBefore := getNodesCount()
-	signedTx2, err := common2.RawSimTx(backend, owner, &nodeListAddress, nodeListAddNodeABIPacked)
+	signedTx2, err := common2.RawSimTx(backend, owner, &nodeRegistryAddress, testForwardCreateNodeRegistryABIPacked)
 	require.NoError(t, err)
 
 	v, r, s := signedTx2.RawSignatureValues()
@@ -30,11 +52,9 @@ func Test_AddNodeSignRawTx(t *testing.T) {
 
 func Test_AddNodeSimple(t *testing.T) {
 	countBefore := getNodesCount()
-	_, err := nodeList.AddNode(
+	_, err := nodeRegistry.AddNode(
 		owner,
-		createNodeData.nodeWallet,
-		createNodeData.nodeIdAddress,
-		createNodeData.blsPubKey)
+		createNodeRegistryData)
 	require.NoError(t, err)
 	backend.Commit()
 	countAfter := getNodesCount()

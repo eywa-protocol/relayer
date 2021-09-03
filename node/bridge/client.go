@@ -138,9 +138,7 @@ func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.Private
 	node := wrappers.NodeRegistryNode{
 		Owner:         fromAddress,
 		NodeIdAddress: nodeIdAsAddress,
-		Pool:          common.Address{},
 		BlsPubKey:     blsPubkey,
-		NodeId:        nodeIdAsAddress.Hash().Big(),
 	}
 
 	var txHash common.Hash
@@ -187,6 +185,5 @@ func (c *Client) RegisterNode(gsnClient *gsn.Client, ownerPrivKey *ecdsa.Private
 		return it.Event.NodeId, &it.Event.RelayerPool, nil
 	}
 
-return
+	return
 }
-

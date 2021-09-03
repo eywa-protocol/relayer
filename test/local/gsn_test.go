@@ -147,6 +147,7 @@ func (n *gsnClientNodeType) ExecuteNodeRegistryCreateNode(chainId *big.Int) (txH
 	deadline := big.NewInt(time.Now().Unix() + 100)
 	const EywaPermitName = "EYWA"
 	const EywaPermitVersion = "1"
+
 	v, r, s := common2.SignErc20Permit(n.ecdsaPriv, EywaPermitName, EywaPermitVersion, chainId,
 		eywaAddress, fromAddress, chainCfg.NodeRegistryAddress, value, fromNonce, deadline)
 

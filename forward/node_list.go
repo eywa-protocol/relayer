@@ -8,10 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeRegistryAddress common.Address, node wrappers.NodeRegistryNode, deadline *big.Int, v uint8, r [32]byte, s [32]byte) (txHash common.Hash, err error) {
+	nodeRegistryABI := common2.MustGetABI(wrappers.NodeRegistryABI)
+
+	frequest, err := nodeRegistryABI.Pack("createRelayer", node, deadline, v, r, s)
+	if err != nil {
+
+		return
+	}
 
 	forwarder, err := gsnCaller.GetForwarder(chainId)
 	if err != nil {
@@ -44,6 +52,7 @@ func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa
 		Value: big.NewInt(0),
 		Gas:   big.NewInt(1e6),
 		Nonce: nonce,
+		Data:  frequest,
 	}
 
 	typedData, err := NewForwardRequestTypedData(

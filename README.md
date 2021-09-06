@@ -38,6 +38,20 @@ cd scripts
 ./deploy.sh local
 ```
 
+#### Problem fixing.
+
+In case of the problem
+
+```bash
+Creating network "dev_net_1" with the default driver
+ERROR: Pool overlaps with other one on this address space
+```
+
+try to remove old networks from
+```bash
+docker network ls
+```
+
 ### запуск тестов
 
 - e2e тест js

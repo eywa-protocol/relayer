@@ -105,7 +105,7 @@ func init() {
 	}
 	backend.Commit()
 
-	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, testForwardAddress)
+	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeRegistryAddress, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +123,7 @@ func init() {
 	}
 	backend.Commit()
 
-	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, testForwardAddress)
+	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeRegistryAddress, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -136,11 +136,11 @@ func init() {
 	}
 	backend.Commit()
 
-	// _, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// backend.Commit()
+	//_, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//backend.Commit()
 
 	logrus.Info("testForwardAddress: ", testForwardAddress)
 

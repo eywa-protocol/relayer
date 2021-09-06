@@ -16,7 +16,7 @@ import (
 
 func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, contractAddress common.Address, node wrappers.NodeRegistryNode, deadline *big.Int, v uint8, r [32]byte, s [32]byte) (txHash common.Hash, err error) {
 
-	contractABI, err := abi.JSON(strings.NewReader(wrappers.BridgeABI))
+	contractABI, err := abi.JSON(strings.NewReader(wrappers.NodeRegistryABI))
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("could not parse ABI: %w", err)
 	}

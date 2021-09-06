@@ -1,4 +1,4 @@
-package local
+package test
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func NewGsnClientNode(ctx context.Context) (node *gsnClientNodeType, err error) 
 		},
 	}
 
-	if err := config.LoadBridgeConfig("../../.data/bridge.yaml", true); err != nil {
+	if err := config.LoadBridgeConfig("../.data/bridge.yaml", true); err != nil {
 		logrus.Fatal(err)
 	}
 

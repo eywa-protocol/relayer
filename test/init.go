@@ -1,4 +1,4 @@
-package networks
+package test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ var qwe big.Int
 var testData *big.Int
 
 func init() {
-	err = config.LoadBridgeConfig("../../.data/bridge.yaml", false)
+	err = config.LoadBridgeConfig("../.data/bridge.yaml", false)
 	if err != nil {
 		logrus.Fatal(err)
 	}

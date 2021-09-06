@@ -30,7 +30,9 @@ export BSN_URL3=$(docker-compose -f ../docker-compose-macos.yaml exec bsn3 cat k
 
 # build shared bootstrap nodes config for use in bridge nodes
 mkdir -p ../.data
-sudo chown -R $USER:$USER ../.data
+if [[ "$OSTYPE" != "darwin"* ]];then
+  sudo chown -R $USER:$USER ../.data
+fi
 cat > ../.data/bsn.yaml <<EOF
 bootstrap-addrs:
   - "${BSN_URL1}"

@@ -114,14 +114,24 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		field.NodeRendezvous: config.Bridge.Rendezvous,
 	})
 
-	c1, ok := n.Clients[config.Bridge.Chains[0].ChainId.String()]
-	if !ok {
-		return fmt.Errorf("node  client 0 not initialized")
+	var cl *Client
+	for _, client := range n.Clients {
+		if client.EthClient != nil {
+			cl = &client
+			break
+		}
 	}
-	res, err := c1.NodeList.NodeExists(NodeIdAddressFromFile)
+	if cl == nil {
+		return fmt.Errorf("node  client  not initialized")
+	}
 
+	res, err := cl.NodeList.NodeExists(NodeIdAddressFromFile)
+	if err != nil {
+
+		logrus.Error(fmt.Errorf("can not check node existence on error: %w", err))
+	}
 	if res {
-		nodeFromContract, err := c1.NodeList.GetNode(NodeIdAddressFromFile)
+		nodeFromContract, err := cl.NodeList.GetNode(NodeIdAddressFromFile)
 		if err != nil {
 			return err
 		}
@@ -155,12 +165,19 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			err = n.ListenNodeOracleRequest(
 				eventChan,
 				wg,
-				client.ChainCfg.ChainId)
-			if errors.Is(err, ErrContextDone) {
+				big.NewInt(int64(client.ChainCfg.Id)))
+			if errors.Is(err, ErrGetEthClient) {
+				logrus.Warnf("ListenNodeOracleRequest on not reachable network [%d]",
+					client.ChainCfg.Id)
+				continue
+			} else if errors.Is(err, ErrContextDone) {
 				logrus.Info(err)
 				return nil
 			} else if err != nil {
 				return fmt.Errorf("stop listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
+			} else {
+				logrus.Infof("ListenNodeOracleRequest on chain [%d]",
+					client.ChainCfg.Id)
 			}
 		}
 
@@ -181,6 +198,14 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 	if !ok {
 		n.cMx.Unlock()
 		return Client{}, false, errors.New("eth client for chain ID not found")
+	} else if client.EthClient == nil {
+		var err error
+
+		client.EthClient, client.currentUrl, err = config.Bridge.Chains.GetChainCfg(uint(chainId.Uint64())).GetEthClient("")
+		if err != nil {
+			n.cMx.Unlock()
+			return client, false, ErrGetEthClient
+		}
 	}
 	n.cMx.Unlock()
 
@@ -191,7 +216,11 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 		}).Error(fmt.Errorf("recreate network client on error: %w", err))
 
 		client, err = NewClient(client.ChainCfg, client.currentUrl)
-		if err != nil {
+		if errors.Is(err, ErrGetEthClient) {
+
+			return client, false, ErrGetEthClient
+		} else if err != nil {
+
 			err = fmt.Errorf("can not create client on error:%w", err)
 			return Client{}, false, err
 		} else {
@@ -238,19 +267,26 @@ func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
 		uptimeRegistry: new(flow.MeterRegistry),
 	}
 	logrus.Print(len(config.Bridge.Chains), " chains Length")
+
 	for _, chain := range config.Bridge.Chains {
+		key := fmt.Sprintf("%d", chain.Id)
 		logrus.Print("CHAIN ", chain, "chain")
 		client, err := NewClient(chain, "")
 		if err != nil {
-			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
+
+			logrus.Error(fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err))
+			// return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
+		} else if reflect.DeepEqual(client, ethclient.Client{}) {
+
+			logrus.Error(fmt.Errorf("init chain [%d] client failed", chain.Id))
+			// return nil, fmt.Errorf("init chain [%d] client failed", chain.Id)
+		} else if _, ok := n.Clients[key]; ok {
+
+			logrus.Error(fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err))
+			// return nil, fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
 		}
-		if reflect.DeepEqual(client, ethclient.Client{}) {
-			return nil, fmt.Errorf("init chain [%d] client failed", chain.Id)
-		}
-		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
-			return nil, fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
-		}
-		n.Clients[client.ChainCfg.ChainId.String()] = client
+
+		n.Clients[key] = client
 	}
 	return
 }

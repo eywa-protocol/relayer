@@ -18,7 +18,10 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 )
 
-const defaultRendezvous = "mygroupofnodes"
+const (
+	appName           = "bridge"
+	defaultRendezvous = "mygroupofnodes"
+)
 
 func initPprof() {
 
@@ -62,7 +65,8 @@ func main() {
 	// Toggle logrus log level between current logLevel and trace by USR2 os signal
 	runa.LogrusLevelHandler(logrus.Level(logLevel))
 
-	sentry.Init("bridge")
+	sentry.Init(appName)
+	defer runa.MainRecoveryExit(appName)
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("init: %v, path: %s, keys-path: %s", init, path, keysPath)
@@ -92,7 +96,7 @@ func main() {
 	} else {
 		err := bridge.NewNode(name, keysPath, config.Bridge.Rendezvous)
 		if err != nil {
-			logrus.Fatalf("not registered Node or no keyfile: %v", err)
+			logrus.Fatal(fmt.Errorf("node stoped on error: %w", err))
 		}
 	}
 

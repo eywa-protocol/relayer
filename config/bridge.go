@@ -25,9 +25,20 @@ var Bridge Configuration
 type Configuration struct {
 	TickerInterval       time.Duration `yaml:"ticker_interval"`
 	UptimeReportInterval time.Duration
-	Rendezvous           string         `yaml:"rendezvous"`
-	Chains               []*BridgeChain `yaml:"chains"`
-	BootstrapAddrs       []string       `yaml:"bootstrap-addrs"`
+	Rendezvous           string       `yaml:"rendezvous"`
+	Chains               BridgeChains `yaml:"chains"`
+	BootstrapAddrs       []string     `yaml:"bootstrap-addrs"`
+}
+
+type BridgeChains []*BridgeChain
+
+func (bcs BridgeChains) GetChainCfg(chainId uint) *BridgeChain {
+	for _, bridgeChain := range bcs {
+		if bridgeChain.Id == chainId {
+			return bridgeChain
+		}
+	}
+	return nil
 }
 
 type BridgeKeys struct {

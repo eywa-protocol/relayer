@@ -3,13 +3,19 @@ package bridge
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+)
+
+var (
+	ErrGetEthClient = errors.New("get eth client error")
 )
 
 type Client struct {
@@ -26,15 +32,21 @@ type Client struct {
 
 func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err error) {
 
+	client = Client{
+		ChainCfg: chain,
+		EcdsaKey: chain.EcdsaKey,
+	}
 	c, url, err := chain.GetEthClient(skipUrl)
 	if err != nil {
-		err = fmt.Errorf("get eth client error: %w", err)
-		return
+		err = fmt.Errorf("chain[%d] %s: %w", chain.Id, ErrGetEthClient.Error(), err)
+		logrus.Error(err)
+		return client, ErrGetEthClient
 	}
 	chain.ChainId, err = c.ChainID(context.Background())
 	if err != nil {
-		err = fmt.Errorf("get chain id error: %w", err)
-		return
+		err = fmt.Errorf("chain[%d] get chain id from blockchain error: %w", chain.Id, err)
+		logrus.Error(err)
+		return client, ErrGetEthClient
 	}
 
 	bridge, err := wrappers.NewBridge(chain.BridgeAddress, c)

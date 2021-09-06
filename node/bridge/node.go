@@ -93,6 +93,11 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 }
 
 func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
+
+	if client.EthClient == nil {
+		return nil, ErrGetEthClient
+	}
+
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
@@ -121,6 +126,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err e
 }
 
 func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
+
 	publicKeys, err := n.GetPubKeysFromContract(client)
 	if err != nil {
 		return
@@ -222,19 +228,28 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 
 func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, chainId *big.Int) (err error) {
 	opt := &bind.WatchOpts{}
-	client, _, err := n.GetNodeClientOrRecreate(chainId)
+	recreateOnTimer := false
+	checkClientTimer := time.NewTicker(10 * time.Second)
+	mx := new(sync.Mutex)
+	var sub event.Subscription
+	client, clientRecreated, err := n.GetNodeClientOrRecreate(chainId)
 	if err != nil {
-		return err
-	}
-	sub, err := client.BridgeFilterer.WatchOracleRequest(opt, channel)
-	if err != nil {
-		logrus.Errorf("WatchOracleRequest can't %v", err)
-		return
+		if errors.Is(err, ErrGetEthClient) {
+			recreateOnTimer = true
+			sub = event.NewSubscription(func(i <-chan struct{}) error {
+				return nil
+			})
+		} else {
+			return err
+		}
+	} else {
+		sub, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
+		if err != nil {
+			logrus.Errorf("WatchOracleRequest can't %v", err)
+			return
+		}
 	}
 
-	checkClientTimer := time.NewTicker(10 * time.Second)
-	recreateOnTimer := false
-	mx := new(sync.Mutex)
 	wg.Add(1)
 	go func(subPtr *event.Subscription, clientPtr *Client) {
 		defer func() {
@@ -249,9 +264,14 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					mx.Lock()
 					defer mx.Unlock()
 					if recreateOnTimer {
-						clientRecreated := false
+						clientRecreated = false
 						client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
-						if err != nil {
+						if errors.Is(err, ErrGetEthClient) {
+							mx.Lock()
+							recreateOnTimer = true
+							mx.Unlock()
+							return err
+						} else if err != nil {
 							logrus.WithField(field.CainId, chainId.String()).
 								Error(fmt.Errorf("can not get client for network [%s] on error:%w",
 									chainId.String(), err))

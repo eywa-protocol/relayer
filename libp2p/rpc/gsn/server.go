@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -22,6 +23,7 @@ type ForwarderServerNode interface {
 }
 
 type Server struct {
+	mx        *sync.Mutex
 	node      ForwarderServerNode
 	rpcServer *rpc.Server
 }
@@ -29,6 +31,7 @@ type Server struct {
 // NewServer create new gsn forwarder rpc server and advertise it in network
 func NewServer(ctx context.Context, host host.Host, node ForwarderServerNode) (*Server, error) {
 	s := &Server{
+		mx:        new(sync.Mutex),
 		node:      node,
 		rpcServer: rpc.NewServer(host, ProtocolId),
 	}
@@ -53,6 +56,8 @@ func NewServer(ctx context.Context, host host.Host, node ForwarderServerNode) (*
 }
 
 func (s *Server) ExecuteRequestHandler(request *ExecuteRequest) (*ExecuteResult, error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
 	logrus.Infof("request: %v", request)
 	if chainId, ok := new(big.Int).SetString(request.ChainId, 10); !ok {
 

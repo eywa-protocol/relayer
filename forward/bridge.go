@@ -2,20 +2,26 @@ package forward
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
-	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
-func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, nodeRegistryAddress common.Address, node wrappers.NodeRegistryNode, deadline *big.Int, v uint8, r [32]byte, s [32]byte) (txHash common.Hash, err error) {
-	nodeRegistryABI := common2.MustGetABI(wrappers.NodeRegistryABI)
+// BridgeRequestV2 receiveRequestV2(bytes32 reqId, bytes b, address receiveSide, address bridgeFrom)
+func BridgeRequestV2(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, contractAddress common.Address, reqId [32]byte, b []byte, receiveSide, bridgeFrom common.Address) (txHash common.Hash, err error) {
+	contractABI, err := abi.JSON(strings.NewReader(wrappers.BridgeABI))
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("could not parse ABI: %w", err)
+	}
 
-	frequest, err := nodeRegistryABI.Pack("createRelayer", node, deadline, v, r, s)
+	fRequest, err := contractABI.Pack("receiveRequestV2", reqId, b, receiveSide, bridgeFrom)
 	if err != nil {
 
 		return
@@ -34,7 +40,7 @@ func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa
 	}
 
 	logrus.Infof("forwarderAddress: %s", forwarderAddress.String())
-	logrus.Infof("nodeRegistryAddress: %s", nodeRegistryAddress.String())
+	logrus.Infof("nodeRegistryAddress: %s", contractAddress.String())
 
 	signerAddress := crypto.PubkeyToAddress(signer.PublicKey)
 
@@ -48,18 +54,18 @@ func NodeRegistryCreateNode(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa
 
 	req := &wrappers.IForwarderForwardRequest{
 		From:  signerAddress,
-		To:    nodeRegistryAddress,
+		To:    contractAddress,
 		Value: big.NewInt(0),
 		Gas:   big.NewInt(1e6),
 		Nonce: nonce,
-		Data:  frequest,
+		Data:  fRequest,
 	}
 
 	typedData, err := NewForwardRequestTypedData(
 		req,
 		forwarderAddress.String(),
-		wrappers.NodeRegistryABI,
-		"createRelayer", node, deadline, v, r, s)
+		wrappers.BridgeABI,
+		"receiveRequestV2", reqId, b, receiveSide, bridgeFrom)
 	if err != nil {
 
 		return

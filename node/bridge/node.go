@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
@@ -77,7 +78,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 			logrus.Info("LEADER going to Call external chain contract method")
 			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
-				logrus.Errorf("%v", err)
+				logrus.Error(fmt.Errorf("%w", err))
 			}
 		}
 	}
@@ -371,7 +372,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	logrus.Infof("event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
 		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
 
-	client, err := n.GetNodeClient(event.Chainid)
+	client, _, err := n.GetNodeClientOrRecreate(event.Chainid)
 	if err != nil {
 		logrus.WithFields(
 			field.ListFromBridgeOracleRequest(event),
@@ -388,31 +389,50 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 		).Error(fmt.Errorf("invoke opposite bridge error: %w", err))
 	}
 	n.nonceMx.Lock()
-	txOpts := common2.CustomAuth(client.EthClient, n.signerKey)
-	/** Invoke bridge on another side */
-	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
-	if err != nil {
-		logrus.WithFields(
-			field.ListFromBridgeOracleRequest(event),
-		).Error(fmt.Errorf("ReceiveRequestV2 error:%w", err))
+
+	var txHash *common.Hash
+
+	if client.ChainCfg.UseGsn && n.gsnClient != nil {
+		hash, err := forward.BridgeRequestV2(n.gsnClient, event.Chainid, n.signerKey, client.ChainCfg.BridgeAddress, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		if err != nil {
+			err = fmt.Errorf("ReceiveRequestV2 gsn error:%w", err)
+			logrus.WithFields(
+				field.ListFromBridgeOracleRequest(event),
+			).Error(err)
+			n.nonceMx.Unlock()
+			return nil, err
+		} else {
+			txHash = &hash
+		}
+	} else {
+		txOpts := common2.CustomAuth(client.EthClient, n.signerKey)
+		/** Invoke bridge on another side */
+		tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		if err != nil {
+			err = fmt.Errorf("ReceiveRequestV2 error:%w", err)
+			logrus.WithFields(
+				field.ListFromBridgeOracleRequest(event),
+			).Error(err)
+			n.nonceMx.Unlock()
+			return nil, err
+		} else {
+			hash := tx.Hash()
+			txHash = &hash
+		}
 	}
 	n.nonceMx.Unlock()
-	if tx != nil {
-		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
+	if txHash != nil {
+		receipt, err = helpers.WaitTransactionDeadline(client.EthClient, *txHash, 30*time.Second)
 		if err != nil || receipt == nil {
 			err = fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
 			logrus.WithFields(logrus.Fields{
 				field.BridgeRequest: field.ListFromBridgeOracleRequest(event),
-				field.TxId:          tx.Hash().Hex(),
+				field.TxId:          txHash.Hex(),
 			}).Error()
 			return nil, err
 		}
 	}
 	return
-}
-
-func (n Node) Discover(topic string) {
-	go libp2p.Discover(n.Ctx, n.Host, n.Dht, topic, 3*time.Second)
 }
 
 func (n Node) InitializeCommonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {

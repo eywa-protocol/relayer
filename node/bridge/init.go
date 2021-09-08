@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -192,24 +193,30 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 }
 
 func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
+
 	n.cMx.Lock()
+	defer n.cMx.Unlock()
 	clientRecreated := false
 	client, ok := n.Clients[chainId.String()]
 	if !ok {
-		n.cMx.Unlock()
 		return Client{}, false, errors.New("eth client for chain ID not found")
 	} else if client.EthClient == nil {
 		var err error
-
 		client.EthClient, client.currentUrl, err = config.Bridge.Chains.GetChainCfg(uint(chainId.Uint64())).GetEthClient("")
 		if err != nil {
-			n.cMx.Unlock()
 			return client, false, ErrGetEthClient
+		} else if err = client.RecreateContractsAndFilters(); err != nil {
+
+			return client, false, ErrGetEthClient
+		} else {
+			clientRecreated = true
+			n.Clients[chainId.String()] = client
 		}
 	}
-	n.cMx.Unlock()
+	ctx, cancel := context.WithTimeout(n.Ctx, 3*time.Second)
+	defer cancel()
 
-	netChainId, err := client.EthClient.ChainID(n.Ctx)
+	netChainId, err := client.EthClient.ChainID(ctx)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			field.CainId: chainId,
@@ -222,13 +229,13 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 		} else if err != nil {
 
 			err = fmt.Errorf("can not create client on error:%w", err)
-			return Client{}, false, err
+			return client, false, err
 		} else {
 			// replace network client in clients map
 			clientRecreated = true
-			n.cMx.Lock()
 			n.Clients[chainId.String()] = client
-			n.cMx.Unlock()
+			logrus.Infof("client for chain[%s] recrated", chainId.String())
+			return client, clientRecreated, nil
 		}
 	}
 
@@ -244,6 +251,27 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 	return client, clientRecreated, nil
 }
 
+func (n *Node) IsClientReady(chainId *big.Int) bool {
+	n.cMx.Lock()
+	defer n.cMx.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, ok := n.Clients[chainId.String()]
+	if !ok {
+		logrus.Errorf("eth client for chain[%s] not found", chainId.String())
+		return false
+	} else if client.EthClient == nil {
+		logrus.Errorf("eth client for chain[%s] not initialized", chainId.String())
+		return false
+	} else if _, err := client.EthClient.ChainID(ctx); err != nil {
+		logrus.Error(fmt.Errorf("network with chain[%s] is not reachable on error: %w", chainId.String(), err))
+		return false
+	} else {
+		return true
+	}
+
+}
+
 func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	n.cMx.Lock()
 	defer n.cMx.Unlock()
@@ -251,6 +279,8 @@ func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	client, ok := n.Clients[chainId.String()]
 	if !ok {
 		return Client{}, errors.New("eth client for chain ID not found")
+	} else if client.EthClient == nil {
+		return client, ErrGetEthClient
 	}
 
 	return client, nil

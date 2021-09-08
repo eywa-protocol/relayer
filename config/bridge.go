@@ -97,7 +97,7 @@ func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, ur
 		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
 			continue
 		}
-		if client, err = ethclient.Dial(url); err != nil {
+		if client, err = dial(url); err != nil {
 			logrus.WithFields(logrus.Fields{
 				field.CainId: c.Id,
 				field.EthUrl: url,
@@ -111,8 +111,11 @@ func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, ur
 					field.EcdsaAddress: c.EcdsaAddress.String(),
 				}).Error(fmt.Errorf("get address balance error: %w", err))
 			}
-			if balance == big.NewInt(0) {
-
+			if balance.Cmp(big.NewInt(0)) <= 0 {
+				logrus.WithFields(logrus.Fields{
+					field.CainId:       c.Id,
+					field.EcdsaAddress: c.EcdsaAddress.String(),
+				}).Error(fmt.Errorf("node balance on chain [%d] is low", c.Id))
 				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
 					c.Id, c.EcdsaAddress.String(), balance.String())
 

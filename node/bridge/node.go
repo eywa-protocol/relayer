@@ -279,28 +279,30 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 						} else {
 							logrus.Infof("client for network [%s] restored on timer. recreated: %v",
 								chainId.String(), clientRecreated)
-						}
 
-						if clientRecreated {
-							logrus.Info("resubscribe to OracleRequest recreated client on timer")
-							*subPtr, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
-							if err != nil {
-								logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
-								recreateOnTimer = true
-								time.Sleep(1 * time.Second)
-								return err
+							if clientRecreated {
+								logrus.Info("resubscribe to OracleRequest recreated client on timer")
+								*subPtr, err = clientPtr.BridgeFilterer.WatchOracleRequest(opt, channel)
+								if err != nil {
+									logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
+									recreateOnTimer = true
+									time.Sleep(1 * time.Second)
+									return err
+								} else {
+									recreateOnTimer = false
+									return nil
+								}
 							} else {
+								logrus.Info("resubscribe to OracleRequest")
+								*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+									return clientPtr.BridgeFilterer.WatchOracleRequest(opt, channel)
+								})
 								recreateOnTimer = false
 								return nil
 							}
-						} else {
-							logrus.Info("resubscribe to OracleRequest")
-							*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
-								return client.BridgeFilterer.WatchOracleRequest(opt, channel)
-							})
-							recreateOnTimer = false
-							return nil
+
 						}
+
 					}
 					return nil
 				}(); err != nil {
@@ -313,7 +315,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 						mx.Lock()
 						defer mx.Unlock()
 						clientRecreated := false
-						client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
+						*clientPtr, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
 						if err != nil {
 							logrus.WithField(field.CainId, chainId.String()).
 								Error(fmt.Errorf("can not get client for network [%s] on error:%w",
@@ -322,28 +324,29 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 							recreateOnTimer = true
 							return
 						} else {
-							logrus.Infof("client for network [%s] restored after sub err: %v, recreated: %v",
-								chainId.String(), err, clientRecreated)
-						}
-						if clientRecreated {
-							logrus.Infof("subscribe to OracleRequest on recreated client on sub err: %v", err)
-							*subPtr, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
-							if err != nil {
-								logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
-								time.Sleep(1 * time.Second)
-								recreateOnTimer = true
-								return
-							} else {
-								recreateOnTimer = false
+							logrus.Infof("client for network [%s] restored after sub err: %v, recreated: %v, client: %v",
+								chainId.String(), err, clientRecreated, *clientPtr)
 
-								return
+							if clientRecreated {
+								logrus.Infof("subscribe to OracleRequest on recreated client on sub err: %v", err)
+								*subPtr, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
+								if err != nil {
+									logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
+									time.Sleep(1 * time.Second)
+									recreateOnTimer = true
+									return
+								} else {
+									recreateOnTimer = false
+
+									return
+								}
+							} else {
+								logrus.Infof("resubscribe to OracleRequest on error: %v", err)
+								*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+									return clientPtr.BridgeFilterer.WatchOracleRequest(opt, channel)
+								})
+								recreateOnTimer = false
 							}
-						} else {
-							logrus.Infof("resubscribe to OracleRequest on error: %v", err)
-							*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
-								return client.BridgeFilterer.WatchOracleRequest(opt, channel)
-							})
-							recreateOnTimer = false
 						}
 					}()
 				}

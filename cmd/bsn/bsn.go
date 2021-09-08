@@ -15,6 +15,8 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 )
 
+const appName = "bsn"
+
 func initPprof() {
 
 	go func() {
@@ -55,7 +57,8 @@ func main() {
 	// Toggle logrus log level between current logLevel and trace by USR2 os signal
 	runa.LogrusLevelHandler(logrus.Level(logLevel))
 
-	sentry.Init("bsn")
+	sentry.Init(appName)
+	defer runa.MainRecoveryExit(appName)
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
 	logrus.Tracef("init: %v, name: %s, keys-path: %s", init, name, keysPath)

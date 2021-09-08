@@ -4,10 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"math/big"
-	"math/rand"
-	"time"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +14,9 @@ import (
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+	"math/big"
+	"math/rand"
+	"time"
 )
 
 var backend *backends.SimulatedBackend
@@ -25,18 +24,22 @@ var backend *backends.SimulatedBackend
 var owner *bind.TransactOpts
 
 var forwarder *wrappers.Forwarder
+
 var testTarget *wrappers.TestTarget
-
 var bridge *wrappers.Bridge
-var nodeList *wrappers.NodeList
-var mockDexPool *wrappers.MockDexPool
-var nodeListAddNodeABIPacked []byte
 
-var nodeListABI = common2.MustGetABI(wrappers.NodeListABI)
+var testForward *wrappers.TestForward
+var mockDexPool *wrappers.MockDexPool
+var eywaToken *wrappers.TestTokenPermit
+var nodeRegistry *wrappers.NodeRegistry
+var testForwardCreateNodeRegistryABIPacked []byte
+
+var testForwardABI = common2.MustGetABI(wrappers.TestForwardABI)
 var testTargetABI = common2.MustGetABI(wrappers.TestTargetABI)
+var nodeRegistryABI = common2.MustGetABI(wrappers.NodeRegistryABI)
 
 var fwdRequestTypedData signer.TypedData
-
+var createNodeRegistryData wrappers.NodeRegistryNode
 var testTargetAddress,
 	testForwarderTargetAddress,
 	testfForwarderAddress,
@@ -44,12 +47,17 @@ var testTargetAddress,
 	miniForwarderAddress,
 	forwarderAddress,
 	signerAddress,
-	nodeListAddress,
+	testForwardAddress,
 	forwarderTestAddress,
 	bridgeAddress,
+	eywaTokenAddress,
+	nodeRegistryAddress,
+	bridgeOwner,
+	pool,
+	randWallet,
 	mockDexPooolAddress common.Address
 var forwarederRequest *wrappers.IForwarderForwardRequest
-
+var blsPubKey string
 var err error
 var ownerKey, signerKey *ecdsa.PrivateKey
 
@@ -57,14 +65,6 @@ var ctx context.Context
 var Domain map[string]json.RawMessage
 var domainChainIDAsString map[string]json.RawMessage
 var Msg map[string]json.RawMessage
-
-var createNodeData *createNodeDataTypw
-
-type createNodeDataTypw struct {
-	nodeWallet    common.Address
-	nodeIdAddress common.Address
-	blsPubKey     string
-}
 
 func init() {
 	ctx = context.Background()
@@ -99,57 +99,78 @@ func init() {
 	}
 	backend.Commit()
 
-	nodeListAddress, _, nodeList, err = wrappers.DeployNodeList(owner, backend)
+	testForwardAddress, _, testForward, err = wrappers.DeployTestForward(owner, backend, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeListAddress)
+	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeRegistryAddress, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, nodeListAddress)
+	eywaTokenAddress, _, eywaToken, err = wrappers.DeployTestTokenPermit(owner, backend, "EYWA", "EYWA")
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	_, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
+	nodeRegistryAddress, _, nodeRegistry, err = wrappers.DeployNodeRegistry(owner, backend, eywaTokenAddress, forwarderAddress)
 	if err != nil {
 		panic(err)
 	}
 	backend.Commit()
 
-	logrus.Info("nodeListAddress: ", nodeListAddress)
-	initForwarderContractCall()
+	bridgeAddress, _, bridge, err = wrappers.DeployBridge(owner, backend, nodeRegistryAddress, forwarderAddress)
+	if err != nil {
+		panic(err)
+	}
+	backend.Commit()
+
+	// mockDexPooolAddress, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, testForwardAddress)
+	_, _, mockDexPool, err = wrappers.DeployMockDexPool(owner, backend, testForwardAddress)
+	if err != nil {
+		panic(err)
+	}
+	backend.Commit()
+
+	//_, err := bridge.UpdateDexBind(owner, mockDexPooolAddress, true)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//backend.Commit()
+
+	logrus.Info("testForwardAddress: ", testForwardAddress)
+
+	//initForwarderContractCall()
+
 }
 
 func initForwarderContractCall() {
 
-	blsPubKey := string(GenRandomBytes(256))
-	randWallet := common.BytesToAddress(GenRandomBytes(3))
+	blsPubKey = string(GenRandomBytes(256))
+	randWallet = common.BytesToAddress(GenRandomBytes(20))
+	pool = common.BytesToAddress(GenRandomBytes(20))
+	bridgeOwner = common.BytesToAddress(GenRandomBytes(20))
 
-	createNodeData = &createNodeDataTypw{
-		nodeWallet:    randWallet,
-		nodeIdAddress: randWallet,
-		blsPubKey:     blsPubKey,
+	createNodeRegistryData = wrappers.NodeRegistryNode{
+		Owner:         bridgeOwner,
+		Pool:          pool,
+		NodeIdAddress: randWallet,
+		BlsPubKey:     blsPubKey,
+		NodeId:        big.NewInt(0),
 	}
 
-	logrus.Print("createNodeData.blsPubKey ", createNodeData.blsPubKey)
-	logrus.Print("createNodeData.nodeIdAddress ", createNodeData.nodeIdAddress)
-	logrus.Print("createNodeData.nodeWallet ", createNodeData.nodeWallet)
-
-	nodeListAddNodeABIPacked, err = nodeListABI.Pack("addNode",
-		createNodeData.nodeWallet,
-		createNodeData.nodeIdAddress,
-		createNodeData.blsPubKey)
-
+	testForwardCreateNodeRegistryABIPacked, err = nodeRegistryABI.Pack("addNode", &createNodeRegistryData)
 	if err != nil {
 		panic(err)
 	}
+
+	//testForwardCreateNodeRegistryABIPacked = []byte("dcdss")
+
+	logrus.Print("testForwardCreateNodeRegistryABIPacked LENGTH ", len(testForwardCreateNodeRegistryABIPacked))
 
 	nonce, err := forwarder.GetNonce(&bind.CallOpts{}, signerAddress)
 	if err != nil {
@@ -158,11 +179,11 @@ func initForwarderContractCall() {
 
 	forwarederRequest = &wrappers.IForwarderForwardRequest{
 		From:  signerAddress,
-		To:    nodeListAddress,
+		To:    testForwardAddress,
 		Value: big.NewInt(0),
 		Gas:   big.NewInt(1e6),
 		Nonce: nonce,
-		Data:  nodeListAddNodeABIPacked,
+		Data:  testForwardCreateNodeRegistryABIPacked,
 	}
 
 	fwdRequestTypedData = signer.TypedData{
@@ -194,18 +215,10 @@ func initForwarderContractCall() {
 			"value": forwarederRequest.Value.String(),
 			"gas":   forwarederRequest.Gas.String(),
 			"nonce": forwarederRequest.Nonce.String(),
-			"data":  nodeListAddNodeABIPacked,
+			"data":  testForwardCreateNodeRegistryABIPacked,
 		},
 	}
 
-}
-
-func getNodesCount() int {
-	nodes, err := nodeList.GetNodes(&bind.CallOpts{})
-	if err != nil {
-		panic(err)
-	}
-	return len(nodes)
 }
 
 func GenRandomBytes(size int) (blk []byte) {
@@ -221,4 +234,12 @@ func getSignerNonceFromForwarder() (nonce *big.Int) {
 		panic(err)
 	}
 	return
+}
+
+func getNodesCount() int {
+	nodes, err := nodeRegistry.GetNodes(&bind.CallOpts{})
+	if err != nil {
+		panic(err)
+	}
+	return len(nodes)
 }

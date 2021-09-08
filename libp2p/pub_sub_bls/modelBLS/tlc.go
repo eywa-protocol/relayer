@@ -296,7 +296,6 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 	aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, keyMask)
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	// Verify message signature

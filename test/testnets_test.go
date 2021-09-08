@@ -1,4 +1,4 @@
-package networks
+package test
 
 import (
 	"github.com/stretchr/testify/require"

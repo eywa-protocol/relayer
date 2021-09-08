@@ -2,18 +2,20 @@ package helpers
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
-	wrappers "gitlab.digiu.ai/blockchainlaboratory/wrappers"
+	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 type OracleRequest struct {
@@ -59,6 +61,10 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	return
 }
 
+
+
+
+
 func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
@@ -79,6 +85,37 @@ func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Re
 	return receipt, nil
 }
 
+func WaitTransactionDeadline(client *ethclient.Client, txHash common.Hash, timeout time.Duration) (*types.Receipt, error) {
+	var receipt *types.Receipt
+	var err error
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+
+			return nil, fmt.Errorf("wait for transaction %s timed out", txHash.Hex())
+		default:
+
+			if receipt, err = client.TransactionReceipt(context.Background(), txHash); receipt == nil ||
+				errors.Is(err, ethereum.NotFound) {
+
+				time.Sleep(time.Millisecond * 500)
+				continue
+			} else if err != nil {
+
+				return nil, fmt.Errorf("transaction %s failed: %v", txHash.Hex(), err)
+			} else if receipt.Status != 1 {
+
+				return nil, fmt.Errorf("failed transaction: %s", txHash.Hex())
+			} else {
+
+				return receipt, nil
+			}
+		}
+	}
+}
+
 func WaitTransactionWithRetry(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
@@ -93,7 +130,7 @@ func WaitTransactionWithRetry(client *ethclient.Client, tx *types.Transaction) (
 		}
 		break
 	}
-	//TODO: confirm that it's always possible to get code message with empty from address and nil block number
+	// TODO: confirm that it's always possible to get code message with empty from address and nil block number
 	if receipt.Status != 1 {
 		msg := ethereum.CallMsg{
 			To:   tx.To(),
@@ -119,7 +156,7 @@ func WaitForBlockCompletation(client *ethclient.Client, hash string) (int, *type
 			statusCode := -1
 			txHash := common.HexToHash(hash)
 			tx, err := client.TransactionReceipt(ctx, txHash)
-			//tx.BlockNumber.String()
+			// tx.BlockNumber.String()
 			if err == nil {
 				statusCode = int(tx.Status)
 				transaction <- tx
@@ -148,7 +185,7 @@ func WaitForBlockCompletation(client *ethclient.Client, hash string) (int, *type
 			txd, _, _ := client.TransactionByHash(context.Background(), tx.TxHash)
 			total := new(big.Int).Mul(txd.GasPrice(), new(big.Int).SetUint64(tx.GasUsed))
 			GasUsed.Add(GasUsed, total)
-			//GasUsed += tx.CumulativeGasUsed
+			// GasUsed += tx.CumulativeGasUsed
 			return int(tx.Status), tx
 		}
 		return -1, nil

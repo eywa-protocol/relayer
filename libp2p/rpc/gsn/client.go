@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -23,6 +24,8 @@ import (
 
 type ForwarderClientNode interface {
 	GetDht() *dht.IpfsDHT
+	GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error)
+	GetForwarderAddress(chainId *big.Int) (common.Address, error)
 }
 
 type Client struct {
@@ -68,6 +71,29 @@ func (c *Client) getGsnPeerId() (peer.ID, error) {
 	}
 }
 
+func (c *Client) WaitForDiscoveryGsn(timeout time.Duration) error {
+	var err error
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	stopTime := time.Now().Add(timeout)
+	go func() {
+		defer wg.Done()
+		for {
+			if _, err = c.getGsnPeerId(); err == nil {
+
+				return
+			} else if time.Now().After(stopTime) {
+				err = errors.New("wait for discover gsn peer timed out")
+				return
+			} else {
+				time.Sleep(time.Second)
+			}
+		}
+	}()
+	wg.Wait()
+	return err
+}
+
 func (c *Client) discovery() {
 	ticker := time.NewTicker(c.discoveryInterval)
 	defer ticker.Stop()
@@ -106,28 +132,40 @@ func (c *Client) discovery() {
 
 }
 
-func (c *Client) Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (string, error) {
+func (c *Client) Execute(chainId *big.Int, req wrappers.IForwarderForwardRequest, domainSeparator [32]byte, requestTypeHash [32]byte, suffixData []byte, sig []byte) (common.Hash, error) {
 
 	var res ExecuteResult
 
 	callReq := ExecuteRequest{
-		ChainId:         chainId,
-		ForwardRequest:  req,
+		ChainId:         chainId.String(),
+		ForwardRequest:  NewRpcForwarderForwardRequest(&req),
 		DomainSeparator: domainSeparator,
 		RequestTypeHash: requestTypeHash,
 		SuffixData:      suffixData,
 		Signature:       sig,
 	}
 
+	logrus.Infof("forwarder request chainId: %s", chainId.String())
+
 	if peerId, err := c.getGsnPeerId(); err != nil {
 
-		return "", fmt.Errorf("get gsn peer ID error: %w", err)
+		return common.Hash{}, fmt.Errorf("get gsn peer ID error: %w", err)
 	} else if err := c.rpcClient.CallContext(context.Background(), peerId, RpcService, RpcServiceFuncExecute, callReq, &res); err != nil {
 
-		return "", fmt.Errorf("call rpc service [%s] method [%s] error: %w",
+		return common.Hash{}, fmt.Errorf("call rpc service [%s] method [%s] error: %w",
 			RpcService, RpcServiceFuncExecute, err)
 	} else {
 
-		return res.TxId, nil
+		return res.TxHash, nil
 	}
+}
+
+func (c *Client) GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error) {
+
+	return c.node.GetForwarder(chainId)
+}
+
+func (c *Client) GetForwarderAddress(chainId *big.Int) (common.Address, error) {
+
+	return c.node.GetForwarderAddress(chainId)
 }

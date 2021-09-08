@@ -36,3 +36,7 @@ func (n Node) InitDHT(bootstrapPeerAddrs []string) (dht *dht.IpfsDHT, err error)
 
 	return
 }
+
+func (n Node) GetDht() *dht.IpfsDHT {
+	return n.Dht
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
+	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gopkg.in/yaml.v3"
 	_ "gopkg.in/yaml.v3"
@@ -25,6 +26,7 @@ var Bridge Configuration
 type Configuration struct {
 	TickerInterval       time.Duration `yaml:"ticker_interval"`
 	UptimeReportInterval time.Duration
+	UseGsn               bool
 	Rendezvous           string         `yaml:"rendezvous"`
 	Chains               []*BridgeChain `yaml:"chains"`
 	BootstrapAddrs       []string       `yaml:"bootstrap-addrs"`
@@ -46,9 +48,11 @@ type BridgeChain struct {
 	BridgeAddress       common.Address `yaml:"bridge_address"`
 	NodeRegistryAddress common.Address `yaml:"node_registry_address"`
 	DexPoolAddress      common.Address `yaml:"dex_pool_address"`
+	ForwarderAddress    common.Address `yaml:"forwarder_address"`
+	UseGsn              bool
 }
 
-func LoadBridgeConfig(path string) error {
+func LoadBridgeConfig(path string, useGsn bool) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read config file [%s] error: %w",
@@ -71,6 +75,11 @@ func LoadBridgeConfig(path string) error {
 			return fmt.Errorf("chain [%d] casting public key to ECDSA Address error: %w", chain.Id, err)
 		}
 		chain.EcdsaAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+
+		if useGsn && !common2.AddressIsZero(chain.ForwarderAddress) {
+			Bridge.UseGsn = true
+			chain.UseGsn = true
+		}
 	}
 
 	// override config fields from env
@@ -81,7 +90,7 @@ func LoadBridgeConfig(path string) error {
 	return nil
 }
 
-func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
+func (c *BridgeChain) GetEthClient(skipUrl string, signerAddress common.Address) (client *ethclient.Client, url string, err error) {
 	for _, url := range c.RpcUrls {
 		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
 			continue
@@ -93,17 +102,17 @@ func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, ur
 			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
 			continue
 		} else {
-			balance, err := client.BalanceAt(context.Background(), c.EcdsaAddress, nil)
+			balance, err := client.BalanceAt(context.Background(), signerAddress, nil)
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
 					field.CainId:       c.Id,
-					field.EcdsaAddress: c.EcdsaAddress.String(),
+					field.EcdsaAddress: signerAddress,
 				}).Error(fmt.Errorf("get address balance error: %w", err))
 			}
 			if balance == big.NewInt(0) {
 
 				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
-					c.Id, c.EcdsaAddress.String(), balance.String())
+					c.Id, signerAddress.String(), balance.String())
 
 			}
 

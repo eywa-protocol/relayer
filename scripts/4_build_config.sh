@@ -61,6 +61,7 @@ do
     node_registry_address: $NODEREGISTRY_ADDRESS
     dex_pool_address: $DEXPOOL_ADDRESS
     reward_address: $REWARDS_ADDRESS
+    forwarder_address: $FORWARDER_ADDRESS
     rpc_urls:
       - $RPC_URL
 EOF

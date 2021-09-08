@@ -150,7 +150,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 			return nil, err
 		}
 		blsNode = func() *modelBLS.Node {
-			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(10*time.Second))
+			ctx, cancel := context.WithTimeout(n.Ctx, 10*time.Second)
 			defer cancel()
 			for {
 				topicParticipants := topic.ListPeers()
@@ -265,27 +265,41 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					defer mx.Unlock()
 					if recreateOnTimer {
 						clientRecreated = false
-						client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
+						*clientPtr, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
 						if errors.Is(err, ErrGetEthClient) {
-							mx.Lock()
 							recreateOnTimer = true
-							mx.Unlock()
 							return err
 						} else if err != nil {
 							logrus.WithField(field.CainId, chainId.String()).
 								Error(fmt.Errorf("can not get client for network [%s] on error:%w",
 									chainId.String(), err))
+							recreateOnTimer = true
 							time.Sleep(1 * time.Second)
 							return err
+						} else {
+							logrus.Infof("client for network [%s] restored on timer. recreated: %v",
+								chainId.String(), clientRecreated)
 						}
+
 						if clientRecreated {
-							logrus.Info("resubscribe recreated client on timer")
-							sub, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
+							logrus.Info("resubscribe to OracleRequest recreated client on timer")
+							*subPtr, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
 							if err != nil {
 								logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
+								recreateOnTimer = true
 								time.Sleep(1 * time.Second)
 								return err
+							} else {
+								recreateOnTimer = false
+								return nil
 							}
+						} else {
+							logrus.Info("resubscribe to OracleRequest")
+							*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+								return client.BridgeFilterer.WatchOracleRequest(opt, channel)
+							})
+							recreateOnTimer = false
+							return nil
 						}
 					}
 					return nil
@@ -295,38 +309,57 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 			case err := <-(*subPtr).Err():
 				if err != nil {
 					logrus.Error(fmt.Errorf("OracleRequest subscription error: %w chainId: %s", err, chainId.String()))
-					clientRecreated := false
-					client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
-					if err != nil {
-						logrus.WithField(field.CainId, chainId.String()).
-							Error(fmt.Errorf("can not get client for network [%s] on error:%w",
-								chainId.String(), err))
-						time.Sleep(1 * time.Second)
+					func() {
+						mx.Lock()
+						defer mx.Unlock()
+						clientRecreated := false
+						client, clientRecreated, err = n.GetNodeClientOrRecreate(chainId)
+						if err != nil {
+							logrus.WithField(field.CainId, chainId.String()).
+								Error(fmt.Errorf("can not get client for network [%s] on error:%w",
+									chainId.String(), err))
+							time.Sleep(1 * time.Second)
+							recreateOnTimer = true
+							return
+						} else {
+							logrus.Infof("client for network [%s] restored after sub err: %v, recreated: %v",
+								chainId.String(), err, clientRecreated)
+						}
+						if clientRecreated {
+							logrus.Infof("subscribe to OracleRequest on recreated client on sub err: %v", err)
+							*subPtr, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
+							if err != nil {
+								logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
+								time.Sleep(1 * time.Second)
+								recreateOnTimer = true
+								return
+							} else {
+								recreateOnTimer = false
+
+								return
+							}
+						} else {
+							logrus.Infof("resubscribe to OracleRequest on error: %v", err)
+							*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+								return client.BridgeFilterer.WatchOracleRequest(opt, channel)
+							})
+							recreateOnTimer = false
+						}
+					}()
+				}
+			case e := <-channel:
+				if e != nil {
+					logrus.Debugf("receive event tx: %s", e.Raw.TxHash.Hex())
+					if !n.IsClientReady(e.Chainid) {
+						logrus.WithFields(logrus.Fields{
+							field.BridgeRequest: field.ListFromBridgeOracleRequest(e),
+							field.TxId:          e.Raw.TxHash.Hex(),
+						}).Errorf("CANCEL PROTOCOL on chain [%s] because network client not ready", e.Chainid)
 						mx.Lock()
 						recreateOnTimer = true
 						mx.Unlock()
 						continue
 					}
-					if clientRecreated {
-						logrus.Infof("subscribe to OracleRequest on recreated client on sub err: %v", err)
-						sub, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
-						if err != nil {
-							logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
-							time.Sleep(1 * time.Second)
-							mx.Lock()
-							recreateOnTimer = true
-							mx.Unlock()
-							continue
-						}
-					} else {
-						logrus.Infof("resubscribe to OracleRequest on error: %v", err)
-						sub = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
-							return client.BridgeFilterer.WatchOracleRequest(opt, channel)
-						})
-					}
-				}
-			case e := <-channel:
-				if e != nil {
 					logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", e.Chainid.String())
 					currentTopic := common2.ToHex(e.Raw.TxHash)
 					logrus.Debugf("currentTopic %s", currentTopic)
@@ -506,8 +539,14 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
+		chainId := big.NewInt(int64(config.Bridge.Chains[0].Id))
 	uptimeLoop:
 		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.Bridge.UptimeReportInterval) {
+			if !n.IsClientReady(chainId) {
+				logrus.WithFields(logrus.Fields{}).Errorf("CANCEL uptime PROTOCOL on chain [%s] because network client not ready", chainId)
+				continue
+			}
+
 			currentTopic := schedule.TimeToTopicName("uptime", t)
 			if uptimeTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
 				logrus.WithFields(logrus.Fields{
@@ -536,7 +575,7 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 					logrus.Infoln("uptime.ListPeers(): ", topic.ListPeers())
 
 					var nodeBls *modelBLS.Node
-					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.Bridge.Chains[0].ChainId.String()])
+					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[chainId.String()])
 					if err != nil {
 						err = fmt.Errorf("uptime create new bls node error: %w ", err)
 						logrus.WithFields(logrus.Fields{

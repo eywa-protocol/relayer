@@ -7,7 +7,7 @@ else
 fi
 
 gsns=$(docker ps -a --format "{{.Names}}" | grep gsn | sort -n)
-if [[ "$bsns" == "" ]] ;then
+if [[ "$gsns" == "" ]] ;then
   echo "gsn nodes containers not found"
 else
   docker stop $gsns
@@ -25,7 +25,7 @@ fi
 
 
 if [[ "$(docker images p2p-bridge_img | grep p2p-bridge_img)" == "" ]];then
-  echo "bootstrap nodes image not found"
+  echo "nodes image not found"
 else
   docker rmi -f p2p-bridge_img
 fi

@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	ErrGetEthClient = errors.New("get eth client error")
+	ErrGetEthClient = errors.New("eth client not initialized")
 )
 
 type Client struct {
@@ -30,66 +30,72 @@ type Client struct {
 	currentUrl string
 }
 
+func (c *Client) RecreateContractsAndFilters() (err error) {
+
+	if c.EthClient == nil {
+		return ErrGetEthClient
+	}
+
+	c.ChainCfg.ChainId, err = c.EthClient.ChainID(context.Background())
+	if err != nil {
+		err = fmt.Errorf("chain[%d] get chain id from blockchain error: %w", c.ChainCfg.Id, err)
+		logrus.Error(err)
+		return ErrGetEthClient
+	}
+
+	bridge, err := wrappers.NewBridge(c.ChainCfg.BridgeAddress, c.EthClient)
+	if err != nil {
+		err = fmt.Errorf("init bridge [%s] error: %w", c.ChainCfg.BridgeAddress, err)
+		return
+	}
+
+	bridgeFilterer, err := wrappers.NewBridgeFilterer(c.ChainCfg.BridgeAddress, c.EthClient)
+	if err != nil {
+		err = fmt.Errorf("init bridge filter [%s] error: %w", c.ChainCfg.BridgeAddress, err)
+		return
+	}
+	nodeList, err := wrappers.NewNodeList(c.ChainCfg.NodeListAddress, c.EthClient)
+	if err != nil {
+		err = fmt.Errorf("init nodelist [%s] error: %w", c.ChainCfg.BridgeAddress, err)
+		return
+	}
+
+	nodeListFilterer, err := wrappers.NewNodeListFilterer(c.ChainCfg.NodeListAddress, c.EthClient)
+	if err != nil {
+		err = fmt.Errorf("init nodelist filter [%s] error: %w", c.ChainCfg.BridgeAddress, err)
+		return
+	}
+
+	txOpts := common2.CustomAuth(c.EthClient, c.ChainCfg.EcdsaKey)
+
+	c.Bridge = wrappers.BridgeSession{
+		Contract:     bridge,
+		CallOpts:     bind.CallOpts{},
+		TransactOpts: *txOpts,
+	}
+	c.NodeList = wrappers.NodeListSession{
+		Contract:     nodeList,
+		CallOpts:     bind.CallOpts{},
+		TransactOpts: *txOpts,
+	}
+	c.BridgeFilterer = *bridgeFilterer
+	c.NodeListFilterer = *nodeListFilterer
+
+	return nil
+}
+
 func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err error) {
 
 	client = Client{
 		ChainCfg: chain,
 		EcdsaKey: chain.EcdsaKey,
 	}
-	c, url, err := chain.GetEthClient(skipUrl)
+	client.EthClient, client.currentUrl, err = chain.GetEthClient(skipUrl)
 	if err != nil {
 		err = fmt.Errorf("chain[%d] %s: %w", chain.Id, ErrGetEthClient.Error(), err)
 		logrus.Error(err)
 		return client, ErrGetEthClient
 	}
-	chain.ChainId, err = c.ChainID(context.Background())
-	if err != nil {
-		err = fmt.Errorf("chain[%d] get chain id from blockchain error: %w", chain.Id, err)
-		logrus.Error(err)
-		return client, ErrGetEthClient
-	}
-
-	bridge, err := wrappers.NewBridge(chain.BridgeAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init bridge [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	bridgeFilterer, err := wrappers.NewBridgeFilterer(chain.BridgeAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init bridge filter [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-	nodeList, err := wrappers.NewNodeList(chain.NodeListAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init nodelist [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	nodeListFilterer, err := wrappers.NewNodeListFilterer(chain.NodeListAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init nodelist filter [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	txOpts := common2.CustomAuth(c, chain.EcdsaKey)
-
-	return Client{
-		EthClient: c,
-		ChainCfg:  chain,
-		EcdsaKey:  chain.EcdsaKey,
-		Bridge: wrappers.BridgeSession{
-			Contract:     bridge,
-			CallOpts:     bind.CallOpts{},
-			TransactOpts: *txOpts,
-		},
-		NodeList: wrappers.NodeListSession{
-			Contract:     nodeList,
-			CallOpts:     bind.CallOpts{},
-			TransactOpts: *txOpts,
-		},
-		BridgeFilterer:   *bridgeFilterer,
-		NodeListFilterer: *nodeListFilterer,
-		currentUrl:       url,
-	}, nil
+	err = client.RecreateContractsAndFilters()
+	return
 }

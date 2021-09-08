@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
@@ -53,26 +54,38 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	require.NoError(t, err)
 	logrus.Print("(dexPoolFrom, clientFrom.EthClient)", dexPoolFrom, clientFrom.EthClient)
 
-	txOptsFrom := common2.CustomAuth(clientFrom.EthClient, pKeyFrom)
-	dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, clientFrom.EthClient)
-	require.NoError(t, err)
+	var tx *types.Transaction
+	if clientFrom.EthClient != nil {
+		txOptsFrom := common2.CustomAuth(clientFrom.EthClient, pKeyFrom)
+		dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, clientFrom.EthClient)
+		require.NoError(t, err)
 
-	dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
-	require.NoError(t, err)
+		tx, err = dexPoolFromContract.SendRequestTestV2(txOptsFrom,
+			testData,
+			dexPoolTo,
+			bridgeTo,
+			chainIdTo)
 
-	tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
-		testData,
-		dexPoolTo,
-		bridgeTo,
-		chainIdTo)
-	require.NoError(t, err)
-	logrus.Print(tx.Hash())
-	status, recaipt := helpers.WaitForBlockCompletation(clientFrom.EthClient, tx.Hash().String())
-	logrus.Print(recaipt.Logs)
-	logrus.Print(status)
-	time.Sleep(20 * time.Second)
-	res, err := dexPoolToContract.TestData(&bind.CallOpts{})
-	require.NoError(t, err)
-	require.Equal(t, testData, res)
-	logrus.Print(res)
+		require.NoError(t, err)
+		logrus.Print(tx.Hash())
+	} else {
+		t.Fatal("eth client from not initialized")
+	}
+
+	if clientTo.EthClient != nil {
+		dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
+		require.NoError(t, err)
+
+		status, recaipt := helpers.WaitForBlockCompletation(clientFrom.EthClient, tx.Hash().String())
+		logrus.Print(recaipt.Logs)
+		logrus.Print(status)
+		time.Sleep(20 * time.Second)
+		res, err := dexPoolToContract.TestData(&bind.CallOpts{})
+		require.NoError(t, err)
+		require.Equal(t, testData, res)
+		logrus.Print(res)
+	} else {
+		t.Fatal("eth client to not initialized")
+	}
+
 }

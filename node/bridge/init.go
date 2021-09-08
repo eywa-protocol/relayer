@@ -229,7 +229,7 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 		} else if err != nil {
 
 			err = fmt.Errorf("can not create client on error:%w", err)
-			return Client{}, false, err
+			return client, false, err
 		} else {
 			// replace network client in clients map
 			clientRecreated = true

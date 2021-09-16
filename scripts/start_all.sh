@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 touch ../.env.sentry
+touch ../.env.prom
+
 
 if [[ "$OSTYPE" == "darwin"* ]];then
   DC="../docker-compose-macos.yaml"

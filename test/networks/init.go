@@ -30,10 +30,10 @@ func init() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	node, err = bridge.NewNodeWithClients(context.Background())
-	if err != nil {
-		logrus.Fatal(err)
-	}
+	node = bridge.NewNode(context.Background())
+
+	node.InitClients()
+
 	if len(os.Args) > 5 {
 		testData, _ = qwe.SetString(os.Args[5], 10)
 	} else {
@@ -41,13 +41,13 @@ func init() {
 	}
 }
 
-func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testData *big.Int) {
+func SendRequestV2FromChainToChain(t *testing.T, chainIdFrom, chainIdTo, testData *big.Int) {
 	logrus.Info("sending to contract ", testData)
-	clientFrom := node.Clients[chainidFrom.String()]
+	clientFrom := node.Clients[chainIdFrom.String()]
 	require.NoError(t, err)
 	clientTo := node.Clients[chainIdTo.String()]
 	require.NoError(t, err)
-	dexPoolFrom := node.Clients[chainidFrom.String()].ChainCfg.DexPoolAddress
+	dexPoolFrom := node.Clients[chainIdFrom.String()].ChainCfg.DexPoolAddress
 	dexPoolTo := node.Clients[chainIdTo.String()].ChainCfg.DexPoolAddress
 	bridgeTo := node.Clients[chainIdTo.String()].ChainCfg.BridgeAddress
 	pKeyFrom := clientFrom.EcdsaKey
@@ -76,8 +76,8 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 		dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
 		require.NoError(t, err)
 
-		status, recaipt := helpers.WaitForBlockCompletation(clientFrom.EthClient, tx.Hash().String())
-		logrus.Print(recaipt.Logs)
+		status, receipt := helpers.WaitForBlockCompletation(clientFrom.EthClient, tx.Hash().String())
+		logrus.Print(receipt.Logs)
 		logrus.Print(status)
 		time.Sleep(20 * time.Second)
 		res, err := dexPoolToContract.TestData(&bind.CallOpts{})

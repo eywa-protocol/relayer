@@ -30,6 +30,7 @@ require (
 	github.com/linkpoolio/bridges v0.0.0-20200226172010-aa6f132d477e
 	github.com/multiformats/go-multiaddr v0.3.2
 	github.com/multiformats/go-multihash v0.0.15
+	github.com/prometheus/client_golang v1.11.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077

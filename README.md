@@ -116,5 +116,11 @@ cd scripts
 ./init_env_sentry.sh dkh
 ```
 
+### Prometheus
+Для включения мониторингаперед выполните ```./init_env_prom.sh``` из папки скрипт с параметром номер порта на котором будет слушать экспортер
 
-
+Пример
+```shell
+cd scripts
+./init_env_prom.sh 8080
+```

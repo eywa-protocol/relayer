@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 touch ../.env.sentry
+touch ../.env.prom
 
 if [[ "${1}" == "local" ]];then
   if [[ "$OSTYPE" == "darwin"* ]];then

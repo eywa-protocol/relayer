@@ -94,7 +94,7 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	} else {
-		err := bridge.NewNode(name, keysPath, config.Bridge.Rendezvous)
+		err := bridge.RunBridge(name, keysPath, config.Bridge.Rendezvous)
 		if err != nil {
 			logrus.Fatal(fmt.Errorf("node stoped on error: %w", err))
 		}

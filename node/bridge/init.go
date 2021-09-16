@@ -21,6 +21,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
@@ -66,17 +67,27 @@ func InitNode(name, keysPath string) (err error) {
 	return
 }
 
-func NewNode(name, keysPath, rendezvous string) (err error) {
+func NewNode(ctx context.Context) *Node {
+	return &Node{
+		Node: base.Node{
+			Ctx: ctx,
+		},
+		nonceMx:        new(sync.Mutex),
+		cMx:            new(sync.Mutex),
+		Clients:        make(map[string]Client, len(config.Bridge.Chains)),
+		uptimeRegistry: new(flow.MeterRegistry),
+		metrics:        bridge.NewMetrics(),
+	}
+}
+
+func RunBridge(name, keysPath, rendezvous string) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err != nil {
 			cancel()
 		}
 	}()
-	n, err := NewNodeWithClients(ctx)
-	if err != nil {
-		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
-	}
+	n := NewNode(ctx)
 
 	keyFile := keysPath + "/" + name + "-ecdsa.key"
 
@@ -98,6 +109,13 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
+	err = n.metrics.Init(n.Host.ID())
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	n.InitClients()
 
 	n.Dht, err = n.InitDHT(config.Bridge.BootstrapAddrs)
 	if err != nil {
@@ -186,6 +204,12 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		go n.UptimeSchedule(wg)
 
 		logrus.Info("bridge started")
+		if config.Bridge.PromListenPort != nil {
+			promListenAddr := ":" + *config.Bridge.PromListenPort
+			n.metrics.Serve(ctx, promListenAddr, wg)
+		} else {
+			n.metrics.Disable()
+		}
 		runa.Host(n.Host, cancel, wg)
 		return nil
 	}
@@ -194,19 +218,23 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 
 func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 
+	m := n.metrics.ChainMetrics(chainId.String())
+
 	n.cMx.Lock()
 	defer n.cMx.Unlock()
 	clientRecreated := false
 	client, ok := n.Clients[chainId.String()]
 	if !ok {
+		m.ChainOffline()
 		return Client{}, false, errors.New("eth client for chain ID not found")
 	} else if client.EthClient == nil {
 		var err error
 		client.EthClient, client.currentUrl, err = config.Bridge.Chains.GetChainCfg(uint(chainId.Uint64())).GetEthClient("")
 		if err != nil {
+			m.ChainOffline()
 			return client, false, ErrGetEthClient
 		} else if err = client.RecreateContractsAndFilters(); err != nil {
-
+			m.ChainOffline()
 			return client, false, ErrGetEthClient
 		} else {
 			clientRecreated = true
@@ -224,13 +252,14 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 
 		client, err = NewClient(client.ChainCfg, client.currentUrl)
 		if errors.Is(err, ErrGetEthClient) {
-
+			m.ChainOffline()
 			return client, false, ErrGetEthClient
 		} else if err != nil {
-
+			m.ChainOffline()
 			err = fmt.Errorf("can not create client on error:%w", err)
 			return client, false, err
 		} else {
+			m.ChainOnline()
 			// replace network client in clients map
 			clientRecreated = true
 			n.Clients[chainId.String()] = client
@@ -245,9 +274,11 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 			field.CainId:         chainId,
 			field.NetworkChainId: netChainId,
 		}).Error(err)
+		m.ChainOffline()
 		return Client{}, false, err
 	}
 
+	m.ChainOnline()
 	return client, clientRecreated, nil
 }
 
@@ -286,34 +317,27 @@ func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	return client, nil
 }
 
-func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
-	n = &Node{
-		Node: base.Node{
-			Ctx: ctx,
-		},
-		nonceMx:        new(sync.Mutex),
-		cMx:            new(sync.Mutex),
-		Clients:        make(map[string]Client, len(config.Bridge.Chains)),
-		uptimeRegistry: new(flow.MeterRegistry),
-	}
+func (n *Node) InitClients() {
 	logrus.Print(len(config.Bridge.Chains), " chains Length")
-
 	for _, chain := range config.Bridge.Chains {
 		key := fmt.Sprintf("%d", chain.Id)
+		m := n.metrics.ChainMetrics(key)
 		logrus.Print("CHAIN ", chain, "chain")
 		client, err := NewClient(chain, "")
 		if err != nil {
-
+			m.ChainOffline()
 			logrus.Error(fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err))
 			// return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
 		} else if reflect.DeepEqual(client, ethclient.Client{}) {
-
+			m.ChainOffline()
 			logrus.Error(fmt.Errorf("init chain [%d] client failed", chain.Id))
 			// return nil, fmt.Errorf("init chain [%d] client failed", chain.Id)
 		} else if _, ok := n.Clients[key]; ok {
-
+			m.ChainOffline()
 			logrus.Error(fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err))
 			// return nil, fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
+		} else {
+			m.ChainOnline()
 		}
 
 		n.Clients[key] = client

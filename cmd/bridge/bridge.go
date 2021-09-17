@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/blockchain"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
@@ -106,6 +107,8 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	} else {
+
+		blockchain.CrateBlockchain()
 		err := bridge.NewNode(name, keysPath, config.Bridge.Rendezvous)
 		if err != nil {
 			logrus.Fatalf("node stoped on error: %v", err)

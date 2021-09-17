@@ -11,15 +11,15 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const dbFile = "blockchain_%s.db"
+const dbFile = "./.data/blockchain.db"
 const blocksBucket = "blocks"
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
 // Blockchain implements interactions with a DB
 type Blockchain struct {
 	currentEpoch []byte
-	tip []byte
-	db  *bolt.DB
+	tip          []byte
+	db           *bolt.DB
 }
 
 // CreateBlockchain creates a new blockchain DB
@@ -70,7 +70,7 @@ func CreateBlockchain() *Blockchain {
 
 // NewBlockchain creates a new Blockchain with genesis Block
 func NewBlockchain() *Blockchain {
-		dbFile := fmt.Sprintf(dbFile)
+	dbFile := fmt.Sprintf(dbFile)
 	if dbExists(dbFile) == false {
 		fmt.Println("No existing blockchain found. Create one first.")
 		os.Exit(1)

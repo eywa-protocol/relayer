@@ -4,18 +4,20 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"strings"
 	"encoding/gob"
-	"log"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+	"log"
+	"strings"
 )
 
 const subsidy = 10
 
 // Transaction represents a EYWA transaction = EYWA bridge cross-chain action abstraction
 type Transaction struct {
-	ID []byte
-	Events []*wrappers.BridgeOracleRequest
+	ID         []byte
+	Events     []*wrappers.BridgeOracleRequest
+	UptimeList uptime.UpList
 }
 
 // IsCoinbase checks whether the transaction is coinbase
@@ -53,19 +55,16 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 	if tx.IsCoinbase() {
 		return
 	}
-//TODO Sign tx with node BLS key
-
+	//TODO Sign tx with node BLS key
 
 }
 
 // String returns a human-readable representation of a transaction
 func (tx Transaction) String() string {
 	var lines []string
-//TDOD Implement tx String method
+	//TDOD Implement tx String method
 	return strings.Join(lines, "\n")
 }
-
-
 
 // Verify verifies signatures of Transaction inputs
 func (tx *Transaction) Verify(txs map[string]Transaction) bool {
@@ -74,14 +73,12 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 	}
 	//TODO Verify transactions signed by nodes
 
-
-
 	return true
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) *Transaction {
-	tx := Transaction{[]byte("0"), nil }
+	tx := Transaction{[]byte("0"), nil, nil}
 	return &tx
 }
 

@@ -65,6 +65,7 @@ do
 
     cat >> ../.data/bridge.yaml <<EOF
   - id: $NETWORK_ID
+    gas_factor: 150
     ecdsa_key: $ECDSA_KEY
     bridge_address: $BRIDGE_ADDRESS
     node_list_address: $NODELIST_ADDRESS

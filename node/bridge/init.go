@@ -250,7 +250,7 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 			field.CainId: chainId,
 		}).Error(fmt.Errorf("recreate network client on error: %w", err))
 
-		client, err = NewClient(client.ChainCfg, client.currentUrl)
+		client, err = NewClient(client.ChainCfg, n.metrics, client.currentUrl)
 		if errors.Is(err, ErrGetEthClient) {
 			m.ChainOffline()
 			return client, false, ErrGetEthClient
@@ -323,7 +323,7 @@ func (n *Node) InitClients() {
 		key := fmt.Sprintf("%d", chain.Id)
 		m := n.metrics.ChainMetrics(key)
 		logrus.Print("CHAIN ", chain, "chain")
-		client, err := NewClient(chain, "")
+		client, err := NewClient(chain, n.metrics, "")
 		if err != nil {
 			m.ChainOffline()
 			logrus.Error(fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err))

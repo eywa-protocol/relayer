@@ -65,6 +65,7 @@ services:
   # protocol nodes
   node1:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node1
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -86,6 +87,7 @@ services:
 
   node2:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node2
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -107,6 +109,7 @@ services:
 
   node3:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node3
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -128,6 +131,7 @@ services:
 
   node4:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node4
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -149,6 +153,7 @@ services:
 
   node5:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node5
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -170,6 +175,7 @@ services:
 
   node6:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node6
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -191,6 +197,7 @@ services:
 
   node7:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+    hostname: node7
     image: p2p-bridge_img
     depends_on:
       - ganache_net1

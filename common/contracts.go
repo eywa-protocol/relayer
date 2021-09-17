@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
 )
 
 /*
@@ -34,7 +36,8 @@ func GetContractByAddressNetwork1(config config.AppConfig, ethClient *ethclient.
 	return wrappers.NewBridge(common.HexToAddress(config.BRIDGE_ADDRESS_NETWORK1), ethClient)
 }
 */
-func CustomAuth(client *ethclient.Client, privateKey *ecdsa.PrivateKey) (auth *bind.TransactOpts) {
+
+func CustomAuth(client *ethclient.Client, metrics *bridge.Metrics, privateKey *ecdsa.PrivateKey) (auth *bind.TransactOpts) {
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
@@ -47,33 +50,50 @@ func CustomAuth(client *ethclient.Client, privateKey *ecdsa.PrivateKey) (auth *b
 	if err != nil {
 		logrus.Error(err)
 	}
+
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		logrus.Error(err)
 	}
+
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
 		logrus.Error(err)
 	}
+
+	if metrics != nil {
+		metrics.ChainMetrics(chainId.String()).GasPriceFromNet(gasPrice)
+	}
+
+	if chainCfg := config.Bridge.Chains.GetChainCfg(uint(chainId.Uint64())); chainCfg != nil {
+		if chainCfg.GasFactor > 0 {
+			gasPrice = new(big.Int).Div(gasPrice, big.NewInt(100))
+			gasPrice = new(big.Int).Mul(gasPrice, big.NewInt(int64(chainCfg.GasFactor)))
+			if metrics != nil {
+				metrics.ChainMetrics(chainId.String()).GasPriceUsed(gasPrice)
+			}
+		}
+	}
+
 	auth, err = bind.NewKeyedTransactorWithChainID(privateKey, chainId)
 
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0) // in wei
-	//NOTE!!! TODO: should be adjusted for optimal gas cunsumption
+	// NOTE!!! TODO: should be adjusted for optimal gas cunsumption
 	auth.GasPrice = new(big.Int).Mul(gasPrice, big.NewInt(2))
 	return
 }
 
 func MustGetABI(json string) abi.ABI {
-	abi, err := abi.JSON(strings.NewReader(json))
+	contractAbi, err := abi.JSON(strings.NewReader(json))
 	if err != nil {
 		panic("could not parse ABI: " + err.Error())
 	}
-	return abi
+	return contractAbi
 }
 
 func SignTypedData(key ecdsa.PrivateKey, addr common.MixedcaseAddress, typedData core.TypedData) (signature hexutil.Bytes, SignDataRequestHash hexutil.Bytes, err error) {
-	//logrus.Print(typedData.Domain.Map())
+	// logrus.Print(typedData.Domain.Map())
 	domainSeparator, err := typedData.HashStruct("EIP712Domain", typedData.Domain.Map())
 	if err != nil {
 		return nil, nil, err
@@ -83,7 +103,7 @@ func SignTypedData(key ecdsa.PrivateKey, addr common.MixedcaseAddress, typedData
 	if err != nil {
 		return nil, nil, err
 	}
-	//mainHash := fmt.Sprintf("0x%s", common.Bytes2Hex(typedDataHash))
+	// mainHash := fmt.Sprintf("0x%s", common.Bytes2Hex(typedDataHash))
 	rawData := []byte(fmt.Sprintf("\x19\x01%s%s", string(domainSeparator), string(typedDataHash)))
 	sighash := crypto.Keccak256(rawData)
 	messages, err := typedData.Format()

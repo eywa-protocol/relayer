@@ -72,8 +72,8 @@ func CreateNode(duration time.Duration, createNode func(time.Time) bool) chan bo
 		defer log.Println("CreateNode ticker stopped")
 		for {
 			select {
-			case time := <-ticker.C:
-				if !createNode(time) {
+			case t := <-ticker.C:
+				if !createNode(t) {
 					stop <- true
 				}
 			case <-stop:
@@ -132,7 +132,7 @@ func RegisterNode(client *ethclient.Client, pk *ecdsa.PrivateKey, nodeListContra
 		logrus.Infof("Node %x allready exists", peerId)
 		return nil
 	} else {
-		txOpts1 := CustomAuth(client, pk)
+		txOpts1 := CustomAuth(client, nil, pk)
 		tx, err := nodeListContract.AddNode(txOpts1, fromAddress, common.BytesToAddress([]byte(peerId)), blsPubkey)
 		if err != nil {
 			chainId, _ := client.ChainID(context.Background())

@@ -51,6 +51,7 @@ type BridgeContract struct {
 type BridgeChain struct {
 	Id              uint `yaml:"id"`
 	ChainId         *big.Int
+	GasFactor       uint     `yaml:"gas_factor"` // gas price in percent of node gas price
 	RpcUrls         []string `yaml:"rpc_urls"`
 	EcdsaKeyString  string   `yaml:"ecdsa_key"`
 	EcdsaKey        *ecdsa.PrivateKey

@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -26,6 +27,7 @@ type Client struct {
 	BridgeFilterer   wrappers.BridgeFilterer
 	NodeList         wrappers.NodeListSession
 	NodeListFilterer wrappers.NodeListFilterer
+	metrics          *bridge.Metrics
 
 	currentUrl string
 }
@@ -43,7 +45,7 @@ func (c *Client) RecreateContractsAndFilters() (err error) {
 		return ErrGetEthClient
 	}
 
-	bridge, err := wrappers.NewBridge(c.ChainCfg.BridgeAddress, c.EthClient)
+	bridgeContract, err := wrappers.NewBridge(c.ChainCfg.BridgeAddress, c.EthClient)
 	if err != nil {
 		err = fmt.Errorf("init bridge [%s] error: %w", c.ChainCfg.BridgeAddress, err)
 		return
@@ -66,10 +68,10 @@ func (c *Client) RecreateContractsAndFilters() (err error) {
 		return
 	}
 
-	txOpts := common2.CustomAuth(c.EthClient, c.ChainCfg.EcdsaKey)
+	txOpts := common2.CustomAuth(c.EthClient, c.metrics, c.ChainCfg.EcdsaKey)
 
 	c.Bridge = wrappers.BridgeSession{
-		Contract:     bridge,
+		Contract:     bridgeContract,
 		CallOpts:     bind.CallOpts{},
 		TransactOpts: *txOpts,
 	}
@@ -84,11 +86,12 @@ func (c *Client) RecreateContractsAndFilters() (err error) {
 	return nil
 }
 
-func NewClient(chain *config.BridgeChain, skipUrl string) (client Client, err error) {
+func NewClient(chain *config.BridgeChain, metrics *bridge.Metrics, skipUrl string) (client Client, err error) {
 
 	client = Client{
 		ChainCfg: chain,
 		EcdsaKey: chain.EcdsaKey,
+		metrics:  metrics,
 	}
 	client.EthClient, client.currentUrl, err = chain.GetEthClient(skipUrl)
 	if err != nil {

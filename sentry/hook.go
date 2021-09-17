@@ -55,6 +55,10 @@ func Init(appName string) {
 		logrus.ErrorLevel,
 	}
 
+	if hostName := os.Getenv("EYWA_HOSTNAME"); hostName != "" {
+		tags["eywa_hostname"] = hostName
+	}
+
 	var (
 		err error
 	)

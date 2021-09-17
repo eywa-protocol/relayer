@@ -1,11 +1,10 @@
 keys
 /.data
-./bridge
-./bsn
+/bridge
+/bsn
 tmp
 node*.env
 .idea
 bsn.yaml
 .env.sentry
-bsn
-bridge
+.env.prom

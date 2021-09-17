@@ -16,6 +16,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -53,10 +54,13 @@ type Node struct {
 	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
+	metrics        *bridge.Metrics
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node, srcChainId *big.Int) {
 	defer wg.Done()
+	m := n.metrics.RequestMetrics(srcChainId.String(), bridge.ReqTypeBridge)
+	startTime := time.Now().UTC()
 	consensusChannel := make(chan bool)
 	logrus.Tracef("сurrentRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
 	wg.Add(1)
@@ -64,7 +68,9 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	wg.Add(1)
 	go nodeBls.WaitForMsgNEW(consensusChannel, wg)
 	consensus := <-consensusChannel
+	m.ConsensusTime(startTime)
 	if consensus == true {
+		m.ConsensusSuccess()
 		logrus.Tracef("Starting Leader election !!!")
 		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)
 		if err != nil {
@@ -74,11 +80,18 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		logrus.Debugf("LEADER id %s my ID %s", nodeBls.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
+			sendStartTime := time.Now().UTC()
 			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
+				m.SentFailed(event.Chainid.String())
 				logrus.Errorf("%v", err)
+			} else {
+				m.SentSuccess(event.Chainid.String())
 			}
+			m.SendTime(event.Chainid.String(), sendStartTime)
 		}
+	} else {
+		m.ConsensusFailed()
 	}
 	logrus.Println("The END of Protocol")
 }
@@ -230,10 +243,12 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	opt := &bind.WatchOpts{}
 	recreateOnTimer := false
 	checkClientTimer := time.NewTicker(10 * time.Second)
+	m := n.metrics.RequestMetrics(chainId.String(), bridge.ReqTypeBridge)
 	mx := new(sync.Mutex)
 	var sub event.Subscription
 	client, clientRecreated, err := n.GetNodeClientOrRecreate(chainId)
 	if err != nil {
+		m.SubscribeFailed()
 		if errors.Is(err, ErrGetEthClient) {
 			recreateOnTimer = true
 			sub = event.NewSubscription(func(i <-chan struct{}) error {
@@ -245,9 +260,11 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	} else {
 		sub, err = client.BridgeFilterer.WatchOracleRequest(opt, channel)
 		if err != nil {
+			m.SubscribeFailed()
 			logrus.Errorf("WatchOracleRequest can't %v", err)
 			return
 		}
+		m.SubscribeSuccess()
 	}
 
 	wg.Add(1)
@@ -306,7 +323,10 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					}
 					return nil
 				}(); err != nil {
+					m.ResubscribeFailed()
 					continue
+				} else {
+					m.ResubscribeSuccess()
 				}
 			case err := <-(*subPtr).Err():
 				if err != nil {
@@ -321,6 +341,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								Error(fmt.Errorf("can not get client for network [%s] on error:%w",
 									chainId.String(), err))
 							time.Sleep(1 * time.Second)
+							m.ResubscribeFailed()
 							recreateOnTimer = true
 							return
 						} else {
@@ -333,9 +354,11 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								if err != nil {
 									logrus.Error(fmt.Errorf("WatchOracleRequest can't %w", err))
 									time.Sleep(1 * time.Second)
+									m.ResubscribeFailed()
 									recreateOnTimer = true
 									return
 								} else {
+									m.ResubscribeSuccess()
 									recreateOnTimer = false
 
 									return
@@ -345,6 +368,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
 									return clientPtr.BridgeFilterer.WatchOracleRequest(opt, channel)
 								})
+								m.ResubscribeSuccess()
 								recreateOnTimer = false
 							}
 						}
@@ -352,6 +376,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				}
 			case e := <-channel:
 				if e != nil {
+					m.Received()
 					logrus.Debugf("receive event tx: %s", e.Raw.TxHash.Hex())
 					if !n.IsClientReady(e.Chainid) {
 						logrus.WithFields(logrus.Fields{
@@ -407,7 +432,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 							if nodeBls != nil {
 								wg := new(sync.WaitGroup)
 								wg.Add(1)
-								go n.StartProtocolByOracleRequest(e, wg, nodeBls)
+								go n.StartProtocolByOracleRequest(e, wg, nodeBls, chainId)
 								wg.Wait()
 							}
 						}(sendTopic)

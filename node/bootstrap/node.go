@@ -101,6 +101,7 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 		return err
 	}
 
+	logrus.Infof("start listen bootstrap node on %s", multiAddr.String())
 	runa.Host(h, cancel, &sync.WaitGroup{})
 
 	return

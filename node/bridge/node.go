@@ -306,6 +306,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 									time.Sleep(1 * time.Second)
 									return err
 								} else {
+									m.ResubscribeSuccess()
 									recreateOnTimer = false
 									return nil
 								}
@@ -314,6 +315,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								*subPtr = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
 									return clientPtr.BridgeFilterer.WatchOracleRequest(opt, channel)
 								})
+								m.ResubscribeSuccess()
 								recreateOnTimer = false
 								return nil
 							}
@@ -325,8 +327,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				}(); err != nil {
 					m.ResubscribeFailed()
 					continue
-				} else {
-					m.ResubscribeSuccess()
 				}
 			case err := <-(*subPtr).Err():
 				if err != nil {
@@ -468,7 +468,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 		).Error(fmt.Errorf("invoke opposite bridge error: %w", err))
 	}
 	n.nonceMx.Lock()
-	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
+	txOpts := common2.CustomAuth(client.EthClient, n.metrics, client.EcdsaKey)
 	/** Invoke bridge on another side */
 	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
 	if err != nil {
@@ -478,6 +478,9 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	}
 	n.nonceMx.Unlock()
 	if tx != nil {
+		logrus.Infof("ReceiveRequestV2 tx: %s, event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
+			tx.Hash().Hex(), event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
+
 		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {
 			err = fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)

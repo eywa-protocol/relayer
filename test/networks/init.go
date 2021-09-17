@@ -56,7 +56,7 @@ func SendRequestV2FromChainToChain(t *testing.T, chainIdFrom, chainIdTo, testDat
 
 	var tx *types.Transaction
 	if clientFrom.EthClient != nil {
-		txOptsFrom := common2.CustomAuth(clientFrom.EthClient, pKeyFrom)
+		txOptsFrom := common2.CustomAuth(clientFrom.EthClient, nil, pKeyFrom)
 		dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, clientFrom.EthClient)
 		require.NoError(t, err)
 

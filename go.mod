@@ -7,6 +7,7 @@ replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contract
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 require (
+	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/ethereum/go-ethereum v1.10.3

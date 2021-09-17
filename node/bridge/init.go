@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -10,17 +11,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-flow-metrics"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
@@ -29,38 +30,81 @@ import (
 
 func InitNode(name, keysPath string) (err error) {
 
-	if common2.FileExists(keysPath + name + "-ecdsa.key") {
-		return errors.New("node already registered! ")
-	}
+	common2.MakeKeyDir(keysPath)
 
-	err = common2.GenAndSaveECDSAKey(keysPath, name)
-	if err != nil {
-		panic(err)
-	}
-
-	_, pub, err := common2.GenAndSaveBN256Key(keysPath, name)
+	_, err = common2.GenAndSaveECDSAKey(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	logrus.Tracef("keyfile %v", keysPath+"/"+name+"-ecdsa.key")
+	_, err = common2.GenAndSaveBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
 
-	h, err := libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
+	privKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	logrus.Infoln("Generated address:")
+	fmt.Println(common2.AddressFromSecp256k1PrivKey(privKey))
+	logrus.Infoln("Please transfer the collateral there and restart me with -register flag.")
+	return
+}
+
+func RegisterNode(name, keysPath string) (err error) {
+
+	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	n, err := NewNodeWithClients(ctx, signerKey)
+	if err != nil {
+		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
+	}
+
+	// Secp256k1 node key
+	// nodeKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name+"-signer")
+
+	pub, err := common2.LoadBN256Key(keysPath, name)
+	if err != nil {
+		return
+	}
+
+	n.Host, err = libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
 	if err != nil {
 		panic(err)
 	}
-	_ = libp2p.WriteHostAddrToConfig(h, keysPath+"/"+name+"-peer.env")
+	_ = libp2p.WriteHostAddrToConfig(n.Host, keysPath+"/"+name+"-peer.env")
 
-	for _, chain := range config.App.Chains {
-		client, url, err := chain.GetEthClient("")
+	if config.Bridge.UseGsn {
+
+		n.Dht, err = n.InitDHT(config.Bridge.BootstrapAddrs)
 		if err != nil {
-			return fmt.Errorf("%w", err)
-		} else {
-			logrus.Tracef("chain[%s] client connected to url: %s", chain.ChainId.String(), url)
+			return fmt.Errorf("can not init DHT on error: %w ", err)
 		}
-		if err := common2.RegisterNode(client, chain.EcdsaKey, chain.NodeListAddress, h.ID(), pub); err != nil {
-			return fmt.Errorf("register node on chain [%d] error: %w ", chain.Id, err)
+
+		n.gsnClient, err = gsn.NewClient(ctx, n.Host, n, 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("can not init gsn client on error: %w ", err)
 		}
+		err = n.gsnClient.WaitForDiscoveryGsn(60 * time.Second)
+		if err != nil {
+			return fmt.Errorf("can not discover gsn node on error: %w ", err)
+		}
+	}
+
+	for _, client := range n.Clients {
+		id, relayerPool, err := client.RegisterNode(n.gsnClient, signerKey, n.Host.ID(), pub)
+		if err != nil {
+			return fmt.Errorf("register node on chain [%d] error: %w ", client.ChainCfg.Id, err)
+		}
+		logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
 	}
 
 	return
@@ -73,7 +117,13 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			cancel()
 		}
 	}()
-	n, err := NewNodeWithClients(ctx)
+	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
+	if err != nil {
+
+		return err
+	}
+
+	n, err := NewNodeWithClients(ctx, signerKey)
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
 	}
@@ -94,42 +144,46 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 
 	ipFromFile := words[2]
 	logrus.Info("IP ADDRESS", ipFromFile)
-	hostFromFile, err := libp2p.NewHostFromKeyFila(n.Ctx, keyFile, portFromFile, ipFromFile)
+	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, keyFile, portFromFile, ipFromFile)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	NodeIdAddressFromFile := common.BytesToAddress([]byte(hostFromFile.ID()))
+	n.Dht, err = n.InitDHT(config.Bridge.BootstrapAddrs)
+	if err != nil {
+		return err
+	}
+
+	if n.gsnClient, err = gsn.NewClient(n.Ctx, n.Host, n, config.Bridge.TickerInterval); err != nil {
+		logrus.Fatal(err)
+	}
+
+	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 	sentry.AddTags(map[string]string{
-		field.PeerId:         hostFromFile.ID().Pretty(),
-		field.NodeAddress:    NodeIdAddressFromFile.Hex(),
-		field.NodeRendezvous: config.App.Rendezvous,
+		field.PeerId:         n.Host.ID().Pretty(),
+		field.NodeAddress:    nodeIdAddress.Hex(),
+		field.NodeRendezvous: config.Bridge.Rendezvous,
 	})
 
-	c1, ok := n.Clients[config.App.Chains[0].ChainId.String()]
+	c1, ok := n.Clients[config.Bridge.Chains[0].ChainId.String()]
 	if !ok {
 		return fmt.Errorf("node  client 0 not initialized")
 	}
-	res, err := c1.NodeList.NodeExists(NodeIdAddressFromFile)
 
-	if res {
-		nodeFromContract, err := c1.NodeList.GetNode(NodeIdAddressFromFile)
+	if res, err := c1.NodeRegistry.NodeExists(nodeIdAddress); err != nil {
+		logrus.Fatal(fmt.Errorf("failed to check node existent on error: %w", err))
+		return err
+	} else if res {
+		nodeFromContract, err := c1.NodeRegistry.GetNode(nodeIdAddress)
 		if err != nil {
 			return err
 		}
 		logrus.Infof("PORT %d", portFromFile)
 
-		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(hostFromFile.ID())), nodeFromContract.NodeIdAddress)
+		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(n.Host.ID())), nodeFromContract.NodeIdAddress)
 
-		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(hostFromFile.ID())) {
-			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(hostFromFile.ID())))
-		}
-
-		n.Host = hostFromFile
-
-		n.Dht, err = n.initDHT()
-		if err != nil {
-			return err
+		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(n.Host.ID())) {
+			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(n.Host.ID())))
 		}
 
 		//
@@ -169,66 +223,10 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		logrus.Info("bridge started")
 		runa.Host(n.Host, cancel, wg)
 		return nil
+	} else {
+		logrus.Warnf("node not registered")
+		return nil
 	}
-	return
-}
-
-func NewClient(chain *config.Chain, skipUrl string) (client Client, err error) {
-
-	c, url, err := chain.GetEthClient(skipUrl)
-	if err != nil {
-		err = fmt.Errorf("get eth client error: %w", err)
-		return
-	}
-	chain.ChainId, err = c.ChainID(context.Background())
-	if err != nil {
-		err = fmt.Errorf("get chain id error: %w", err)
-		return
-	}
-
-	bridge, err := wrappers.NewBridge(chain.BridgeAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init bridge [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	bridgeFilterer, err := wrappers.NewBridgeFilterer(chain.BridgeAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init bridge filter [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-	nodeList, err := wrappers.NewNodeList(chain.NodeListAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init nodelist [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	nodeListFilterer, err := wrappers.NewNodeListFilterer(chain.NodeListAddress, c)
-	if err != nil {
-		err = fmt.Errorf("init nodelist filter [%s] error: %w", chain.BridgeAddress, err)
-		return
-	}
-
-	txOpts := common2.CustomAuth(c, chain.EcdsaKey)
-
-	return Client{
-		EthClient: c,
-		ChainCfg:  chain,
-		EcdsaKey:  chain.EcdsaKey,
-		Bridge: wrappers.BridgeSession{
-			Contract:     bridge,
-			CallOpts:     bind.CallOpts{},
-			TransactOpts: *txOpts,
-		},
-		NodeList: wrappers.NodeListSession{
-			Contract:     nodeList,
-			CallOpts:     bind.CallOpts{},
-			TransactOpts: *txOpts,
-		},
-		BridgeFilterer:   *bridgeFilterer,
-		NodeListFilterer: *nodeListFilterer,
-		currentUrl:       url,
-	}, nil
 }
 
 func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
@@ -247,7 +245,7 @@ func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
 			field.CainId: chainId,
 		}).Error(fmt.Errorf("recreate network client on error: %w", err))
 
-		client, err = NewClient(client.ChainCfg, client.currentUrl)
+		client, err = NewClient(client.ChainCfg, client.currentUrl, n.signerKey)
 		if err != nil {
 			err = fmt.Errorf("can not create client on error:%w", err)
 			return Client{}, false, err
@@ -284,39 +282,22 @@ func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
 	return client, nil
 }
 
-func (n Node) initDHT() (dht *dht.IpfsDHT, err error) {
-
-	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(config.App.BootstrapAddrs))
-
-	for _, addr := range config.App.BootstrapAddrs {
-		logrus.Infof("add bootstrap peer: %s", addr)
-		nAddr, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return nil, err
-		}
-		bootstrapPeers = append(bootstrapPeers, nAddr)
-	}
-	logrus.Infof("bootstrap peers count: %d", len(bootstrapPeers))
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers[:])
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func NewNodeWithClients(ctx context.Context) (n *Node, err error) {
+func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *Node, err error) {
 	n = &Node{
-		Ctx:            ctx,
+		Node: base.Node{
+			Ctx: ctx,
+		},
 		nonceMx:        new(sync.Mutex),
 		cMx:            new(sync.Mutex),
-		Clients:        make(map[string]Client, len(config.App.Chains)),
+		Clients:        make(map[string]Client, len(config.Bridge.Chains)),
+		signerKey:      signerKey,
 		uptimeRegistry: new(flow.MeterRegistry),
 	}
-	logrus.Print(len(config.App.Chains), " chains Length")
-	for _, chain := range config.App.Chains {
+
+	logrus.Print(len(config.Bridge.Chains), " chains Length")
+	for _, chain := range config.Bridge.Chains {
 		logrus.Print("CHAIN ", chain, "chain")
-		client, err := NewClient(chain, "")
+		client, err := NewClient(chain, "", signerKey)
 		if err != nil {
 			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
 		}

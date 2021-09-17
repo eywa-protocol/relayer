@@ -84,8 +84,8 @@ func (c *Client) Uptime() UpList {
 		cnt := 0
 		var dur time.Duration
 		for _, duration := range durations {
-			if duration >= config.App.UptimeReportInterval-config.App.TickerInterval &&
-				duration <= config.App.UptimeReportInterval+config.App.TickerInterval {
+			if duration >= config.Bridge.UptimeReportInterval-config.Bridge.TickerInterval &&
+				duration <= config.Bridge.UptimeReportInterval+config.Bridge.TickerInterval {
 				cnt++
 				if duration > dur {
 					dur = duration

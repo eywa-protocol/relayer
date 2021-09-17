@@ -12,26 +12,44 @@ cd digiu
 git clone git@gitlab.digiu.ai:blockchainlaboratory/eywa-p2p-bridge.git
 cd eywa-p2p-bridge
 ```
-
+Добавление submodule (если необходимо)
+```shell
+git submodule init
+git submodule update (--remote - если необходимо получить последние изменения)
+```
 
 ### тестнет деплой
-
+- Рекомендуется предварительно очищать каталог external/eth-contracts/hardhat/networks_env, если он существует (возможны конфликты с настройками нод)
 - Адрес релеера во всех всетях 0x2b3cc5fcAC62299520FA96D75f125c33B48E70d7
 
 ```shell
+make -C external/eth-contracts eth-testnet-migrate
 cd scripts
 ./deploy.sh testnet
 ```
 
-
-
 ### локальный деплой
+- Рекомендуется предварительно очищать каталог external/eth-contracts/hardhat/networks_env, если он существует (возможны конфликты с настройками нод)
 
 ```shell
 cd scripts
 
 # for macos only run before deploy sudo ./macos_add_interfaces.sh
 ./deploy.sh local
+```
+
+#### Problem fixing.
+
+In case of the problem
+
+```bash
+Creating network "dev_net_1" with the default driver
+ERROR: Pool overlaps with other one on this address space
+```
+
+try to remove old networks from
+```bash
+docker network ls
 ```
 
 ### запуск тестов

@@ -4,18 +4,20 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
+	p "path"
+	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	bootstrap2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bootstrap"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry"
 )
 
-const appName = "bsn"
+const appName = "gsn"
 
 func initPprof() {
 
@@ -25,22 +27,24 @@ func initPprof() {
 }
 
 func main() {
-	var init bool
-	var listen string
-	var port uint
-	var name string
-	var logLevel int
-	var pprofFlag bool
-	var keysPath string
-	var printVer bool
-	flag.BoolVar(&init, "init", false, "run \"./bsn -init\" to init node")
+	var (
+		path      string
+		listen    string
+		port      uint
+		logLevel  int
+		pprofFlag bool
+		keysPath  string
+		printVer  bool
+	)
+
+	flag.StringVar(&path, "cnf", "gsn.yaml", "config file absolute path")
 	flag.StringVar(&listen, "listen", "0.0.0.0", "listen ip address")
-	flag.UintVar(&port, "port", 4001, "-port")
-	flag.StringVar(&name, "name", "bootstrap", "name for key and config files")
+	flag.UintVar(&port, "port", 4002, "-port")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
 	flag.StringVar(&keysPath, "keys-path", "keys", "keys directory path")
 	flag.BoolVar(&printVer, "version", false, "print version and exit")
+
 	flag.Parse()
 
 	if printVer {
@@ -61,18 +65,17 @@ func main() {
 	defer runa.MainRecoveryExit(appName)
 
 	keysPath = strings.TrimSuffix(keysPath, "/")
-	logrus.Tracef("init: %v, name: %s, keys-path: %s", init, name, keysPath)
+	logrus.Tracef("path: %s, keys-path: %s", path, keysPath)
 
-	if init {
-		err := bootstrap2.NodeInit(keysPath, name, listen, port)
-		if err != nil {
-			logrus.Error(fmt.Errorf("node init error %w", err))
-		}
-	} else {
-		err := bootstrap2.NewNode(keysPath, name, listen, port)
-		if err != nil {
-			logrus.Error(fmt.Errorf("node start error %w", err))
-		}
+	if err := config.LoadGsnConfig(path); err != nil {
+		logrus.Fatal(err)
+	}
+
+	file := filepath.Base(path)
+	name := strings.TrimSuffix(file, p.Ext(file))
+
+	if err := gsn.RunNode(name, keysPath, listen, port); err != nil {
+		logrus.Fatal(fmt.Errorf("node run error: %w", err))
 	}
 
 }

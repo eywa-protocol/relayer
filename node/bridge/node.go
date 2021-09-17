@@ -12,22 +12,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gorilla/mux"
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubSub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
@@ -48,31 +46,15 @@ var ErrContextDone = errors.New("interrupt on context done")
 const minConsensusNodesCount = 5
 
 type Node struct {
-	Ctx            context.Context
-	nonceMx        *sync.Mutex
-	Router         *mux.Router
-	Server         bridges.Server
-	Host           host.Host
-	Dht            *dht.IpfsDHT
-	Service        *libp2p.Service
-	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
-	Routing        routing.PeerRouting
-	Discovery      *discovery.RoutingDiscovery
-	PrivKey        kyber.Scalar
+	base.Node
 	cMx            *sync.Mutex
 	Clients        map[string]Client
+	nonceMx        *sync.Mutex
+	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
+	signerKey      *ecdsa.PrivateKey
+	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
-}
-
-type Client struct {
-	EthClient        *ethclient.Client
-	ChainCfg         *config.Chain
-	EcdsaKey         *ecdsa.PrivateKey
-	Bridge           wrappers.BridgeSession
-	BridgeFilterer   wrappers.BridgeFilterer
-	NodeList         wrappers.NodeListSession
-	NodeListFilterer wrappers.NodeListFilterer
-	currentUrl       string
+	gsnClient      *gsn.Client
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
@@ -96,7 +78,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 			logrus.Info("LEADER going to Call external chain contract method")
 			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
-				logrus.Errorf("%v", err)
+				logrus.Error(fmt.Errorf("%w", err))
 			}
 		}
 	}
@@ -104,8 +86,8 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 }
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
-	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeListAddress, nodeIdAddress)
-	if err != nil || node.NodeWallet == common.HexToAddress("0") {
+	node, err := common2.GetNode(client.EthClient, client.ChainCfg.NodeRegistryAddress, nodeIdAddress)
+	if err != nil || node.Owner == common.HexToAddress("0") {
 		return false
 	}
 	return true
@@ -115,7 +97,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
 	suite := pairing.NewSuiteBn256()
 	publicKeys = make([]kyber.Point, 0)
-	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
+	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
 		return
 	}
@@ -154,7 +136,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 
 	} else {
 		logrus.Tracef("Host.ID() %v ", n.Host.ID())
-		node, err := client.NodeList.GetNode(nodeIdAddress)
+		node, err := client.NodeRegistry.GetNode(nodeIdAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -171,9 +153,9 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.App.Rendezvous))/2+1 {
+				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
-						Id:                int(node.NodeId),
+						Id:                int(node.NodeId.Int64()),
 						TimeStep:          0,
 						ThresholdWit:      len(topicParticipants)/2 + 1,
 						ThresholdAck:      len(topicParticipants)/2 + 1,
@@ -227,7 +209,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 			case _ = <-sub.Err():
 				break
 			case e := <-channel:
-				logrus.Infof("ReceiveRequest: %v %v %v", e.ReqId, e.ReceiveSide, common2.ToHex(e.Tx))
+				logrus.Infof("ReceiveRequest: %v %v", e.ReqId, e.ReceiveSide)
 				// TODO disconnect from topic
 				/** TODO:
 				Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)
@@ -390,7 +372,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	logrus.Infof("event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
 		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
 
-	client, err := n.GetNodeClient(event.Chainid)
+	client, _, err := n.GetNodeClientOrRecreate(event.Chainid)
 	if err != nil {
 		logrus.WithFields(
 			field.ListFromBridgeOracleRequest(event),
@@ -407,31 +389,50 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 		).Error(fmt.Errorf("invoke opposite bridge error: %w", err))
 	}
 	n.nonceMx.Lock()
-	txOpts := common2.CustomAuth(client.EthClient, client.EcdsaKey)
-	/** Invoke bridge on another side */
-	tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
-	if err != nil {
-		logrus.WithFields(
-			field.ListFromBridgeOracleRequest(event),
-		).Error(fmt.Errorf("ReceiveRequestV2 error:%w", err))
+
+	var txHash *common.Hash
+
+	if client.ChainCfg.UseGsn && n.gsnClient != nil {
+		hash, err := forward.BridgeRequestV2(n.gsnClient, event.Chainid, n.signerKey, client.ChainCfg.BridgeAddress, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		if err != nil {
+			err = fmt.Errorf("ReceiveRequestV2 gsn error:%w", err)
+			logrus.WithFields(
+				field.ListFromBridgeOracleRequest(event),
+			).Error(err)
+			n.nonceMx.Unlock()
+			return nil, err
+		} else {
+			txHash = &hash
+		}
+	} else {
+		txOpts := common2.CustomAuth(client.EthClient, n.signerKey)
+		/** Invoke bridge on another side */
+		tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		if err != nil {
+			err = fmt.Errorf("ReceiveRequestV2 error:%w", err)
+			logrus.WithFields(
+				field.ListFromBridgeOracleRequest(event),
+			).Error(err)
+			n.nonceMx.Unlock()
+			return nil, err
+		} else {
+			hash := tx.Hash()
+			txHash = &hash
+		}
 	}
 	n.nonceMx.Unlock()
-	if tx != nil {
-		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
+	if txHash != nil {
+		receipt, err = helpers.WaitTransactionDeadline(client.EthClient, *txHash, 30*time.Second)
 		if err != nil || receipt == nil {
 			err = fmt.Errorf("ReceiveRequestV2 Failed on error: %w", err)
 			logrus.WithFields(logrus.Fields{
 				field.BridgeRequest: field.ListFromBridgeOracleRequest(event),
-				field.TxId:          tx.Hash().Hex(),
+				field.TxId:          txHash.Hex(),
 			}).Error()
 			return nil, err
 		}
 	}
 	return
-}
-
-func (n Node) Discover(topic string) {
-	go libp2p.Discover(n.Ctx, n.Host, n.Dht, topic, 3*time.Second)
 }
 
 func (n Node) InitializeCommonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
@@ -457,7 +458,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
 	logrus.Printf("Successfully announced! n.Host.ID():%s ", n.Host.ID().Pretty())
 
-	ticker := time.NewTicker(config.App.TickerInterval)
+	ticker := time.NewTicker(config.Bridge.TickerInterval)
 	defer ticker.Stop()
 
 	for {
@@ -488,7 +489,7 @@ func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 					}
 				} else {
 					// store peer uptime
-					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.App.TickerInterval.Milliseconds() / 1000))
+					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.Bridge.TickerInterval.Milliseconds() / 1000))
 				}
 
 				if n.Host.Network().Connectedness(p.ID) == network.Connected {
@@ -507,7 +508,7 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 	uptimeLoop:
-		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.App.UptimeReportInterval) {
+		for t := range schedule.TimeStream(n.Ctx, time.Time{}, config.Bridge.UptimeReportInterval) {
 			currentTopic := schedule.TimeToTopicName("uptime", t)
 			if uptimeTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
 				logrus.WithFields(logrus.Fields{
@@ -536,7 +537,7 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 					logrus.Infoln("uptime.ListPeers(): ", topic.ListPeers())
 
 					var nodeBls *modelBLS.Node
-					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.App.Chains[0].ChainId.String()])
+					nodeBls, err = n.NewBLSNode(uptimeTopic, n.Clients[config.Bridge.Chains[0].ChainId.String()])
 					if err != nil {
 						err = fmt.Errorf("uptime create new bls node error: %w ", err)
 						logrus.WithFields(logrus.Fields{
@@ -598,4 +599,24 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 		}
 	}
 
+}
+
+func (n *Node) GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error) {
+	if c, _, err := n.GetNodeClientOrRecreate(chainId); err != nil {
+
+		return nil, err
+	} else {
+
+		return &c.Forwarder, err
+	}
+}
+
+func (n *Node) GetForwarderAddress(chainId *big.Int) (common.Address, error) {
+	if c, ok := n.Clients[chainId.String()]; !ok {
+
+		return common.Address{}, fmt.Errorf("invalid chain [%s]", chainId.String())
+	} else {
+
+		return c.ChainCfg.ForwarderAddress, nil
+	}
 }

@@ -16,6 +16,9 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.11
+    expose:
+      - "4001"
+
 
   bsn2:
     command: [ "./bsn" ]
@@ -28,6 +31,10 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.12
+    expose:
+      - "4001"
+
+
 
   bsn3:
     command: [ "./bsn"]
@@ -40,7 +47,33 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.64.13
+    expose:
+      - "4001"
 
+
+
+  #gsn nodes
+  gsn1:
+    command: [ "./gsn", "-cnf", "gsn.yaml" ]
+    image: p2p-bridge_img
+    depends_on:
+      - ganache_net1
+      - ganache_net2
+      - ganache_net3
+      - bsn1
+      - bsn2
+      - bsn3
+    env_file:
+      - .env.sentry
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
+      - .data/gsn.yaml:/go/gsn.yaml
+      - .data/keys/gsn1:/go/keys
+    networks:
+      static-network:
+        ipv4_address: 172.20.30.11
+    expose:
+      - "4002"
   # protocol nodes
   node1:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
@@ -52,6 +85,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -72,6 +106,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -92,6 +127,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -112,6 +148,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -132,6 +169,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -152,6 +190,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:
@@ -172,6 +211,7 @@ services:
       - bsn1
       - bsn2
       - bsn3
+      - gsn1
     env_file:
       - .env.sentry
     volumes:

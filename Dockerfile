@@ -12,6 +12,7 @@ RUN go mod download
 COPY    ./cmd ./cmd
 COPY    ./common ./common
 COPY    ./config ./config
+COPY    ./forward ./forward
 COPY    ./helpers ./helpers
 COPY    ./libp2p ./libp2p
 COPY    ./node ./node
@@ -35,3 +36,5 @@ RUN touch ./bootstrap.env
 COPY --from=build /go/bin/bridge ./
 
 COPY --from=build /go/bin/bsn ./
+
+COPY --from=build /go/bin/gsn ./

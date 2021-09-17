@@ -13,7 +13,7 @@ build: deps
 
 
 clean:
-	rm -f ./bridge ./bsn keys/*.key keys/*.env
+	rm -f ./bridge ./bsn;rm -rf ./.data/*
 
 build-all: deps build build-bsn
 

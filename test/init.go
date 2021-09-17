@@ -1,7 +1,13 @@
-package networks
+package test
 
 import (
 	"context"
+	"math/big"
+	"math/rand"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -10,10 +16,6 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-	"math/big"
-	"os"
-	"testing"
-	"time"
 )
 
 var node *bridge.Node
@@ -23,15 +25,19 @@ var qwe big.Int
 var testData *big.Int
 
 func init() {
-	err = config.Load("../../.data/bridge.yaml")
+	err = config.LoadBridgeConfig("../.data/bridge.yaml", false)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	node, err = bridge.NewNodeWithClients(context.Background())
+	node, err = bridge.NewNodeWithClients(context.Background(), nil)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	testData, _ = qwe.SetString(os.Args[5], 10)
+	if len(os.Args) > 5 {
+		testData, _ = qwe.SetString(os.Args[5], 10)
+	} else {
+		testData = qwe.SetUint64(rand.Uint64())
+	}
 }
 
 func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testData *big.Int) {
@@ -43,7 +49,7 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	dexPoolFrom := node.Clients[chainidFrom.String()].ChainCfg.DexPoolAddress
 	dexPoolTo := node.Clients[chainIdTo.String()].ChainCfg.DexPoolAddress
 	bridgeTo := node.Clients[chainIdTo.String()].ChainCfg.BridgeAddress
-	pKeyFrom := clientFrom.EcdsaKey
+	pKeyFrom := clientFrom.ChainCfg.EcdsaKey
 	require.NoError(t, err)
 	logrus.Print("(dexPoolFrom, clientFrom.EthClient)", dexPoolFrom, clientFrom.EthClient)
 

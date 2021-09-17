@@ -323,16 +323,17 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	}
 
 	index := keyMask.IndexOfNthEnabled(0)
-	if index >= len(node.PublicKeys) { index = index - 1 }
-	PubKey := append(node.PublicKeys)[index]
 
-//	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
+	if index >= len(node.PublicKeys) {
+		return errors.New(fmt.Sprintf("keyMask.IndexOfNthEnabled %d pubKeys: %d", index, len(node.PublicKeys)))
+	}
+
+	PubKey := append(node.PublicKeys)[index]
 
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
 		return
 	}
-	// fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 

@@ -63,6 +63,12 @@ git commit -m "submodule eth-contracts update"
 git push
 ```
 
+переключить submodule на текущую ветку
+
+```
+git submodule foreach -q --recursive 'git checkout develop'
+```
+
 
 ### Переключение loglevel
 

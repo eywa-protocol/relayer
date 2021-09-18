@@ -64,7 +64,9 @@ func CustomAuth(client *ethclient.Client, metrics *bridge.Metrics, privateKey *e
 	if metrics != nil {
 		metrics.ChainMetrics(chainId.String()).GasPriceFromNet(gasPrice)
 	}
-
+	if gasPrice == nil {
+		gasPrice = big.NewInt(100)
+	}
 	if chainCfg := config.Bridge.Chains.GetChainCfg(uint(chainId.Uint64())); chainCfg != nil {
 		if chainCfg.GasFactor > 0 {
 			gasPrice = new(big.Int).Div(gasPrice, big.NewInt(100))

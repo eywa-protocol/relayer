@@ -56,7 +56,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 		return nodeTimeStep <= stop
 	}
 	for isNeedToStop() {
-		// For now we assume that the underlying receive function is blocking
+		// For now, we assume that the underlying received function is blocking
 
 		mutex.Lock()
 		nodeTimeStep = node.TimeStep
@@ -80,7 +80,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
 			if nodeTimeStep == stop {
-			//	logrus.Tracef(" Consensus achieved by node %v", node.Id)
+				//	logrus.Tracef(" Consensus achieved by node %v", node.Id)
 				mutex.Lock()
 				end = true
 				node.TimeStep++
@@ -132,17 +132,18 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
 					logrus.Error("node.verifyAckSignature ", err)
-                                        return
+					return
 
 				}
-				//fmt.Print("verified Ack Signature\n")
+				// fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
 					logrus.Error(err)
+					mutex.Unlock()
 					return
 				}
-				//fmt.Print("node SigMask Merged\n")
+				// fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
 				node.Acks += 1
 
@@ -160,7 +161,9 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 					mutex.Unlock()
 					return
 				}
-				if index >= len(node.Signatures) { index = index - 1 }
+				if index >= len(node.Signatures) {
+					index = index - 1
+				}
 				node.Signatures[index] = msg.Signature
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold

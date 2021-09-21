@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubSub "github.com/libp2p/go-libp2p-pubsub"
@@ -95,7 +96,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	} else {
 		m.ConsensusFailed()
 	}
-	logrus.Println("The END of Protocol")
+	logrus.Trace("The END of Protocol")
 }
 
 func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
@@ -107,24 +108,38 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
+func (n Node) GetParticipantsPubKeysFromContract(client Client, participants []peer.ID) (publicKeys []kyber.Point, err error) {
 
 	if client.EthClient == nil {
 		return nil, ErrGetEthClient
 	}
 
 	suite := pairing.NewSuiteBn256()
-	publicKeys = make([]kyber.Point, 0)
+	publicKeys = make([]kyber.Point, 0, len(participants))
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
 	if err != nil {
 		return
 	}
+	ps := make(map[string]struct{}, len(participants))
+
+	for _, participant := range participants {
+		ps[common.BytesToAddress([]byte(participant)).String()] = struct{}{}
+	}
+	//logrus.Print(ps)
 	for _, node := range nodes {
-		p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
-		if err != nil {
-			panic(err)
+		//logrus.Print("NodeIdAddress from Contract ", node.NodeIdAddress)
+
+		if _, ok := ps[node.NodeIdAddress.String()]; ok {
+			p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
+			if err != nil {
+				return nil, err
+			}
+			//logrus.Print("node.NodeIdAddress", node.NodeIdAddress.String())
+			publicKeys = append(publicKeys, p)
+		} else {
+			//logrus.Print("NOT FOUND node.NodeIdAddress", node.NodeIdAddress.String())
+
 		}
-		publicKeys = append(publicKeys, p)
 	}
 	return
 }
@@ -142,7 +157,9 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err e
 
 func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
 
-	publicKeys, err := n.GetPubKeysFromContract(client)
+	mates := topic.ListPeers()
+
+	publicKeys, err := n.GetParticipantsPubKeysFromContract(client, mates)
 	if err != nil {
 		return
 	}
@@ -424,6 +441,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								return
 							}
 							defer p2pSub.Cancel()
+							time.Sleep(200 * time.Millisecond)
 							logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
 							logrus.Println("sendTopic.ListPeers(): ", sendTopic.ListPeers())
 
@@ -659,7 +677,7 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 			logrus.Infof("uptime data: %v", uptimeData)
 			logrus.Infof("LEADER going to reset uptime %s", t.String())
 			uptimeLeader.Reset()
-			logrus.Infof("The END of Protocol")
+			logrus.Tracef("The END of Protocol")
 		} else {
 			logrus.Debug("start uptime server")
 			if uptimeServer, err := uptime.NewServer(n.Host, leaderPeerId, n.uptimeRegistry); err != nil {
@@ -671,7 +689,7 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 				logrus.Debug("uptime server stopped")
 
 			}
-			logrus.Debug("The END of Protocol")
+			logrus.Trace("The END of Protocol")
 		}
 	}
 

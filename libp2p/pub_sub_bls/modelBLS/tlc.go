@@ -302,7 +302,7 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 	// Verify message signature
 	err = bdn.Verify(node.Suite, aggPubKey, msgHash, sig)
 	if err != nil {
-		fmt.Println(err)
+		logrus.Tracef("bdn.Verify", err)
 		return
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
@@ -318,7 +318,7 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 	}
 	err = keyMask.SetMask(msg.Mask)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Trace("keyMask.SetMask", err)
 		return
 	}
 
@@ -328,11 +328,15 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err e
 		return errors.New(fmt.Sprintf("keyMask.IndexOfNthEnabled %d pubKeys: %d", index, len(node.PublicKeys)))
 	}
 
+	if index == -1 {
+		return errors.New(fmt.Sprintf("keyMask.IndexOfNthEnabled %d pubKeys: %d", index, len(node.PublicKeys)))
+	}
+
 	PubKey := append(node.PublicKeys)[index]
 
 	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
 	if err != nil {
-		return
+		return errors.New(fmt.Sprintf("bdn.Verify %v", err))
 	}
 	return
 }

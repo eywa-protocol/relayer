@@ -131,7 +131,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				msgHash := calculateHash(*msg, node.ConvertMsg)
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
-					logrus.Error("node.verifyAckSignature ", err)
+					logrus.Trace("node.verifyAckSignature Error: ", err)
 					return
 
 				}
@@ -139,7 +139,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Error("node.SigMask.Merge", err)
 					mutex.Unlock()
 					return
 				}
@@ -150,7 +150,7 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
 				err = keyMask.SetMask(msg.Mask)
 				if err != nil {
-					logrus.Errorf(err.Error())
+					logrus.Tracef("keyMask.SetMask Error: %v", err)
 					mutex.Unlock()
 					return
 				}
@@ -181,18 +181,18 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 
 					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
 					if err != nil {
-						logrus.Error(err)
+						logrus.Error("AggregateSignatures", err)
 					}
 
 					msg.Signature, err = aggSignature.MarshalBinary()
 					if err != nil {
-						logrus.Error(err)
+						logrus.Error("MarshalBinary", err)
 					}
 					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
 
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
-						logrus.Error(err)
+						logrus.Error("Verify", err)
 					}
 
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
@@ -221,17 +221,20 @@ func (node *Node) WaitForMsgNEW(consensusAgreed chan bool, wg *sync.WaitGroup) {
 
 				signature, err := bdn.Sign(node.Suite, node.PrivateKey, msgHash)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Errorf("Sign %v", err)
 				}
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				msg.Signature = signature
 
 				// Add mask for the signature
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
+				if err != nil {
+					logrus.Errorf("NewMask %v", err)
+				}
 				err = keyMask.SetBit(node.Id, true)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Tracef("SetBit %v", err)
 				}
 				msg.Mask = keyMask.Mask()
 

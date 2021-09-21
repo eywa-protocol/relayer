@@ -43,7 +43,7 @@ import (
 
 var ErrContextDone = errors.New("interrupt on context done")
 
-const minConsensusNodesCount = 3
+const minConsensusNodesCount = 5
 
 type Node struct {
 	base.Node

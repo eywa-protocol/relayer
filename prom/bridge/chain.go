@@ -1,6 +1,10 @@
 package bridge
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/params"
+)
 
 const (
 	gasTypeNet  = "from_net"
@@ -43,4 +47,10 @@ func (c *ChainMetrics) GasPriceUsed(gasPrice *big.Int) {
 		return
 	}
 	c.m.chainGasPriceGauge.WithLabelValues(c.chainId, gasTypeUsed).Set(c.gasPrice2Float64(gasPrice))
+}
+
+func (c *ChainMetrics) NodeBalance(balanceWei *big.Int) {
+
+	ethBalance, _ := new(big.Float).Quo(new(big.Float).SetInt(balanceWei), big.NewFloat(params.Ether)).Float64()
+	c.m.nodeBalanceGauge.WithLabelValues(c.chainId).Set(ethBalance)
 }

@@ -9,22 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/libp2p/go-flow-metrics"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/libp2p/go-flow-metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	discovery "github.com/libp2p/go-libp2p-discovery"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubSub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
@@ -34,6 +27,12 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/prom/bridge"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -330,6 +329,10 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 				}(); err != nil {
 					m.ResubscribeFailed()
 					continue
+				} else {
+					if balance, err := clientPtr.GetBalance(); err == nil && balance != nil {
+						n.metrics.ChainMetrics(chainId.String()).NodeBalance(balance)
+					}
 				}
 			case err := <-(*subPtr).Err():
 				if err != nil {

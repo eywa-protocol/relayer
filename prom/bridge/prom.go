@@ -27,6 +27,7 @@ type Metrics struct {
 	reqSubGauge           *prometheus.GaugeVec
 	chainOnlineGauge      *prometheus.GaugeVec
 	chainGasPriceGauge    *prometheus.GaugeVec
+	nodeBalanceGauge      *prometheus.GaugeVec
 }
 
 func NewMetrics() *Metrics {
@@ -116,6 +117,14 @@ func (m *Metrics) Init(peerId peer.ID) error {
 		ConstLabels: constLabels,
 	}, []string{"chain_id", "gas_price_type"})
 
+	m.nodeBalanceGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:   namespace,
+		Subsystem:   subsystem,
+		Name:        "node_balance",
+		Help:        `node balance in eth partitioned by peer_id, chain_id`,
+		ConstLabels: constLabels,
+	}, []string{"chain_id"})
+
 	if err := prometheus.Register(m.reqReceivedCounter); err != nil {
 
 		return fmt.Errorf("register req_received_count error: %w", err)
@@ -140,6 +149,9 @@ func (m *Metrics) Init(peerId peer.ID) error {
 	} else if err := prometheus.Register(m.chainGasPriceGauge); err != nil {
 
 		return fmt.Errorf("register chain_gas_price error: %w", err)
+	} else if err := prometheus.Register(m.nodeBalanceGauge); err != nil {
+
+		return fmt.Errorf("register node_balance error: %w", err)
 	} else {
 		m.disabled = false
 		return nil

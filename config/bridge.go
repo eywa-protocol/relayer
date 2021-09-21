@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gopkg.in/yaml.v3"
@@ -125,6 +126,11 @@ func (c *BridgeChain) GetEthClient(skipUrl string) (client *ethclient.Client, ur
 				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
 					c.Id, c.EcdsaAddress.String(), balance.String())
 
+			} else if new(big.Float).SetInt(balance).Cmp(big.NewFloat(params.Ether)) <= 0 {
+				logrus.WithFields(logrus.Fields{
+					field.CainId:       c.Id,
+					field.EcdsaAddress: c.EcdsaAddress.String(),
+				}).Error(fmt.Errorf("node balance on chain [%d] is less then 1 eth", c.Id))
 			}
 
 			return client, url, nil

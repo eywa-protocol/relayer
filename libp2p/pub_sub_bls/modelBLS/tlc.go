@@ -56,7 +56,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 		return nodeTimeStep <= stop
 	}
 	for isNeedToStop() {
-		// For now we assume that the underlying receive function is blocking
+		// For now, we assume that the underlying received function is blocking
 
 		mutex.Lock()
 		nodeTimeStep = node.TimeStep
@@ -79,7 +79,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 			logrus.Tracef("node %d\n in nodeTimeStep %d;\nReceived MSG with\n msg.Step %d\n MsgType %d source: %d\n", node.Id, nodeTimeStep, msg.Step, msg.MsgType, msg.Source)
 
-			// Used for stopping the execution after some timesteps
+			// Used for stopping the execution after some time steps
 			if nodeTimeStep == stop {
 				fmt.Println("Break reached by node ", node.Id)
 				mutex.Lock()
@@ -203,7 +203,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
 						fmt.Println("node ", node.Id, "PANIC Sig: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
-						//panic(err)
+						// panic(err)
 						return
 					}
 
@@ -289,7 +289,7 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
 	}
 
 	if keyMask.CountEnabled() < node.ThresholdAck {
-		err = errors.New("not Enough sigantures")
+		err = errors.New("not Enough signatures")
 		return
 	}
 

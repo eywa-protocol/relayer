@@ -43,7 +43,7 @@ import (
 
 var ErrContextDone = errors.New("interrupt on context done")
 
-const minConsensusNodesCount = 5
+const minConsensusNodesCount = 3
 
 type Node struct {
 	base.Node
@@ -84,7 +84,10 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
 				m.SentFailed(event.Chainid.String())
-				logrus.Errorf("%v", err)
+				logrus.WithFields(logrus.Fields{
+					field.CainId:        srcChainId,
+					field.BridgeRequest: field.ListFromBridgeOracleRequest(event),
+				}).Error(fmt.Errorf("%w", err))
 			} else {
 				m.SentSuccess(event.Chainid.String())
 			}
@@ -149,10 +152,10 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 	if !n.nodeExists(client, nodeIdAddress) {
-		logrus.Errorf("node %x does not exist", n.Host.ID())
+		logrus.Errorf("node %x does not exist", n.Host.ID().Pretty())
 
 	} else {
-		logrus.Tracef("Host.ID() %v ", n.Host.ID())
+		logrus.Tracef("Host.ID() %v ", n.Host.ID().Pretty())
 		node, err := client.NodeList.GetNode(nodeIdAddress)
 		if err != nil {
 			return nil, err
@@ -170,7 +173,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
-				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
+				if len(topicParticipants) >= minConsensusNodesCount && len(topicParticipants) >= len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
 						Id:                int(node.NodeId),
 						TimeStep:          0,
@@ -394,6 +397,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 					if sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
 						logrus.WithFields(logrus.Fields{
 							field.CainId:              e.Chainid,
+							field.TxId:                e.Raw.TxHash.Hex(),
 							field.ConsensusRendezvous: currentTopic,
 						}).Error(fmt.Errorf("join topic error: %w", err))
 						continue reqLoop

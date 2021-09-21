@@ -421,6 +421,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 								return
 							}
 							defer p2pSub.Cancel()
+							time.Sleep(200 * time.Millisecond)
 							logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
 							logrus.Println("sendTopic.ListPeers(): ", sendTopic.ListPeers())
 

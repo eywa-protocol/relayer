@@ -108,6 +108,28 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
+func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
+
+	if client.EthClient == nil {
+		return nil, ErrGetEthClient
+	}
+
+	suite := pairing.NewSuiteBn256()
+	publicKeys = make([]kyber.Point, 0)
+	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeListAddress)
+	if err != nil {
+		return
+	}
+	for _, node := range nodes {
+		p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
+		if err != nil {
+			panic(err)
+		}
+		publicKeys = append(publicKeys, p)
+	}
+	return
+}
+
 func (n Node) GetParticipantsPubKeysFromContract(client Client, participants []peer.ID) (publicKeys []kyber.Point, err error) {
 
 	if client.EthClient == nil {
@@ -127,14 +149,14 @@ func (n Node) GetParticipantsPubKeysFromContract(client Client, participants []p
 	}
 	//logrus.Print(ps)
 	for _, node := range nodes {
-		//logrus.Print("NodeIdAddress from Contract ", node.NodeIdAddress)
+		logrus.Print("NodeIdAddress from Contract ", node.NodeIdAddress)
 
 		if _, ok := ps[node.NodeIdAddress.String()]; ok {
 			p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
 			if err != nil {
 				return nil, err
 			}
-			//logrus.Print("node.NodeIdAddress", node.NodeIdAddress.String())
+			logrus.Print("node.NodeIdAddress", node.NodeIdAddress.String())
 			publicKeys = append(publicKeys, p)
 		} else {
 			//logrus.Print("NOT FOUND node.NodeIdAddress", node.NodeIdAddress.String())
@@ -157,9 +179,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err e
 
 func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
 
-	mates := topic.ListPeers()
-
-	publicKeys, err := n.GetParticipantsPubKeysFromContract(client, mates)
+	publicKeys, err := n.GetPubKeysFromContract(client)
 	if err != nil {
 		return
 	}

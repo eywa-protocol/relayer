@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -101,4 +103,10 @@ func NewClient(chain *config.BridgeChain, metrics *bridge.Metrics, skipUrl strin
 	}
 	err = client.RecreateContractsAndFilters()
 	return
+}
+
+func (c *Client) GetBalance() (*big.Int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	return c.EthClient.BalanceAt(ctx, c.ChainCfg.EcdsaAddress, nil)
 }

@@ -11,13 +11,14 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const dbFile = "./.data/blockchain.db"
+const dbFile = "../.data/blockchain.db"
 const blocksBucket = "blocks"
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
 // Blockchain implements interactions with a DB
 type Blockchain struct {
 	currentEpoch []byte
+	currentBlockNumber int
 	tip          []byte
 	db           *bolt.DB
 }
@@ -27,7 +28,7 @@ func CreateBlockchain() *Blockchain {
 	dbFile := fmt.Sprintf(dbFile)
 	if dbExists(dbFile) {
 		fmt.Println("Blockchain already exists.")
-		os.Exit(1)
+		//os.Exit(1)
 	}
 
 	var tip []byte
@@ -63,7 +64,7 @@ func CreateBlockchain() *Blockchain {
 		log.Panic(err)
 	}
 
-	bc := Blockchain{genesisEpoch, tip, db}
+	bc := Blockchain{genesisEpoch,1, tip, db}
 
 	return &bc
 }
@@ -92,7 +93,7 @@ func NewBlockchain() *Blockchain {
 		log.Panic(err)
 	}
 
-	bc := Blockchain{[]byte("ds"), tip, db}
+	bc := Blockchain{[]byte("ds"), 1,tip, db}
 
 	return &bc
 }
@@ -117,7 +118,7 @@ func (bc *Blockchain) AddBlock(block *Block) {
 		lastBlockData := b.Get(lastHash)
 		lastBlock := DeserializeBlock(lastBlockData)
 
-		if block.Height > lastBlock.Height {
+		if block.Number > lastBlock.Number {
 			err = b.Put([]byte("l"), block.Hash)
 			if err != nil {
 				log.Panic(err)
@@ -176,7 +177,7 @@ func (bc *Blockchain) GetBestHeight() int {
 		log.Panic(err)
 	}
 
-	return lastBlock.Height
+	return lastBlock.Number
 }
 
 // GetBlock finds a block by its hash and returns it
@@ -240,7 +241,7 @@ func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
 		blockData := b.Get(lastHash)
 		block := DeserializeBlock(blockData)
 
-		lastHeight = block.Height
+		lastHeight = block.Number
 
 		return nil
 	})
@@ -248,7 +249,7 @@ func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
 		log.Panic(err)
 	}
 
-	newBlock := NewBlock(bc.currentEpoch, transactions, lastHash, lastHeight+1)
+	newBlock := NewBlock( lastHeight+1, transactions, lastHash, []byte(""), []byte(""))
 
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))

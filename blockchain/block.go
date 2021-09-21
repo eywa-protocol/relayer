@@ -10,17 +10,25 @@ import (
 // Block represents a block in the blockchain
 type Block struct {
 	Timestamp     int64
-	EpochID	[]byte
 	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
-	Nonce         int
-	Height        int
+	Number        int
+	Signature []byte
+	Leader []byte
 }
 
+
 // NewBlock creates and returns Block
-func NewBlock(epochID	[]byte, transactions  []*Transaction, prevBlockHash []byte, height int) *Block {
-	block := &Block{ time.Now().Unix(),  epochID,transactions, prevBlockHash, []byte{}, 0, height}
+func NewBlock(number int, transactions  []*Transaction, prevBlockHash []byte,  sig []byte, leader []byte) *Block {
+	block := &Block{ time.Now().Unix(),
+		transactions,
+		prevBlockHash,
+		[]byte{},
+		number,
+		sig,
+		leader,
+	}
 //TODO start block propagating protocol
 	return block
 }
@@ -28,7 +36,12 @@ func NewBlock(epochID	[]byte, transactions  []*Transaction, prevBlockHash []byte
 // NewGenesisBlock creates and returns genesis Block
 func NewGenesisBlock(coinbase *Transaction) *Block {
 	//TODO add genesis Epoch calculation
-	return NewBlock([]byte("genesisEpoch"), []*Transaction{coinbase}, []byte{}, 0)
+	return NewBlock(
+		1,
+		[]*Transaction{coinbase},
+		[]byte{},
+		[]byte{},
+		[]byte{})
 }
 
 // HashTransactions returns a hash of the transactions in the block

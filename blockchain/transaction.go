@@ -5,19 +5,24 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/gob"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
-	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"log"
 	"strings"
 )
 
 const subsidy = 10
+type TxType int
+
+const (
+	ChangeEpochTx TxType = iota	// ChangeEpoch 0
+	EventTx						// Events     []*wrappers.BridgeOracleRequest 1
+	UptimeTx					// UptimeList uptime.UpList 2
+)
 
 // Transaction represents a EYWA transaction = EYWA bridge cross-chain action abstraction
 type Transaction struct {
 	ID         []byte
-	Events     []*wrappers.BridgeOracleRequest
-	UptimeList uptime.UpList
+	Type TxType
+	Payload []byte
 }
 
 // IsCoinbase checks whether the transaction is coinbase
@@ -78,7 +83,7 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) *Transaction {
-	tx := Transaction{[]byte("0"), nil, nil}
+	tx := Transaction{epochId, 0, nil}
 	return &tx
 }
 

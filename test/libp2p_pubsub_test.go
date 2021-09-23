@@ -307,10 +307,9 @@ func TestBLS(t *testing.T) {
 }
 
 func TestOneStepBLS(t *testing.T) {
-	logFile, _ := os.OpenFile("../../../oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
+	logFile, _ := os.OpenFile("../logs/oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	// Delayed = false
-	simpleTestOneStepBLS(t, 9, 9900)
+	simpleTestOneStepBLS(t, 7, 9900)
 }
 
 func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {
@@ -343,7 +342,10 @@ func simpleTestOneStepBLS(t *testing.T, n int, initialPort int) {
 	err := setupNetworkTopology(hosts)
 	require.Nil(t, err)
 	// PubSub is ready and we can start our algorithm
-	StartTestOneStepBLS(nodes)
+	cch := StartTestOneStepBLS(nodes)
+	for _, c := range cch {
+		require.True(t, c)
+	}
 	LogOutputBLS(t, nodes)
 }
 
@@ -422,25 +424,34 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 }
 
 // StartTest is used for starting tlc nodes
-func StartTestOneStepBLS(nodes []*modelBLS.Node) {
+func StartTestOneStepBLS(nodes []*modelBLS.Node) (consensuses []bool) {
 	fmt.Print("START")
 	wg := &sync.WaitGroup{}
-
+	defer wg.Done()
 	for _, node := range nodes {
 
 		node.Advance(0)
 	}
+	var consensusesChan []chan bool
 	for _, node := range nodes {
 		wg.Add(1)
-		go runOneStepNodeBLS(node, wg)
+		consensusChannel := make(chan bool)
+		go runOneStepNodeBLS(node, wg, consensusChannel)
+		consensusesChan = append(consensusesChan, consensusChannel)
+
 	}
-	wg.Wait()
-	fmt.Println("The END")
+
+	for i := 0; i < len(consensusesChan); i++ {
+		consensuses = append(consensuses, <-consensusesChan[i])
+	}
+	fmt.Println("CONSENSUSES", consensuses)
+
+	return
 }
 
 func LogOutputBLS(t *testing.T, nodes []*modelBLS.Node) {
 	for i := range nodes {
-		t.Logf("nodes: %d , TimeStep : %d", i, nodes[i].TimeStep)
+		t.Logf("LogOut nodes: %d , TimeStep : %d", i, nodes[i].TimeStep)
 		modelBLS.Logger1.Printf("%d,%d\n", i, nodes[i].TimeStep)
 	}
 }
@@ -451,13 +462,15 @@ func runNodeBLS(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
 }
 
-func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup) {
+func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel chan bool) {
 	defer wg.Done()
-	consensusChannel := make(chan bool)
+	//consensusChannel := make(chan bool)
 	wg.Add(1)
 	go node.WaitForMsgNEW(consensusChannel, wg)
-	_ = <-consensusChannel
-	return
+
+	//achieved = <-consensusChannel
+	//return
 }

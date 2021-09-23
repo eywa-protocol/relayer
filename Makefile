@@ -23,10 +23,10 @@ develop:
 	@docker-compose logs -f $(servicename)
 
 bls_test:
-	 go test -v ./libp2p/pub_sub_bls/libp2p_pubsub -run TestBLS
+	 go test -v ./test/ -run TestBLS
 
 custom_bls_test:
-	 go test -v ./libp2p/pub_sub_bls/libp2p_pubsub -run TestOneStepBLS
+	 go test -v ./test/ -run TestOneStepBLS
 
 test_local_bridge:
 	go test -v ./test/networks -run Test_Local_SendRequestV2

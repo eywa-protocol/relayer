@@ -9,17 +9,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/test_utils"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
+	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messageWithSig"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messagepb"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/test_utils"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 
 	core "github.com/libp2p/go-libp2p-core"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
 )
 
 type FailureModel int
@@ -49,9 +49,9 @@ func setupHosts(n int, initialPort int, failureModel FailureModel) ([]*model.Nod
 
 	for i := range nodes {
 
-		// var comm model.CommunicationInterface
-		var comm *libp2p_pubsub.Libp2pPubSub
-		comm = new(libp2p_pubsub.Libp2pPubSub)
+		// var comm modelBLS.CommunicationInterface
+		var comm *protocol.Libp2pPubSub
+		comm = new(protocol.Libp2pPubSub)
 		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
@@ -141,9 +141,9 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 			if j == i {
 				continue
 			}
-			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", libp2p_pubsub.GetLocalhostAddress(*hosts[i]), libp2p_pubsub.GetLocalhostAddress(*nxtHost))
+			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", protocol.GetLocalhostAddress(*hosts[i]), protocol.GetLocalhostAddress(*nxtHost))
 
-			err := libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*nxtHost))
+			err := protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*nxtHost))
 			if err != nil {
 				return err
 			}
@@ -151,19 +151,19 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 	}
 
 	for i := 0; i < n; i++ {
-		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+1)%n]))
+		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+1)%n]))
 		if err != nil {
 			return
 		}
-		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+2)%n]))
+		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+2)%n]))
 		if err != nil {
 			return
 		}
-		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+3)%n]))
+		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+3)%n]))
 		if err != nil {
 			return
 		}
-		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+4)%n]))
+		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+4)%n]))
 		if err != nil {
 			return
 		}
@@ -371,9 +371,9 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 
 	for i := range nodes {
 
-		// var comm model.CommunicationInterface
-		var comm *libp2p_pubsub.Libp2pPubSub
-		comm = new(libp2p_pubsub.Libp2pPubSub)
+		// var comm modelBLS.CommunicationInterface
+		var comm *protocol.Libp2pPubSub
+		comm = new(protocol.Libp2pPubSub)
 		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
@@ -469,7 +469,7 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 	defer wg.Done()
 	//consensusChannel := make(chan bool)
 	wg.Add(1)
-	go node.WaitForMsgNEW(consensusChannel, wg)
+	go node.WaitForProtocolMsg(consensusChannel, wg)
 
 	//achieved = <-consensusChannel
 	//return

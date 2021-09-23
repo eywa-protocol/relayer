@@ -17,6 +17,8 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
+	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -31,9 +33,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
-	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
+	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -50,7 +50,7 @@ type Node struct {
 	cMx            *sync.Mutex
 	Clients        map[string]Client
 	nonceMx        *sync.Mutex
-	P2PPubSub      *libp2p_pubsub.Libp2pPubSub
+	P2PPubSub      *bls_consensus.Libp2pPubSub
 	signerKey      *ecdsa.PrivateKey
 	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
@@ -64,7 +64,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	wg.Add(1)
 	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
 	wg.Add(1)
-	go nodeBls.WaitForMsgNEW(consensusChannel, wg)
+	go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
 	consensus := <-consensusChannel
 	if consensus == true {
 		logrus.Tracef("Starting Leader election !!!")
@@ -435,8 +435,8 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	return
 }
 
-func (n Node) InitializeCommonPubSub() (p2pPubSub *libp2p_pubsub.Libp2pPubSub) {
-	return new(libp2p_pubsub.Libp2pPubSub)
+func (n Node) InitializeCommonPubSub() (p2pPubSub *bls_consensus.Libp2pPubSub) {
+	return new(bls_consensus.Libp2pPubSub)
 }
 
 // DiscoverByRendezvous	Announce your presence in network using a rendezvous point
@@ -565,7 +565,7 @@ func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *mod
 	wg.Add(1)
 	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
 	wg.Add(1)
-	go nodeBls.WaitForMsgNEW(consensusChannel, wg)
+	go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
 	consensus := <-consensusChannel
 	if consensus == true {
 		logrus.Tracef("Starting uptime Leader election !!!")

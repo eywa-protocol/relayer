@@ -2,7 +2,7 @@ package test_utils
 
 import (
 	"fmt"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
 	"sync"
 	"testing"
 )

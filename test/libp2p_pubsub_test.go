@@ -1,4 +1,4 @@
-package libp2p_pubsub
+package test
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/libp2p_pubsub"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/protobuf/messagepb"
@@ -49,9 +50,9 @@ func setupHosts(n int, initialPort int, failureModel FailureModel) ([]*model.Nod
 	for i := range nodes {
 
 		// var comm model.CommunicationInterface
-		var comm *Libp2pPubSub
-		comm = new(Libp2pPubSub)
-		comm.topic = "TLC"
+		var comm *libp2p_pubsub.Libp2pPubSub
+		comm = new(libp2p_pubsub.Libp2pPubSub)
+		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
 		host := comm.CreatePeer(i, initialPort+i)
@@ -140,9 +141,9 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 			if j == i {
 				continue
 			}
-			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", GetLocalhostAddress(*hosts[i]), GetLocalhostAddress(*nxtHost))
+			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", libp2p_pubsub.GetLocalhostAddress(*hosts[i]), libp2p_pubsub.GetLocalhostAddress(*nxtHost))
 
-			err := connectHostToPeerWithError(*hosts[i], GetLocalhostAddress(*nxtHost))
+			err := libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*nxtHost))
 			if err != nil {
 				return err
 			}
@@ -150,19 +151,19 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 	}
 
 	for i := 0; i < n; i++ {
-		err = connectHostToPeerWithError(*hosts[i], GetLocalhostAddress(*hosts[(i+1)%n]))
+		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+1)%n]))
 		if err != nil {
 			return
 		}
-		err = connectHostToPeerWithError(*hosts[i], GetLocalhostAddress(*hosts[(i+2)%n]))
+		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+2)%n]))
 		if err != nil {
 			return
 		}
-		err = connectHostToPeerWithError(*hosts[i], GetLocalhostAddress(*hosts[(i+3)%n]))
+		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+3)%n]))
 		if err != nil {
 			return
 		}
-		err = connectHostToPeerWithError(*hosts[i], GetLocalhostAddress(*hosts[(i+4)%n]))
+		err = libp2p_pubsub.ConnectHostToPeerWithError(*hosts[i], libp2p_pubsub.GetLocalhostAddress(*hosts[(i+4)%n]))
 		if err != nil {
 			return
 		}
@@ -242,7 +243,7 @@ func TestWithNoFailure(t *testing.T) {
 	// Create hosts in libp2p
 	logFile, _ := os.OpenFile("../../../logs/TestWithNoFailure.log", os.O_RDWR|os.O_CREATE, 0666)
 	model.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	Delayed = false
+	// Delayed = false
 	simpleTest(t, 9, 9900, 9, NoFailure)
 }
 
@@ -301,14 +302,14 @@ func TestWithThreeGroups(t *testing.T) {
 func TestBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../../../logBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	Delayed = false
+	// Delayed = false
 	simpleTestBLS(t, 5, 9900, 2)
 }
 
 func TestOneStepBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../../../oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	modelBLS.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	Delayed = false
+	// Delayed = false
 	simpleTestOneStepBLS(t, 9, 9900)
 }
 
@@ -369,9 +370,9 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	for i := range nodes {
 
 		// var comm model.CommunicationInterface
-		var comm *Libp2pPubSub
-		comm = new(Libp2pPubSub)
-		comm.topic = "TLC"
+		var comm *libp2p_pubsub.Libp2pPubSub
+		comm = new(libp2p_pubsub.Libp2pPubSub)
+		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
 		host := comm.CreatePeer(i, initialPort+i)

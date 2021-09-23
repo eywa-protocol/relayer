@@ -295,6 +295,10 @@ func (c *Libp2pPubSub) JoinGroup(group []int) {
 	c.group = group
 }
 
+func (c *Libp2pPubSub) SetTopic(topic string) {
+	c.topic = topic
+}
+
 // makeVictimNotGossip prevents victim from participating in gossip protocol
 func (c *Libp2pPubSub) makeVictimNotGossip() {
 	// Registering a message validator function. This function will process every received message by pubsub and based
@@ -470,7 +474,7 @@ func connectHostToPeer(h core.Host, connectToAddress string) {
 	}
 }
 
-func connectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
+func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
 	// Creating multi address
 	multiAddr, err := multiaddr.NewMultiaddr(connectToAddress)
 	if err != nil {

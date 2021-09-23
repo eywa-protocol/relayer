@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"log"
-
 	"github.com/boltdb/bolt"
 )
 

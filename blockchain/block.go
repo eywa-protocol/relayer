@@ -24,7 +24,7 @@ func NewBlock(number int, transactions  []*Transaction, prevBlockHash []byte,  s
 	block := &Block{ time.Now().Unix(),
 		transactions,
 		prevBlockHash,
-		[]byte{},
+		[]byte("wqeqwqw"),
 		number,
 		sig,
 		leader,

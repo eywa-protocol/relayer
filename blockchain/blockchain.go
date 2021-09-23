@@ -19,7 +19,7 @@ const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second
 type Blockchain struct {
 	currentEpoch []byte
 	currentBlockNumber int
-	tip          []byte
+	currrentBlockHash []byte
 	db           *bolt.DB
 }
 
@@ -27,8 +27,7 @@ type Blockchain struct {
 func CreateBlockchain() *Blockchain {
 	dbFile := fmt.Sprintf(dbFile)
 	if dbExists(dbFile) {
-		fmt.Println("Blockchain already exists.")
-		//os.Exit(1)
+		log.Println("Blockchain already exists.")
 	}
 
 	var tip []byte
@@ -46,6 +45,8 @@ func CreateBlockchain() *Blockchain {
 		if err != nil {
 			log.Panic(err)
 		}
+
+		log.Print(genesis.Hash, genesis.Serialize())
 
 		err = b.Put(genesis.Hash, genesis.Serialize())
 		if err != nil {
@@ -69,8 +70,8 @@ func CreateBlockchain() *Blockchain {
 	return &bc
 }
 
-// NewBlockchain creates a new Blockchain with genesis Block
-func NewBlockchain() *Blockchain {
+// OpenBlockchain opens Blockchain
+func OpenBlockchain() *Blockchain {
 	dbFile := fmt.Sprintf(dbFile)
 	if dbExists(dbFile) == false {
 		fmt.Println("No existing blockchain found. Create one first.")
@@ -94,7 +95,7 @@ func NewBlockchain() *Blockchain {
 	}
 
 	bc := Blockchain{[]byte("ds"), 1,tip, db}
-
+	log.Print(bc)
 	return &bc
 }
 
@@ -123,7 +124,7 @@ func (bc *Blockchain) AddBlock(block *Block) {
 			if err != nil {
 				log.Panic(err)
 			}
-			bc.tip = block.Hash
+			bc.currrentBlockHash = block.Hash
 		}
 
 		return nil
@@ -156,7 +157,7 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 
 // Iterator returns a BlockchainIterat
 func (bc *Blockchain) Iterator() *BlockchainIterator {
-	bci := &BlockchainIterator{bc.tip, bc.db}
+	bci := &BlockchainIterator{bc.currrentBlockHash, bc.db}
 
 	return bci
 }
@@ -263,7 +264,7 @@ func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
 			log.Panic(err)
 		}
 
-		bc.tip = newBlock.Hash
+		bc.currrentBlockHash = newBlock.Hash
 
 		return nil
 	})

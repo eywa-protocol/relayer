@@ -72,7 +72,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		if err != nil {
 			panic(err)
 		}
-		logrus.Infof("LEADER IS %v", leaderPeerId)
+		logrus.Infof("LEADER IS %v TOPIC %v", leaderPeerId, common2.ToHex(event.Raw.TxHash))
 		logrus.Debugf("LEADER id %s my ID %s", nodeBls.Leader.Pretty(), n.Host.ID().Pretty())
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")

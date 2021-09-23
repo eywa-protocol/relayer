@@ -1,9 +1,37 @@
 package blockchain
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/require"
+)
 
-func TestNewBlockchain(t *testing.T) {
+var(
+
+)
+
+
+
+func TestCreateBlockchain(t *testing.T) {
 	bc := CreateBlockchain()
 	defer bc.db.Close()
-	bc.FindTransaction([]byte("0"))
+
+}
+
+
+func TestNOpenBlockchain(t *testing.T) {
+	bc := OpenBlockchain()
+	defer bc.db.Close()
+	b, err := bc.GetBlock([]byte("wqeqwqw"))
+	require.NoError(t, err)
+	t.Log(b)
+}
+
+
+
+func TestFindTransaction(t *testing.T) {
+	bc := OpenBlockchain()
+	defer bc.db.Close()
+	tx, err := bc.FindTransaction([]byte("0"))
+	require.NoError(t, err)
+	t.Log(tx)
 }

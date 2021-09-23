@@ -1,4 +1,4 @@
-package libp2p_pubsub
+package protocol
 
 import (
 	"context"
@@ -14,8 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/modelBLS"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"

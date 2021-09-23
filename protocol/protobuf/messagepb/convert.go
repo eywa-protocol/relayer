@@ -3,7 +3,7 @@ package messagepb
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/pub_sub_bls/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
 )
 
 type Convert struct{}

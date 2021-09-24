@@ -1,9 +1,8 @@
 package leveldb
 
-type  Block struct {
-
+type Block struct {
 }
 
-func (b *Block) getBlock()  {
+func (b *Block) getBlock() {
 
 }

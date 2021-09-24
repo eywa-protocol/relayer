@@ -1,9 +1,8 @@
 package leveldb
 
-type  Transaction struct {
-
+type Transaction struct {
 }
 
-func (tr *Transaction) getTx()  {
+func (tr *Transaction) getTx() {
 
 }

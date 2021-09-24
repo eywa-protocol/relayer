@@ -9,17 +9,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
-	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messageWithSig"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messagepb"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/test_utils"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
+	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messagepb"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/test_utils"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign"
 
 	core "github.com/libp2p/go-libp2p-core"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
 )
 
 type FailureModel int
@@ -50,8 +50,8 @@ func setupHosts(n int, initialPort int, failureModel FailureModel) ([]*model.Nod
 	for i := range nodes {
 
 		// var comm modelBLS.CommunicationInterface
-		var comm *protocol.Libp2pPubSub
-		comm = new(protocol.Libp2pPubSub)
+		var comm *consensus.Protocol
+		comm = new(consensus.Protocol)
 		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
@@ -141,9 +141,9 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 			if j == i {
 				continue
 			}
-			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", protocol.GetLocalhostAddress(*hosts[i]), protocol.GetLocalhostAddress(*nxtHost))
+			fmt.Printf("LOCAL HOST %s CONNECT TO nxtHost %s \n", consensus.GetLocalhostAddress(*hosts[i]), consensus.GetLocalhostAddress(*nxtHost))
 
-			err := protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*nxtHost))
+			err := consensus.ConnectHostToPeerWithError(*hosts[i], consensus.GetLocalhostAddress(*nxtHost))
 			if err != nil {
 				return err
 			}
@@ -151,19 +151,19 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 	}
 
 	for i := 0; i < n; i++ {
-		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+1)%n]))
+		err = consensus.ConnectHostToPeerWithError(*hosts[i], consensus.GetLocalhostAddress(*hosts[(i+1)%n]))
 		if err != nil {
 			return
 		}
-		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+2)%n]))
+		err = consensus.ConnectHostToPeerWithError(*hosts[i], consensus.GetLocalhostAddress(*hosts[(i+2)%n]))
 		if err != nil {
 			return
 		}
-		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+3)%n]))
+		err = consensus.ConnectHostToPeerWithError(*hosts[i], consensus.GetLocalhostAddress(*hosts[(i+3)%n]))
 		if err != nil {
 			return
 		}
-		err = protocol.ConnectHostToPeerWithError(*hosts[i], protocol.GetLocalhostAddress(*hosts[(i+4)%n]))
+		err = consensus.ConnectHostToPeerWithError(*hosts[i], consensus.GetLocalhostAddress(*hosts[(i+4)%n]))
 		if err != nil {
 			return
 		}
@@ -372,8 +372,8 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	for i := range nodes {
 
 		// var comm modelBLS.CommunicationInterface
-		var comm *protocol.Libp2pPubSub
-		comm = new(protocol.Libp2pPubSub)
+		var comm *consensus.Protocol
+		comm = new(consensus.Protocol)
 		comm.SetTopic("TLC")
 
 		// creating libp2p hosts

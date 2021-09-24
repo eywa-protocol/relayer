@@ -1,10 +1,8 @@
-package blockchain
+package chain
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	//TODO change this to LevelDB
@@ -13,70 +11,64 @@ import (
 
 const dbFile = "../.data/blockchain.db"
 const blocksBucket = "blocks"
-const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-// Blockchain implements interactions with a DB
-type Blockchain struct {
-	currentEpoch []byte
-	currentBlockNumber int
-	currrentBlockHash []byte
+// Chain implements interactions with a DB
+type Chain struct {
+	genesisEpoch *Epoch
 	db           *bolt.DB
 }
 
-// CreateBlockchain creates a new blockchain DB
-func CreateBlockchain() *Blockchain {
-	dbFile := fmt.Sprintf(dbFile)
-	if dbExists(dbFile) {
-		log.Println("Blockchain already exists.")
-	}
-
-	var tip []byte
-	genesisEpoch := []byte(genesisCoinbaseData)
-	cbtx := NewCoinbaseTX(genesisEpoch)
-	genesis := NewGenesisBlock(cbtx)
-
-	db, err := bolt.Open(dbFile, 0600, nil)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucket([]byte(blocksBucket))
-		if err != nil {
-			log.Panic(err)
-		}
-
-		log.Print(genesis.Hash, genesis.Serialize())
-
-		err = b.Put(genesis.Hash, genesis.Serialize())
-		if err != nil {
-			log.Panic(err)
-		}
-
-		err = b.Put([]byte("l"), genesis.Hash)
-		if err != nil {
-			log.Panic(err)
-		}
-		tip = genesis.Hash
-
-		return nil
-	})
-	if err != nil {
-		log.Panic(err)
-	}
-
-	bc := Blockchain{genesisEpoch,1, tip, db}
-
-	return &bc
+// Genesis retrieves the chain's genesis block.
+func (bc *Chain) Genesis() *Epoch {
+	return bc.genesisEpoch
 }
 
-// OpenBlockchain opens Blockchain
-func OpenBlockchain() *Blockchain {
+/*func CreateOrOpenChainFromFile() (chain *Chain) {
+	genesisEpoch := CreateGenesisEpoch()
+	header := NewHeader(*genesisEpoch)
+	coinbaseTransaction := NewCoinbaseTX(genesisEpoch.Serialize())
+	genesis := NewGenesisBlock(*header, []*Transaction{coinbaseTransaction})
+	dbFile := fmt.Sprintf(dbFile)
+
+	db, err := NewLevelDBDatabase(dbFile, 1024, 128, false)
+
+	err = db.Put(genesis.Hash.Bytes(), genesis.Serialize())
+	if err != nil {
+		log.Panic(err)
+	}
+	return nil
+	}
+
+		chain = &Chain{
+			genesisEpoch: genesisEpoch,
+			db:           db,
+		}
+		log.Println("Chain already exists.")
+	} else {
+		err = db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(blocksBucket))
+			qwe = b.Get(genesis.Hash.Bytes(),)
+
+			return nil
+		})
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+}
+
+		return
+	}*/
+
+/*
+//// OpenBlockchain opens Blockchain
+func OpenBlockchain() *Chain {
 	dbFile := fmt.Sprintf(dbFile)
 	if dbExists(dbFile) == false {
 		fmt.Println("No existing blockchain found. Create one first.")
 		os.Exit(1)
 	}
+
 
 	var tip []byte
 	db, err := bolt.Open(dbFile, 0600, nil)
@@ -94,13 +86,13 @@ func OpenBlockchain() *Blockchain {
 		log.Panic(err)
 	}
 
-	bc := Blockchain{[]byte("ds"), 1,tip, db}
+	bc := Chain{db}
 	log.Print(bc)
 	return &bc
-}
+}*/
 
-// AddBlock saves the block into the blockchain
-func (bc *Blockchain) AddBlock(block *Block) {
+/*// AddBlock saves the block into the blockchain
+func (bc *Chain) AddBlock(block *Block) {
 	err := bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		blockInDb := b.Get(block.Hash)
@@ -132,10 +124,10 @@ func (bc *Blockchain) AddBlock(block *Block) {
 	if err != nil {
 		log.Panic(err)
 	}
-}
+}*/
 
 // FindTransaction finds a transaction by its ID
-func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
+/*func (bc *Chain) FindTransaction(ID []byte) (Transaction, error) {
 	bci := bc.Iterator()
 
 	for {
@@ -153,17 +145,17 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 	}
 
 	return Transaction{}, errors.New("Transaction is not found")
-}
-
+}*/
+/*
 // Iterator returns a BlockchainIterat
-func (bc *Blockchain) Iterator() *BlockchainIterator {
+func (bc *Chain) Iterator() *BlockchainIterator {
 	bci := &BlockchainIterator{bc.currrentBlockHash, bc.db}
 
 	return bci
-}
+}*/
 
 // GetBestHeight returns the height of the latest block
-func (bc *Blockchain) GetBestHeight() int {
+func (bc *Chain) GetBestHeight() uint64 {
 	var lastBlock Block
 
 	err := bc.db.View(func(tx *bolt.Tx) error {
@@ -182,7 +174,7 @@ func (bc *Blockchain) GetBestHeight() int {
 }
 
 // GetBlock finds a block by its hash and returns it
-func (bc *Blockchain) GetBlock(blockHash []byte) (Block, error) {
+func (bc *Chain) GetBlock(blockHash []byte) (Block, error) {
 	var block Block
 
 	err := bc.db.View(func(tx *bolt.Tx) error {
@@ -205,8 +197,8 @@ func (bc *Blockchain) GetBlock(blockHash []byte) (Block, error) {
 	return block, nil
 }
 
-// GetBlockHashes returns a list of hashes of all the blocks in the chain
-func (bc *Blockchain) GetBlockHashes() [][]byte {
+/*// GetBlockHashes returns a list of hashes of all the blocks in the chain
+func (bc *Chain) GetBlockHashes() [][]byte {
 	var blocks [][]byte
 	bci := bc.Iterator()
 
@@ -222,9 +214,9 @@ func (bc *Blockchain) GetBlockHashes() [][]byte {
 
 	return blocks
 }
-
-// MineBlock mines a new block with the provided transactions
-func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
+*/
+/*// MineBlock mines a new block with the provided transactions
+func (bc *Chain) DelegateBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
 
@@ -250,7 +242,7 @@ func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
 		log.Panic(err)
 	}
 
-	newBlock := NewBlock( lastHeight+1, transactions, lastHash, []byte(""), []byte(""))
+	newBlock := NewBlock( header , lastHeight+1, transactions, lastHash, []byte(""), []byte(""))
 
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
@@ -274,15 +266,15 @@ func (bc *Blockchain) DelegateBlock(transactions []*Transaction) *Block {
 
 	return newBlock
 }
-
+*/
 // SignTransaction signs inputs of a Transaction
-func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+func (bc *Chain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
 	prevTXs := make(map[string]Transaction)
 	tx.Sign(privKey, prevTXs)
 }
 
 // VerifyTransaction verifies transaction input signatures
-func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
+func (bc *Chain) VerifyTransaction(tx *Transaction) bool {
 	if tx.IsCoinbase() {
 		return true
 	}

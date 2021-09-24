@@ -1,4 +1,4 @@
-package blockchain
+package chain
 
 import (
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
@@ -8,7 +8,3 @@ import (
 type TXInput struct {
 	event *wrappers.BridgeOracleRequest
 }
-
-
-
-

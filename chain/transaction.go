@@ -1,4 +1,4 @@
-package blockchain
+package chain
 
 import (
 	"bytes"
@@ -9,19 +9,18 @@ import (
 	"strings"
 )
 
-const subsidy = 10
 type TxType int
 
 const (
-	ChangeEpochTx TxType = iota	// ChangeEpoch 0
-	EventTx						// Events     []*wrappers.BridgeOracleRequest 1
-	UptimeTx					// UptimeList uptime.UpList 2
+	ChangeEpochTx TxType = iota // ChangeEpoch 0
+	EventTx       TxType = 1    // Events     []*wrappers.BridgeOracleRequest 1
+	UptimeTx      TxType = 2    // UptimeList uptime.UpList 2
 )
 
 // Transaction represents a EYWA transaction = EYWA bridge cross-chain action abstraction
 type Transaction struct {
-	ID         []byte
-	Type TxType
+	ID      []byte
+	Type    TxType
 	Payload []byte
 }
 
@@ -83,7 +82,7 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) *Transaction {
-	tx := Transaction{epochId, 0, nil}
+	tx := Transaction{epochId, ChangeEpochTx, nil}
 	return &tx
 }
 

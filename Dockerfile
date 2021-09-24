@@ -10,6 +10,8 @@ ADD     ./external/eth-contracts/wrappers ./external/eth-contracts/wrappers
 RUN go mod download
 
 COPY    ./cmd ./cmd
+COPY    chain ./blockchain
+COPY    consensus ./consensus
 COPY    ./common ./common
 COPY    ./config ./config
 COPY    ./forward ./forward

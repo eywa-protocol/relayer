@@ -6,16 +6,15 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/store/model"
 )
 
-
 type ServiceInterface interface {
 	GetCurrentBlock() model.Block
 }
 
-type  blockchainService struct {
+type blockchainService struct {
 	p leveldb.Repository
 	n sqldb.Repository
 }
 
 func (b *blockchainService) GetCurrentBlock() *model.Block {
-   b.getTx()
+	b.getTx()
 }

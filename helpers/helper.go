@@ -61,10 +61,6 @@ func FilterOracleRequestEvent(client ethclient.Client, start uint64, contractAdd
 	return
 }
 
-
-
-
-
 func WaitTransaction(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error

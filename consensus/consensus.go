@@ -1,4 +1,4 @@
-package protocol
+package consensus
 
 import (
 	"context"
@@ -14,8 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/model"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"
@@ -33,7 +33,7 @@ var Delayed = true
 
 const BufferLen = 500
 
-type Libp2pPubSub struct {
+type Protocol struct {
 	pubsub       *pubsub.PubSub       // PubSub of each individual node
 	subscription *pubsub.Subscription // Subscription of individual node
 	topic        string               // PubSub topic
@@ -42,16 +42,16 @@ type Libp2pPubSub struct {
 	group        []int
 }
 
-func (c *Libp2pPubSub) BroadcastMsg(msg model.Message) {
+func (c *Protocol) BroadcastMsg(msg model.Message) {
 	panic("not implemented")
 }
 
-func (c *Libp2pPubSub) ListPeersByTopic(topic string) []peer.ID {
+func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
 	return c.pubsub.ListPeers(topic)
 }
 
 // Broadcast Uses PubSub publish to broadcast messages to other peers
-func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
+func (c *Protocol) Broadcast(msgBytes []byte) {
 	// Broadcasting to a topic in PubSub
 	go func(msgBytes []byte, topic string, pubsub *pubsub.PubSub) {
 		// Send the message with a delay in order to prevent message loss in libp2p
@@ -67,18 +67,18 @@ func (c *Libp2pPubSub) Broadcast(msgBytes []byte) {
 	}(msgBytes, c.topic, c.pubsub)
 }
 
-func (c *Libp2pPubSub) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
+func (c *Protocol) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
 	return c.pubsub.Join(topicMsg)
 }
 
 // Send uses Broadcast for sending messages
-func (c *Libp2pPubSub) Send(msgBytes []byte, id int) {
+func (c *Protocol) Send(msgBytes []byte, id int) {
 	// In libp2p implementation, we also broadcast instead of sending directly. So Acks will be broadcast in this case.
 	c.Broadcast(msgBytes)
 }
 
 // Receive gets message from PubSub in a blocking way
-func (c *Libp2pPubSub) Receive() *[]byte {
+func (c *Protocol) Receive() *[]byte {
 	// Check buffer for existing messages
 	if !c.victim {
 		select {
@@ -128,12 +128,12 @@ func (c *Libp2pPubSub) Receive() *[]byte {
 	return &msgBytes
 }
 
-func (c *Libp2pPubSub) Disconnect() {
+func (c *Protocol) Disconnect() {
 	c.subscription.Cancel()
 	c.pubsub.UnregisterTopicValidator(c.topic)
 }
 
-func (c *Libp2pPubSub) Reconnect(topic string) {
+func (c *Protocol) Reconnect(topic string) {
 	var err error
 	if topic != "" {
 		c.topic = topic
@@ -147,7 +147,7 @@ func (c *Libp2pPubSub) Reconnect(topic string) {
 }
 
 // Cancel unsubscribes a node from pubsub
-func (c *Libp2pPubSub) Cancel(cancelTime int, reconnectTime int) {
+func (c *Protocol) Cancel(cancelTime int, reconnectTime int) {
 	go func() {
 		time.Sleep(time.Duration(cancelTime) * time.Millisecond)
 		fmt.Println("	CANCELING	")
@@ -159,7 +159,7 @@ func (c *Libp2pPubSub) Cancel(cancelTime int, reconnectTime int) {
 }
 
 // createPeer creates a peer on localhost and configures it to use libp2p.
-func (c *Libp2pPubSub) CreatePeer(nodeId int, port int) *core.Host {
+func (c *Protocol) CreatePeer(nodeId int, port int) *core.Host {
 	// Creating a node
 	h, err := createHost(port)
 	if err != nil {
@@ -172,7 +172,7 @@ func (c *Libp2pPubSub) CreatePeer(nodeId int, port int) *core.Host {
 }
 
 // CreatePeerWithIp creates a peer on specified ip and port and configures it to use libp2p.
-func (c *Libp2pPubSub) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host {
+func (c *Protocol) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host {
 	// Creating a node
 	h, err := createHostWithIp(nodeId, ip, port)
 	if err != nil {
@@ -185,7 +185,7 @@ func (c *Libp2pPubSub) CreatePeerWithIp(nodeId int, ip string, port int) *core.H
 }
 
 // initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Libp2pPubSub) InitializePubSub(h core.Host) {
+func (c *Protocol) InitializePubSub(h core.Host) {
 	var err error
 	// Creating pubsub
 	// every peer has its own PubSub
@@ -206,7 +206,7 @@ func (c *Libp2pPubSub) InitializePubSub(h core.Host) {
 }
 
 // initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Libp2pPubSub) InitializePubSubWithTopic(h core.Host, topic string) {
+func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 	var err error
 	// Creating pubsub
 	// every peer has its own PubSub
@@ -261,7 +261,7 @@ func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic stri
 }
 */
 // InitializeVictim initializes buffer for keeping messages when a node is attacked by adversary.
-func (c *Libp2pPubSub) InitializeVictim(makeBuffer bool) {
+func (c *Protocol) InitializeVictim(makeBuffer bool) {
 	// victim is always false in initialization
 	c.victim = false
 	if makeBuffer {
@@ -272,13 +272,13 @@ func (c *Libp2pPubSub) InitializeVictim(makeBuffer bool) {
 }
 
 // AttackVictim adds a node to the set of indefinite-delayed nodes.
-func (c *Libp2pPubSub) AttackVictim() {
+func (c *Protocol) AttackVictim() {
 	c.victim = true
 	c.makeVictimNotGossip()
 }
 
 // ReleaseVictim removes the node from set of delayed nodes.
-func (c *Libp2pPubSub) ReleaseVictim() {
+func (c *Protocol) ReleaseVictim() {
 	c.Disconnect()
 	c.victim = false
 	c.Reconnect("")
@@ -291,16 +291,16 @@ func (c *Libp2pPubSub) ReleaseVictim() {
 }
 
 // JoinGroup adds nodes within the same groups to the node's group variable.
-func (c *Libp2pPubSub) JoinGroup(group []int) {
+func (c *Protocol) JoinGroup(group []int) {
 	c.group = group
 }
 
-func (c *Libp2pPubSub) SetTopic(topic string) {
+func (c *Protocol) SetTopic(topic string) {
 	c.topic = topic
 }
 
 // makeVictimNotGossip prevents victim from participating in gossip protocol
-func (c *Libp2pPubSub) makeVictimNotGossip() {
+func (c *Protocol) makeVictimNotGossip() {
 	// Registering a message validator function. This function will process every received message by pubsub and based
 	// on return value will forward it to other nodes. Returning false will prevent the peer from forwarding the message
 	err := c.pubsub.RegisterTopicValidator(c.topic, func(ctx context.Context, pid peer.ID, msg *pubsub.Message) bool {
@@ -496,7 +496,7 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 	return
 }
 
-func (c *Libp2pPubSub) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
+func (c *Protocol) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
 
 	fmt.Print("START BLS NODE\n")
 	wg := &sync.WaitGroup{}
@@ -517,11 +517,6 @@ func runBLSNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 	}
 }
 
-func runNode(node *model.Node, stop int, wg *sync.WaitGroup) {
-	defer wg.Done()
-	node.WaitForMsg(stop)
-}
-
-func (c *Libp2pPubSub) UnregisterTopicValidator() {
+func (c *Protocol) UnregisterTopicValidator() {
 	c.pubsub.UnregisterTopicValidator(c.topic)
 }

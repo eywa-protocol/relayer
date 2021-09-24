@@ -1,15 +1,9 @@
 package blockchainA
 
-
-
-
-
-
-func  (b *blockchainService) getTx()  {
+func (b *blockchainService) getTx() {
 	b.p.Save()
 }
 
-
-func   (b *blockchainService)  getBlock()  {
+func (b *blockchainService) getBlock() {
 	b.n.Save()
 }

@@ -29,7 +29,7 @@ custom_bls_test:
 	 go test -v ./test/ -run TestOneStepBLS
 
 test_local_bridge:
-	go test -v ./test/networks -run Test_Local_SendRequestV2
+	go test -v ./test/ -run Test_Local_SendRequestV2
 
 wrappers:
 	make -C external/eth-contracts/ eth-local-migrate

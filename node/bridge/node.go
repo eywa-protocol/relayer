@@ -12,13 +12,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
+	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/schedule"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
-	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/modelBLS"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -31,9 +31,9 @@ import (
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
+	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
-	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/protocol/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -50,7 +50,7 @@ type Node struct {
 	cMx            *sync.Mutex
 	Clients        map[string]Client
 	nonceMx        *sync.Mutex
-	P2PPubSub      *bls_consensus.Libp2pPubSub
+	P2PPubSub      *bls_consensus.Protocol
 	signerKey      *ecdsa.PrivateKey
 	PrivKey        kyber.Scalar
 	uptimeRegistry *flow.MeterRegistry
@@ -435,8 +435,8 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	return
 }
 
-func (n Node) InitializeCommonPubSub() (p2pPubSub *bls_consensus.Libp2pPubSub) {
-	return new(bls_consensus.Libp2pPubSub)
+func (n Node) InitializeCommonPubSub() (p2pPubSub *bls_consensus.Protocol) {
+	return new(bls_consensus.Protocol)
 }
 
 // DiscoverByRendezvous	Announce your presence in network using a rendezvous point

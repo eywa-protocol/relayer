@@ -20,5 +20,5 @@ func TestLeaderNode(t *testing.T) {
 	}
 	ret, err := LeaderNode("HelloWorld", testPeers)
 	require.Nil(t, err)
-	require.Equal(t,ret, testPeers[0])
+	require.Equal(t, ret, testPeers[0])
 }

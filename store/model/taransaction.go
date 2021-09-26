@@ -4,7 +4,9 @@ type Transaction struct {
 
 }
 
-func (t *Transaction) GetId() bool {
-	return true
+// NewTransaction returns new transaction,
+func NewTransaction() *Transaction {
+   return &Transaction{}
 }
+
 

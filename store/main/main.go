@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/store"
@@ -24,12 +25,14 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- store.ChainHeadEvent
 
 
 func main()  {
-	logrus.SetLevel(logrus.Level(5))
+	logrus.SetLevel(logrus.Level(4))
 	// create mock blockchain
 	bc := &testBlockChain{}
 	// create tx pool (event pool). Subscribe on event ChainHeadEvent. Started eventLoop.
 	txPool := store.NewTxPool(bc)
 	defer txPool.Stop()
+
+
 	// emulate event OracleRequest
 	checkClientTimer := time.NewTicker(10 * time.Second)
 	go func(ch chan <-store.NewEventSourceChain)  {
@@ -39,10 +42,16 @@ func main()  {
 			case <-checkClientTimer.C:
 				logrus.Info("Sended mock OracleRequest...")
 				ch <- store.NewEventSourceChain{
-					EventSourceChain: &wrappers.BridgeOracleRequest{},
+					EventSourceChain: &wrappers.BridgeOracleRequest{
+						RequestType: "setRequest",
+						Bridge: common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2"),
+					},
 				}
 				ch <- store.NewEventSourceChain{
-					EventSourceChain: &wrappers.BridgeOracleRequest{},
+					EventSourceChain: &wrappers.BridgeOracleRequest{
+						RequestType: "setRequest",
+						Bridge: common.HexToAddress("0x0c760E9A85d2E957Dd1E189516b6658CfEcD3985"),
+					},
 				}
 
 			}

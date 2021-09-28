@@ -1,4 +1,4 @@
-package blockchainA
+package store
 
 import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/store/adapters/leveldb"
@@ -16,5 +16,6 @@ type blockchainService struct {
 }
 
 func (b *blockchainService) GetCurrentBlock() *model.Block {
-	b.getTx()
+   b.getTx()
+   return nil
 }

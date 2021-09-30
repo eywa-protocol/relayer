@@ -61,10 +61,11 @@ func NewTxPool(chain blockChain) *TxPool {
 		nonce:          1,
 	}
 
-	pool.wg.Add(1)
-	go pool.loop()
 	// Subscribe events from blockchain
 	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+
+	pool.wg.Add(1)
+	go pool.loop()
 
 	return pool
 }

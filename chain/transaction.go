@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -78,7 +80,7 @@ func (tx *Transaction) Hash() []byte {
 	txCopy := *tx
 
 	hash = sha256.Sum256(txCopy.Serialize())
-
+	logrus.Print("//////////", hash)
 	return hash[:]
 }
 
@@ -109,13 +111,19 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(epochId []byte) *Transaction {
-	tx := Transaction{
+func NewCoinbaseTX(epochId []byte) (tx *Transaction) {
+	topics := []common.Hash{}
+	topics = append(topics, common.BytesToHash(epochId))
+	tx = &Transaction{
 		big.NewInt(0),
-		&wrappers.BridgeOracleRequest{},
+		&wrappers.BridgeOracleRequest{
+			Raw: types.Log{
+				Topics: topics,
+			},
+		},
 		uint64(0),
 	}
-	return &tx
+	return
 }
 
 // DeserializeTransaction deserializes a transaction

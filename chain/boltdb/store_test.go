@@ -23,6 +23,7 @@ func TestStoreBoltOrder(t *testing.T) {
 	defer os.RemoveAll(tmp)
 	store, err := NewBoltStore(tmp, nil)
 	require.NoError(t, err)
+	t.Log(genesisEpoch.Serialize())
 	t.Log(genesisEpoch)
 	t.Log(header)
 	t.Log(coinbaseTransaction)

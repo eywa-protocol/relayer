@@ -10,16 +10,10 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 type TxType int
-
-type ITransaction interface {
-	SenderAddress() common.Address
-	Nonce() uint64
-	ChainId() *big.Int
-	Serialize() []byte
-}
 
 const (
 	ChangeEpochTx TxType = iota // ChangeEpoch 0
@@ -29,24 +23,39 @@ const (
 
 // Transaction represents a EYWA transaction = EYWA bridge cross-chain action abstraction
 type Transaction struct {
-	ID      []byte
-	Type    TxType
-	Payload []byte
+	chainId    *big.Int
+	OriginData *wrappers.BridgeOracleRequest
+	nonce      uint64
+}
+
+// NewTransaction returns new transaction,
+func NewTransaction(ev *wrappers.BridgeOracleRequest, _nonce uint64, chId *big.Int) *Transaction {
+	return &Transaction{
+		OriginData: ev,
+		nonce:      _nonce,
+		chainId:    chId,
+	}
 }
 
 func (tx *Transaction) SenderAddress() common.Address {
-	return common.HexToAddress("0x0")
+	return tx.OriginData.Bridge
 }
 func (tx *Transaction) Nonce() uint64 {
-	return 0
+	return tx.nonce
 }
 func (tx *Transaction) ChainId() *big.Int {
-	return big.NewInt(0)
+	return tx.chainId
 }
+
+// Transactions is a Transactions slice type for basic sorting.
+type Transactions []*Transaction
+
+// Len returns the length of s.
+func (s Transactions) Len() int { return len(s) }
 
 // IsCoinbase checks whether the transaction is coinbase
 func (tx Transaction) IsCoinbase() bool {
-	return string(tx.ID) == "0"
+	return tx.nonce == uint64(0) && tx.chainId.Cmp(big.NewInt(0)) == 0
 }
 
 // Serialize returns a serialized Transaction
@@ -67,7 +76,6 @@ func (tx *Transaction) Hash() []byte {
 	var hash [32]byte
 
 	txCopy := *tx
-	txCopy.ID = []byte{}
 
 	hash = sha256.Sum256(txCopy.Serialize())
 
@@ -102,7 +110,11 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) *Transaction {
-	tx := Transaction{epochId, ChangeEpochTx, nil}
+	tx := Transaction{
+		big.NewInt(0),
+		&wrappers.BridgeOracleRequest{},
+		uint64(0),
+	}
 	return &tx
 }
 

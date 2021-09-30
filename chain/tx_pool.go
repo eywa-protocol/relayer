@@ -308,7 +308,7 @@ func (pool *TxPool) PendingByChainId() (map[uint64]Transactions, error) {
 		tmp := Transactions{}
 		for _, tx := range txsb {
 			if k == tx.ChainId().Uint64() {
-				tmp = append(tmp, tx.(*CrossChainTransaction))
+				tmp = append(tmp, tx.(*Transaction))
 			}
 		}
 		sortedByChainIdAndNonce[k] = tmp

@@ -49,9 +49,11 @@ func main()  {
 			logrus.Debugln("Ended...\n", spew.Sdump(pending))
 			logrus.Debugln("================================================================")
 			pendingByChainId, _ := txPool.PendingByChainId()
-			for k, v := range pendingByChainId {
-				for _, vv := range v {
-					logrus.Info(vv.ChainId(), vv.Nonce())
+			for k, txs := range pendingByChainId {
+				logrus.Info("Key: ", k)
+				for _, tx := range txs {
+					adr, _ := tx.SenderAddress()
+					logrus.Infof("ChainId: %d Nonce: %d Sender: %s",tx.ChainId(), tx.Nonce(), adr.String())
 				}
 			}
 			logrus.Debugln("Ended 2...\n", spew.Sdump(pendingByChainId))
@@ -63,6 +65,20 @@ func main()  {
 				return
 			case <-checkClientTimer.C:
 				logrus.Info("Sended mock OracleRequest...")
+				ch <- store.NewEventSourceChain{
+					EventSourceChain: &wrappers.BridgeOracleRequest{
+						RequestType: "setRequest",
+						Bridge: common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2"),
+						Chainid: big.NewInt(4),
+					},
+				}
+				ch <- store.NewEventSourceChain{
+					EventSourceChain: &wrappers.BridgeOracleRequest{
+						RequestType: "setRequest",
+						Bridge: common.HexToAddress("0x0c760E9A85d2E957Dd1E189516b6658CfEcD3985"),
+						Chainid: big.NewInt(4),
+					},
+				}
 				ch <- store.NewEventSourceChain{
 					EventSourceChain: &wrappers.BridgeOracleRequest{
 						RequestType: "setRequest",

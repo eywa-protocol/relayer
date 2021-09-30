@@ -11,16 +11,28 @@ import (
 
 // Block represents a block in the blockchain
 type Block struct {
-	Header       Header
 	Number       uint64
 	Hash         common.Hash
-	Transactions []*Transaction
+	Transactions []Transaction
 	Signature    []byte
 	Leader       []byte
+	ChanId       int
+	Header       Header
+}
+
+//type Block struct {
+//	header Header
+//	bm      BaseModel
+//	tx        []Transaction
+//	chanId int
+//}
+
+type BaseModel struct {
+	id int
 }
 
 // NewGenesisBlock creates and returns genesis Block
-func NewGenesisBlock(header Header, txs []*Transaction) *Block {
+func NewGenesisBlock(header Header, txs []Transaction) *Block {
 	return NewBlock(
 		header,
 		0,
@@ -30,7 +42,7 @@ func NewGenesisBlock(header Header, txs []*Transaction) *Block {
 }
 
 // NewBlock creates and returns Block
-func NewBlock(header Header, number uint64, transactions []*Transaction, sig []byte) *Block {
+func NewBlock(header Header, number uint64, transactions []Transaction, sig []byte) *Block {
 	block := &Block{}
 	block.Header = header
 	block.Number = number
@@ -93,4 +105,8 @@ func (b *Block) Equal(b2 *Block) bool {
 	return bytes.Equal(b.Signature, b2.Signature) &&
 		b.Header.Fields.Epoch.Number == b2.Header.Fields.Epoch.Number &&
 		bytes.Equal(b.Signature, b2.Signature)
+}
+
+func CopyHeader(header Header) *Header {
+	return &header
 }

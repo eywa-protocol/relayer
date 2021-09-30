@@ -14,8 +14,8 @@ type Epoch struct {
 func CreateGenesisEpoch() *Epoch {
 	return &Epoch{
 		Number: 0,
-		Sign:   nil,
-		Leader: nil,
+		Sign:   []byte("genesis gignature"),
+		Leader: []byte("leader bytes"),
 	}
 }
 

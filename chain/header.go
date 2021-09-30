@@ -29,13 +29,9 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // NewHeader creates a new header object.
 func NewHeader(e Epoch) *Header {
 	return &Header{headerFields{
-		Number: new(big.Int),
-		Time:   new(big.Int),
-		Epoch: &Epoch{
-			Number: 0,
-			Sign:   nil,
-			Leader: nil,
-		},
+		Number: big.NewInt(1),
+		Time:   big.NewInt(11111111),
+		Epoch:  &e,
 	}}
 }
 

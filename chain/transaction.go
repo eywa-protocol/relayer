@@ -6,10 +6,20 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"log"
+	"math/big"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type TxType int
+
+type ITransaction interface {
+	SenderAddress() common.Address
+	Nonce() uint64
+	ChainId() *big.Int
+	Serialize() []byte
+}
 
 const (
 	ChangeEpochTx TxType = iota // ChangeEpoch 0
@@ -22,6 +32,16 @@ type Transaction struct {
 	ID      []byte
 	Type    TxType
 	Payload []byte
+}
+
+func (tx *Transaction) SenderAddress() common.Address {
+	return common.HexToAddress("0x0")
+}
+func (tx *Transaction) Nonce() uint64 {
+	return 0
+}
+func (tx *Transaction) ChainId() *big.Int {
+	return big.NewInt(0)
 }
 
 // IsCoinbase checks whether the transaction is coinbase

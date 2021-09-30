@@ -3,6 +3,7 @@ package store
 import (
 	"container/heap"
 	_ "math/big"
+	"sort"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -84,6 +85,12 @@ func (l *txList) Len() int {
 func (l *txList) Empty() bool {
 	return l.Len() == 0
 }
+// Flatten creates a nonce-sorted slice of transactions based on the loosely
+// sorted internal representation. The result of the sorting is cached in case
+// it's requested again before any modifications are made to the contents.
+func (l *txList) Flatten() model.PoolTransactions {
+	return l.txs.Flatten()
+}
 
 
 
@@ -146,4 +153,21 @@ func (m *txSortedMap) Ready(start uint64) model.PoolTransactions {
 // Len returns the length of the transaction map.
 func (m *txSortedMap) Len() int {
 	return len(m.items)
+}
+// Flatten creates a nonce-sorted slice of transactions based on the loosely
+// sorted internal representation. The result of the sorting is cached in case
+// it's requested again before any modifications are made to the contents.
+func (m *txSortedMap) Flatten() model.PoolTransactions {
+	// If the sorting was not cached yet, create and cache it
+	if m.cache == nil {
+		m.cache = make(model.PoolTransactions, 0, len(m.items))
+		for _, tx := range m.items {
+			m.cache = append(m.cache, tx)
+		}
+		sort.Sort(model.PoolTxByNonce(m.cache))
+	}
+	// Copy the cache to prevent accidental modifications
+	txs := make(model.PoolTransactions, len(m.cache))
+	copy(txs, m.cache)
+	return txs
 }

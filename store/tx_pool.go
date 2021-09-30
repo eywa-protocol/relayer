@@ -116,10 +116,10 @@ func (pool *TxPool) AddEvent(ev *wrappers.BridgeOracleRequest) {
    // send event to another for sync pool
    // check current block for db == currentBlock subscribe
    // put to store
-   tx := model.NewTransaction(ev, pool.nonce)
+   tx := model.NewTransaction(ev, pool.nonce, ev.Chainid)
    poolTxs := model.PoolTransactions{tx}
    pool.addEvLocked(poolTxs)
-   //NOTE: At this moment, nonce shared between all addresses
+   //NOTE: At this moment, nonce shared between all addresses and source chain
    pool.nonce++
 }
 
@@ -263,4 +263,46 @@ func (pool *TxPool) promoteTx(addr common.Address, tx model.PoolTransaction) boo
    //pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
    return true
+}
+// Pending retrieves all currently executable transactions, grouped by origin
+// account and sorted by nonce. The returned transaction set is a copy and can be
+// freely modified by calling code.
+func (pool *TxPool) Pending() (map[common.Address]model.PoolTransactions, error) {
+   pool.mu.Lock()
+   defer pool.mu.Unlock()
+
+   pending := make(map[common.Address]model.PoolTransactions)
+   for addr, list := range pool.pending {
+      pending[addr] = list.Flatten()
+   }
+   return pending, nil
+}
+
+// PendingByChainId retrieves all currently executable transactions, grouped by chainId
+// destination and sorted by nonce. The returned transaction set is a copy and can be
+// freely modified by calling code.
+func (pool *TxPool) PendingByChainId() (map[uint64]model.Transactions, error) {
+      pending, _ := pool.Pending()
+      sortedByChainIdAndNonce := make(map[uint64]model.Transactions)
+      var txsb model.PoolTransactions
+      for _, batch := range pending {
+         txsb = append(txsb, batch...)
+      }
+      key := make(map[uint64]bool)
+      for _, tx := range txsb {
+         if key[tx.ChainId().Uint64()] == false {
+            key[tx.ChainId().Uint64()] = true
+         }
+      }
+      for k, _ := range key {
+         tmp := model.Transactions{}
+         for _, tx := range txsb {
+            if k == tx.ChainId().Uint64(){
+               tmp = append(tmp, tx.(*model.Transaction))
+            }
+         }
+         sortedByChainIdAndNonce[k] = tmp
+      }
+
+      return sortedByChainIdAndNonce, nil
 }

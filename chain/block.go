@@ -35,7 +35,7 @@ type BaseModel struct {
 func NewGenesisBlock(header Header, txs []Transaction) *Block {
 	return NewBlock(
 		header,
-		0,
+		1,
 		txs,
 		[]byte("SIGNATURE"),
 	)

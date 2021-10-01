@@ -1,10 +1,10 @@
 package chain
 
 import (
+	"io"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"io"
-	"math/big"
 )
 
 // Header is the V3 block header.
@@ -29,18 +29,18 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // NewHeader creates a new header object.
 func NewHeader(e Epoch) *Header {
 	return &Header{headerFields{
-		Number: big.NewInt(1),
-		Time:   big.NewInt(11111111),
-		Epoch:  &e,
+		Number: 1,
+		Time:   1111111111,
+		Epoch:  e,
 	}}
 }
 
 type headerFields struct {
 	ParentHash          common.Hash `json:"parentHash"       gencodec:"required"`
 	Root                common.Hash `json:"stateRoot"        gencodec:"required"`
-	Number              *big.Int    `json:"number"           gencodec:"required"`
-	Time                *big.Int    `json:"timestamp"        gencodec:"required"`
-	Epoch               *Epoch      `json:"epoch"            gencodec:"required"`
+	Number              uint64      `json:"number"           gencodec:"required"`
+	Time                uint64      `json:"timestamp"        gencodec:"required"`
+	Epoch               Epoch       `json:"epoch"            gencodec:"required"`
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
 	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
 }

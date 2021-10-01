@@ -18,7 +18,7 @@ var (
 )
 
 func TestStoreBoltOrder(t *testing.T) {
-
+	require.NotNil(t, coinbaseTransaction)
 	require.NoError(t, err)
 	defer os.RemoveAll(tmp)
 	store, err := NewBoltStore(tmp, nil)
@@ -26,10 +26,12 @@ func TestStoreBoltOrder(t *testing.T) {
 	t.Log(genesisEpoch.Serialize())
 	t.Log(genesisEpoch)
 	t.Log(header)
-	t.Log(coinbaseTransaction)
+
+	t.Log(coinbaseTransaction.OriginData)
 	genesisBlock := chain.NewGenesisBlock(*header, []chain.Transaction{*coinbaseTransaction})
 	t.Log(common.BytesToHash(genesisBlock.HashTransactions()))
 	b2 := chain.NewBlock(*header, 2, []chain.Transaction{*coinbaseTransaction}, []byte("sig2"))
+	require.Equal(t, 0, store.Len())
 	require.NoError(t, store.Put(genesisBlock))
 	time.Sleep(10 * time.Millisecond)
 	require.Equal(t, 1, store.Len())

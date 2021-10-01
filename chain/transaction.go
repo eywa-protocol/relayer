@@ -25,13 +25,13 @@ const (
 
 // Transaction represents a EYWA transaction = EYWA bridge cross-chain action abstraction
 type Transaction struct {
-	chainId    *big.Int
-	OriginData *wrappers.BridgeOracleRequest
+	chainId    uint64
+	OriginData wrappers.BridgeOracleRequest
 	nonce      uint64
 }
 
 // NewTransaction returns new transaction,
-func NewTransaction(ev *wrappers.BridgeOracleRequest, _nonce uint64, chId *big.Int) *Transaction {
+func NewTransaction(ev wrappers.BridgeOracleRequest, _nonce uint64, chId uint64) *Transaction {
 	return &Transaction{
 		OriginData: ev,
 		nonce:      _nonce,
@@ -45,7 +45,7 @@ func (tx *Transaction) SenderAddress() common.Address {
 func (tx *Transaction) Nonce() uint64 {
 	return tx.nonce
 }
-func (tx *Transaction) ChainId() *big.Int {
+func (tx *Transaction) ChainId() uint64 {
 	return tx.chainId
 }
 
@@ -57,7 +57,7 @@ func (s Transactions) Len() int { return len(s) }
 
 // IsCoinbase checks whether the transaction is coinbase
 func (tx Transaction) IsCoinbase() bool {
-	return tx.nonce == uint64(0) && tx.chainId.Cmp(big.NewInt(0)) == 0
+	return tx.nonce == uint64(0) && tx.chainId == 0
 }
 
 // Serialize returns a serialized Transaction
@@ -112,17 +112,23 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) (tx *Transaction) {
-	topics := []common.Hash{}
-	topics = append(topics, common.BytesToHash(epochId))
-	tx = &Transaction{
-		big.NewInt(0),
-		&wrappers.BridgeOracleRequest{
+	//topics := []common.Hash{}
+	//topics = append(topics, common.BytesToHash(epochId))
+	tx = NewTransaction(
+		wrappers.BridgeOracleRequest{
+			Chainid:     big.NewInt(999),
+			RequestType: "GENESIS",
+			Bridge:      common.Address{},
+
 			Raw: types.Log{
-				Topics: topics,
-			},
-		},
-		uint64(0),
-	}
+				Address: common.Address{},
+				Topics:  []common.Hash{},
+				Data:    epochId,
+				TxHash:  common.BytesToHash(epochId),
+			}},
+		0,
+		0,
+	)
 	return
 }
 

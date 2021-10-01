@@ -128,7 +128,7 @@ func (pool *TxPool) AddEvent(ev *wrappers.BridgeOracleRequest) {
 	// send event to another for sync pool
 	// check current block for db == currentBlock subscribe
 	// put to store
-	tx := NewTransaction(ev, pool.nonce, ev.Chainid)
+	tx := NewTransaction(*ev, pool.nonce, ev.Chainid.Uint64())
 	poolTxs := PoolTransactions{tx}
 	pool.addEvLocked(poolTxs)
 	//NOTE: At this moment, nonce shared between all addresses and source chain
@@ -300,14 +300,14 @@ func (pool *TxPool) PendingByChainId() (map[uint64]Transactions, error) {
 	}
 	key := make(map[uint64]bool)
 	for _, tx := range txsb {
-		if key[tx.ChainId().Uint64()] == false {
-			key[tx.ChainId().Uint64()] = true
+		if key[tx.ChainId()] == false {
+			key[tx.ChainId()] = true
 		}
 	}
 	for k, _ := range key {
 		tmp := Transactions{}
 		for _, tx := range txsb {
-			if k == tx.ChainId().Uint64() {
+			if k == tx.ChainId() {
 				tmp = append(tmp, tx.(*Transaction))
 			}
 		}

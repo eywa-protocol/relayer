@@ -1,13 +1,9 @@
 package modelBLS
 
 import (
-	"strings"
-
 	"github.com/libp2p/go-libp2p-core/peer"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"go.dedis.ch/kyber/v3/sign"
-	"go.dedis.ch/kyber/v3/util/encoding"
 )
 
 // Node is the struct used for keeping everything related to a node in TLC.
@@ -20,13 +16,12 @@ type Node struct {
 	Wits              int                    // Number of witnesses
 	Comm              CommunicationInterface // interface for communicating with other nodes
 	ConvertMsg        MessageInterface
-	CurrentMsg        MessageWithSig   // Message which the node is waiting for acks
-	History           []MessageWithSig // History of received messages by a node
-	PublicKeys        []kyber.Point    // Public keys of all nodes
+	CurrentMsg        MessageWithSig        // Message which the node is waiting for acks
+	History           []MessageWithSig      // History of received messages by a node
+	PublicKeys        []common.BlsPublicKey // Public keys of all nodes
 	Signatures        [][]byte
 	SigMask           *sign.Mask
-	PrivateKey        kyber.Scalar // Private key of the node
-	Suite             *pairing.SuiteBn256
+	PrivateKey        common.BlsPrivateKey // Private key of the node
 	Participants      []peer.ID
 	CurrentRendezvous string
 	Leader            peer.ID
@@ -41,12 +36,6 @@ type CommunicationInterface interface {
 	Reconnect(string) // Reconnect node
 }
 
-func (n Node) AddPubkeyToNodeKeys(blsPubKey []byte) {
-	suite := pairing.NewSuiteBn256()
-	blsPKey := string(blsPubKey[:])
-	p, err := encoding.ReadHexPoint(suite, strings.NewReader(blsPKey))
-	if err != nil {
-		panic(err)
-	}
-	n.PublicKeys = append(n.PublicKeys, p)
+func (n Node) AddPubkeyToNodeKeys(blsPubKey common.BlsPublicKey) {
+	n.PublicKeys = append(n.PublicKeys, blsPubKey)
 }

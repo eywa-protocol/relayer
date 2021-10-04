@@ -10,13 +10,14 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-datastore v0.4.5
+	github.com/keep-network/keep-core v1.3.1
 	github.com/libp2p/go-flow-metrics v0.0.3
 	github.com/libp2p/go-libp2p v0.14.2
 	github.com/libp2p/go-libp2p-core v0.8.5
@@ -34,7 +35,6 @@ require (
 	github.com/multiformats/go-multihash v0.0.15
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	go.etcd.io/bbolt v1.3.3

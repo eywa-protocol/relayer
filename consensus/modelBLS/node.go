@@ -1,9 +1,10 @@
 package modelBLS
 
 import (
+	"math/big"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	"go.dedis.ch/kyber/v3/sign"
 )
 
 // Node is the struct used for keeping everything related to a node in TLC.
@@ -19,8 +20,8 @@ type Node struct {
 	CurrentMsg        MessageWithSig        // Message which the node is waiting for acks
 	History           []MessageWithSig      // History of received messages by a node
 	PublicKeys        []common.BlsPublicKey // Public keys of all nodes
-	Signatures        [][]byte
-	SigMask           *sign.Mask
+	Signatures        []common.BlsSignature
+	SigMask           big.Int
 	PrivateKey        common.BlsPrivateKey // Private key of the node
 	Participants      []peer.ID
 	CurrentRendezvous string
@@ -34,8 +35,4 @@ type CommunicationInterface interface {
 	Receive() *[]byte // Blocking receive
 	Disconnect()      // Disconnect node
 	Reconnect(string) // Reconnect node
-}
-
-func (n Node) AddPubkeyToNodeKeys(blsPubKey common.BlsPublicKey) {
-	n.PublicKeys = append(n.PublicKeys, blsPubKey)
 }

@@ -1,15 +1,14 @@
 package modelBLS
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"go.dedis.ch/kyber/v3/sign"
-	"go.dedis.ch/kyber/v3/sign/bdn"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 )
 
 const ChanLen = 500
@@ -34,10 +33,9 @@ func (node *Node) Advance(step int) {
 
 	node.CurrentMsg = msg
 	for i := range node.PublicKeys {
-		node.Signatures[i] = nil
+		node.Signatures[i].Clear()
 	}
-	mask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	node.SigMask = mask
+	node.SigMask = common.EmptyMask
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
 	node.Comm.Broadcast(*msgBytes)
@@ -107,7 +105,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					return
 				}
 
-				err := node.verifyThresholdWitnesses(msg)
+				err := node.verifyThresholdWitnesses(msg, msgBytes)
 				if err != nil {
 					return
 				}
@@ -146,66 +144,34 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				mutex.Unlock()
 				fmt.Printf("node %d received ACK from node %d\n", node.Id, msg.Source)
 
-				msgHash := calculateHash(*msg, node.ConvertMsg)
-
-				err := node.verifyAckSignature(msg, msgHash)
+				err := node.verifyAckSignature(msg, msgBytes)
 				if err != nil {
 					return
 				}
 
 				// add message's mask to existing mask
 				mutex.Lock()
-				err = node.SigMask.Merge(msg.Mask)
-				if err != nil {
-					logrus.Error(err)
-					return
-				}
+				node.SigMask.Or(&node.SigMask, &msg.Mask)
 
 				// Count acks toward the threshold
 				node.Acks += 1
-
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				err = keyMask.SetMask(msg.Mask)
-				if err != nil {
-					logrus.Error(err)
-					panic(err)
-				}
-				index := keyMask.IndexOfNthEnabled(0)
-				node.Signatures[index] = msg.Signature
+				node.Signatures[msg.Source] = msg.Signature
 
 				if node.Acks >= node.ThresholdAck {
-					// Send witnessed message if the acks are more than threshold
-					msg.MsgType = Wit
-
-					// Add aggregate signatures to message
-					msg.Mask = node.SigMask.Mask()
-
-					sigs := make([][]byte, 0)
-					for _, sig := range node.Signatures {
-						if sig != nil {
-							sigs = append(sigs, sig)
-						}
-					}
-
-					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
-					if err != nil {
-						logrus.Println("node ", node.Id, "PANIC AggregateSignatures: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
-						panic(err)
-					}
-					msg.Signature, err = aggSignature.MarshalBinary()
-					if err != nil {
-						panic(err)
-					}
-
-					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
-
 					// Verify before sending message to others
-					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
-					if err != nil {
+					aggPubKey := common.AggregateBlsPublicKeys(node.PublicKeys, &node.SigMask)
+					msg.Signature = common.AggregateBlsSignatures(node.Signatures, &node.SigMask)
+					if msg.Signature.Verify(aggPubKey, *msgBytes) != true {
 						fmt.Println("node ", node.Id, "PANIC Sig: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
 						//panic(err)
 						return
 					}
+
+					// Send witnessed message if the acks are more than threshold
+					msg.MsgType = Wit
+
+					// Add aggregate signatures to message
+					msg.Mask = node.SigMask
 
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
 					node.Comm.Broadcast(*msgBytes)
@@ -226,26 +192,13 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					mutex.Unlock()
 				}
 
-				// Node has to sign message hash
-				h := sha256.New()
-				h.Write(*msgBytes)
-				msgHash := h.Sum(nil)
-
-				signature, err := bdn.Sign(node.Suite, node.PrivateKey, msgHash)
-				if err != nil {
-					panic(err)
-				}
+				signature := node.PrivateKey.Sign(*msgBytes)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				msg.Signature = signature
 
 				// Add mask for the signature
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				err = keyMask.SetBit(node.Id, true)
-				if err != nil {
-					panic(err)
-				}
-				msg.Mask = keyMask.Mask()
+				msg.Mask.SetBit(&common.EmptyMask, node.Id, 1)
 
 				// Send ack for the received message
 				msg.MsgType = Ack
@@ -269,77 +222,48 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 	return err
 }
 
-func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig) (err error) {
+func Popcount(z *big.Int) int {
+	var count int
+	for _, x := range z.Bits() {
+		for x != 0 {
+			x &= x - 1
+			count++
+		}
+	}
+	return count
+}
+
+func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig, msgBytes *[]byte) (err error) {
 	// Verify that it's really witnessed by majority of nodes by checking the signature and number of them
 	sig := msg.Signature
 	mask := msg.Mask
 
-	msg.Signature = nil
-	msg.Mask = nil
+	msg.Signature.Clear()
+	msg.Mask.SetInt64(0)
 	msg.MsgType = Raw
 
-	h := sha256.New()
-	h.Write(*node.ConvertMsg.MessageToBytes(*msg))
-	msgHash := h.Sum(nil)
-
-	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	err = keyMask.SetMask(mask)
-	if err != nil {
-		return
-	}
-
-	if keyMask.CountEnabled() < node.ThresholdAck {
+	if Popcount(&mask) < node.ThresholdAck {
 		err = errors.New("not Enough sigantures")
 		return
 	}
 
-	aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, keyMask)
-	if err != nil {
-		panic(err)
-	}
+	aggPubKey := common.AggregateBlsPublicKeys(node.PublicKeys, &mask)
 
 	// Verify message signature
-	err = bdn.Verify(node.Suite, aggPubKey, msgHash, sig)
-	if err != nil {
-		fmt.Println(err)
-		return
+	if sig.Verify(aggPubKey, *msgBytes) == false {
+		return errors.New("Threshold signature mismatch")
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 
 	return nil
 }
 
-func (node *Node) verifyAckSignature(msg *MessageWithSig, msgHash []byte) (err error) {
-
-	keyMask, err := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	if err != nil {
-		return
-	}
-	err = keyMask.SetMask(msg.Mask)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-
-	PubKey := append(node.PublicKeys)[keyMask.IndexOfNthEnabled(0)]
-
-	err = bdn.Verify(node.Suite, PubKey, msgHash, msg.Signature)
-	if err != nil {
-		return
+func (node *Node) verifyAckSignature(msg *MessageWithSig, msgBytes *[]byte) (err error) {
+	if msg.Signature.Verify(node.PublicKeys[msg.Source], *msgBytes) == false {
+		return errors.New("ACK signature mismatch")
 	}
 	// fmt.Println("signature VERIFIED !!!!!\n")
 	return
-}
-
-func calculateHash(msg MessageWithSig, converter MessageInterface) []byte {
-	msg.Signature = nil
-	msg.Mask = nil
-	msg.MsgType = Raw
-
-	h := sha256.New()
-	h.Write(*converter.MessageToBytes(msg))
-	msgHash := h.Sum(nil)
-	return msgHash
 }
 
 // AdvanceWithTopic  will change the step of the node to a new one and then broadcast a message to the network.
@@ -360,10 +284,9 @@ func (node *Node) AdvanceWithTopic(step int, topic string, wg *sync.WaitGroup) {
 
 	node.CurrentMsg = msg
 	for i := range node.PublicKeys {
-		node.Signatures[i] = nil
+		node.Signatures[i].Clear()
 	}
-	mask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-	node.SigMask = mask
+	node.SigMask = common.EmptyMask
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
 	node.Comm.Broadcast(*msgBytes)
@@ -374,7 +297,7 @@ func (node *Node) DisconnectPubSub() {
 
 }
 
-// WaitForMsgNEW  waits for upcoming messages and then decides the next action with respect to msg's contents.
+// WaitForProtocolMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
 func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	mutex := &sync.Mutex{}
@@ -442,7 +365,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					return
 				}
 
-				err := node.verifyThresholdWitnesses(msg)
+				err := node.verifyThresholdWitnesses(msg, msgBytes)
 				if err != nil {
 					return
 				}
@@ -460,63 +383,34 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					return
 				}
 				mutex.Unlock()
-				msgHash := calculateHash(*msg, node.ConvertMsg)
-				err := node.verifyAckSignature(msg, msgHash)
+
+				err := node.verifyAckSignature(msg, msgBytes)
 				if err != nil {
 					logrus.Error(err)
 				}
 				//fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
-				err = node.SigMask.Merge(msg.Mask)
-				if err != nil {
-					logrus.Error(err)
-				}
+				node.SigMask.Or(&node.SigMask, &msg.Mask)
 				//fmt.Print("node SigMask Merged\n")
+
 				// Count acks toward the threshold
 				node.Acks += 1
+				node.Signatures[msg.Source] = msg.Signature
 
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				err = keyMask.SetMask(msg.Mask)
-				if err != nil {
-					logrus.Errorf(err.Error())
-				}
-				index := keyMask.IndexOfNthEnabled(0)
-				// Add signature to the list of signatures
-				if index == -1 {
-					logrus.Error("no such pubkey")
-					mutex.Unlock()
-					break
-				}
-				node.Signatures[index] = msg.Signature
 				if node.Acks >= node.ThresholdAck {
+					// Verify before sending message to others
+					aggPubKey := common.AggregateBlsPublicKeys(node.PublicKeys, &node.SigMask)
+					msg.Signature = common.AggregateBlsSignatures(node.Signatures, &node.SigMask)
+					if msg.Signature.Verify(aggPubKey, *msgBytes) != true {
+						fmt.Println("node ", node.Id, "PANIC Sig: ", node.Signatures, "Pub :", node.PublicKeys, "mask :", msg.Mask)
+						return
+					}
+
 					// Send witnessed message if the acks are more than threshold
 					msg.MsgType = Wit
 
 					// Add aggregate signatures to message
-					msg.Mask = node.SigMask.Mask()
-
-					sigs := make([][]byte, 0)
-					for _, sig := range node.Signatures {
-						if sig != nil {
-							sigs = append(sigs, sig)
-						}
-					}
-
-					aggSignature, err := bdn.AggregateSignatures(node.Suite, sigs, node.SigMask)
-					if err != nil {
-						logrus.Error(err)
-					}
-
-					msg.Signature, err = aggSignature.MarshalBinary()
-					if err != nil {
-						logrus.Error(err)
-					}
-					aggPubKey, err := bdn.AggregatePublicKeys(node.Suite, node.SigMask)
-
-					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
-					if err != nil {
-						logrus.Error(err)
-					}
+					msg.Mask = node.SigMask
 
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
 					node.Comm.Broadcast(*msgBytes)
@@ -537,26 +431,13 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					mutex.Unlock()
 				}
 
-				// Node has to sign message hash
-				h := sha256.New()
-				h.Write(*msgBytes)
-				msgHash := h.Sum(nil)
-
-				signature, err := bdn.Sign(node.Suite, node.PrivateKey, msgHash)
-				if err != nil {
-					logrus.Error(err)
-				}
+				signature := node.PrivateKey.Sign(*msgBytes)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				msg.Signature = signature
 
 				// Add mask for the signature
-				keyMask, _ := sign.NewMask(node.Suite, node.PublicKeys, nil)
-				err = keyMask.SetBit(node.Id, true)
-				if err != nil {
-					logrus.Error(err)
-				}
-				msg.Mask = keyMask.Mask()
+				msg.Mask.SetBit(&common.EmptyMask, node.Id, 1)
 
 				// Send ack for the received message
 				msg.MsgType = Ack

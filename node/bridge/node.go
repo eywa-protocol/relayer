@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,10 +34,6 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/helpers"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign"
-	"go.dedis.ch/kyber/v3/util/encoding"
 )
 
 var ErrContextDone = errors.New("interrupt on context done")
@@ -52,7 +47,7 @@ type Node struct {
 	nonceMx        *sync.Mutex
 	P2PPubSub      *bls_consensus.Protocol
 	signerKey      *ecdsa.PrivateKey
-	PrivKey        kyber.Scalar
+	PrivKey        common2.BlsPrivateKey
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
 }
@@ -94,15 +89,14 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, err error) {
-	suite := pairing.NewSuiteBn256()
-	publicKeys = make([]kyber.Point, 0)
+func (n Node) GetPubKeysFromContract(client Client) (publicKeys []common2.BlsPublicKey, err error) {
+	publicKeys = make([]common2.BlsPublicKey, 0)
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
 		return
 	}
 	for _, node := range nodes {
-		p, err := encoding.ReadHexPoint(suite, strings.NewReader(node.BlsPubKey))
+		p, err := common2.UnmarshalBlsPublicKey([]byte(node.BlsPubKey))
 		if err != nil {
 			panic(err)
 		}
@@ -111,10 +105,10 @@ func (n Node) GetPubKeysFromContract(client Client) (publicKeys []kyber.Point, e
 	return
 }
 
-func (n Node) KeysFromFilesByConfigName(name string) (prvKey kyber.Scalar, err error) {
+func (n Node) KeysFromFilesByConfigName(name string) (prvKey common2.BlsPrivateKey, err error) {
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
-	prvKey, err = common2.ReadScalarFromFile(nodeKeyFile)
+	prvKey, err = common2.ReadBlsPrivateKeyFromFile(nodeKeyFile)
 	if err != nil {
 		return
 	}
@@ -128,8 +122,6 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 		return
 	}
 
-	suite := pairing.NewSuiteBn256()
-
 	nodeIdAddress := common.BytesToAddress([]byte(n.Host.ID()))
 	if !n.nodeExists(client, nodeIdAddress) {
 		logrus.Errorf("node %x does not exist", n.Host.ID())
@@ -141,10 +133,6 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 			return nil, err
 		}
 
-		mask, err := sign.NewMask(suite, publicKeys, nil)
-		if err != nil {
-			return nil, err
-		}
 		blsNode = func() *modelBLS.Node {
 			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(10*time.Second))
 			defer cancel()
@@ -163,11 +151,10 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 						ConvertMsg:        &messageSigPb.Convert{},
 						Comm:              n.P2PPubSub,
 						History:           make([]modelBLS.MessageWithSig, 0),
-						Signatures:        make([][]byte, len(publicKeys)),
-						SigMask:           mask,
+						Signatures:        make([]common2.BlsSignature, len(publicKeys)),
+						SigMask:           common2.EmptyMask,
 						PublicKeys:        publicKeys,
 						PrivateKey:        n.PrivKey,
-						Suite:             suite,
 						Participants:      topicParticipants,
 						CurrentRendezvous: topic.String(),
 						Leader:            "",

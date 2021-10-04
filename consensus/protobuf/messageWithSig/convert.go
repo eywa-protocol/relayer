@@ -2,7 +2,10 @@ package messageSigpb
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/golang/protobuf/proto"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 )
 
@@ -26,8 +29,8 @@ func convertModelMessage(msg modelBLS.MessageWithSig) (message *PbMessageSig) {
 		Step:      &step,
 		MsgType:   &msgType,
 		History:   history,
-		Signature: msg.Signature,
-		Mask:      msg.Mask,
+		Signature: msg.Signature.Marshal(),
+		Mask:      msg.Mask.Bytes(),
 	}
 	return
 }
@@ -49,13 +52,14 @@ func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 		history = append(history, convertPbMessageSig(hist))
 	}
 
+	sig, _ := common.UnmarshalBlsSignature(msg.Signature)
 	message = modelBLS.MessageWithSig{
 		Source:    int(msg.GetSource()),
 		Step:      int(msg.GetStep()),
 		MsgType:   modelBLS.MsgType(int(msg.GetMsgType())),
 		History:   history,
-		Signature: msg.Signature,
-		Mask:      msg.Mask,
+		Signature: sig,
+		Mask:      *new(big.Int).SetBytes(msg.Mask),
 	}
 	return
 }

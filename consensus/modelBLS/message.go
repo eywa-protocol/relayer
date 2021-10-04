@@ -1,5 +1,11 @@
 package modelBLS
 
+import (
+	"math/big"
+
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+)
+
 type MsgType int
 
 const (
@@ -14,8 +20,8 @@ type MessageWithSig struct {
 	Step      int     // Time step of message
 	MsgType   MsgType // Type of message
 	History   []MessageWithSig
-	Signature []byte
-	Mask      []byte
+	Signature common.BlsSignature
+	Mask      big.Int
 }
 
 type MessageInterface interface {

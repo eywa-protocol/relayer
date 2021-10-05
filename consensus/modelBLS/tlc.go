@@ -192,17 +192,20 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					mutex.Unlock()
 				}
 
-				msg.MsgType = Ack
-				msg.Source = node.Id
-				msg.Mask.SetBit(&common.EmptyMask, node.Id, 1)
+				msg.MsgType = Raw
+				msg.Source = -1
+				msg.Mask = common.EmptyMask
 				msg.Signature.Clear()
-
 				msgBytes := node.ConvertMsg.MessageToBytes(*msg)
+
+				logrus.Debug("Signing message ", *msgBytes, " at node ", node.Id)
 				signature := node.PrivateKey.Sign(*msgBytes)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
+				msg.MsgType = Ack
+				msg.Source = node.Id
+				msg.Mask.SetBit(&common.EmptyMask, node.Id, 1)
 				msg.Signature = signature
-
 				msgBytes = node.ConvertMsg.MessageToBytes(*msg)
 				node.Comm.Send(*msgBytes, msg.Source)
 
@@ -381,6 +384,8 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					logrus.Error(err, " at node ", node.Id, msg.Signature.Marshal())
 					return
 				}
+				logrus.Debugf("Verified Vit Signature at node %d from node %d", node.Id, msg.Source)
+
 				mutex.Lock()
 				node.Wits += 1
 				node.TimeStep += 1
@@ -450,7 +455,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				msg.Signature.Clear()
 				msgBytes := node.ConvertMsg.MessageToBytes(*msg)
 
-				logrus.Debugf("Signing message ", *msgBytes, " at node ", node.Id)
+				logrus.Debug("Signing message ", *msgBytes, " at node ", node.Id)
 				signature := node.PrivateKey.Sign(*msgBytes)
 
 				// Adding signature and ack to message. These fields were empty when message got signed

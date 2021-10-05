@@ -117,7 +117,7 @@ func (signature BlsSignature) Verify(publicKey BlsPublicKey, message []byte) boo
 }
 
 func AggregateBlsSignatures(sigs []BlsSignature, mask *big.Int) BlsSignature {
-	p := zeroG1
+	p := *new(bn256.G1).Set(&zeroG1)
 	for i, sig := range sigs {
 		if mask.Bit(i) != 0 {
 			p.Add(&p, sig.p)
@@ -127,7 +127,7 @@ func AggregateBlsSignatures(sigs []BlsSignature, mask *big.Int) BlsSignature {
 }
 
 func AggregateBlsPublicKeys(pubs []BlsPublicKey, mask *big.Int) BlsPublicKey {
-	p := zeroG2
+	p := *new(bn256.G2).Set(&zeroG2)
 	for i, pub := range pubs {
 		if mask.Bit(i) != 0 {
 			p.Add(&p, pub.p)

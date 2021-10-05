@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 )
@@ -52,7 +53,10 @@ func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 		history = append(history, convertPbMessageSig(hist))
 	}
 
-	sig, _ := common.UnmarshalBlsSignature(msg.Signature)
+	sig, err := common.UnmarshalBlsSignature(msg.Signature)
+	if err != nil {
+		logrus.Debug("UnmarshalBlsSignature error: ", err.Error(), msg.Signature, sig.Marshal())
+	}
 	message = modelBLS.MessageWithSig{
 		Source:    int(msg.GetSource()),
 		Step:      int(msg.GetStep()),

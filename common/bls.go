@@ -136,7 +136,17 @@ func AggregateBlsPublicKeys(pubs []BlsPublicKey, mask *big.Int) BlsPublicKey {
 	return BlsPublicKey{p: &p}
 }
 
+func (pub BlsPublicKey) Marshal() []byte {
+	if pub.p == nil {
+		return nil
+	}
+	return pub.p.Marshal()
+}
+
 func (signature BlsSignature) Marshal() []byte {
+	if signature.p == nil {
+		return nil
+	}
 	return signature.p.Marshal()
 }
 
@@ -150,4 +160,9 @@ func UnmarshalBlsPublicKey(raw []byte) (BlsPublicKey, error) {
 	p := new(bn256.G2)
 	_, err := p.Unmarshal(raw)
 	return BlsPublicKey{p: p}, err
+}
+
+func GenRandomKey() (BlsPrivateKey, BlsPublicKey) {
+	priv, pub, _ := bn256.RandomG2(rand.Reader)
+	return BlsPrivateKey{p: priv}, BlsPublicKey{p: pub}
 }

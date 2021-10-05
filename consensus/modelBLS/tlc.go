@@ -1,6 +1,7 @@
 package modelBLS
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -262,7 +263,6 @@ func (node *Node) verifyAckSignature(msg *MessageWithSig, msgBytes *[]byte) (err
 	if msg.Signature.Verify(node.PublicKeys[msg.Source], *msgBytes) == false {
 		return errors.New("ACK signature mismatch")
 	}
-	// fmt.Println("signature VERIFIED !!!!!\n")
 	return
 }
 
@@ -386,12 +386,13 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 				err := node.verifyAckSignature(msg, msgBytes)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Error(err, " at node ", node.Id, msg.Signature.Marshal())
+					return
 				}
-				//fmt.Print("verified Ack Signature\n")
+				logrus.Warning("Verified Ack Signature at node ", node.Id)
 				mutex.Lock()
 				node.SigMask.Or(&node.SigMask, &msg.Mask)
-				//fmt.Print("node SigMask Merged\n")
+				logrus.Warning("Node SigMask Merged: ", node.SigMask.Text(16))
 
 				// Count acks toward the threshold
 				node.Acks += 1
@@ -431,7 +432,14 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					mutex.Unlock()
 				}
 
+				logrus.Warn("Signing message ", *msgBytes, " at node ", node.Id)
 				signature := node.PrivateKey.Sign(*msgBytes)
+
+				// TODO: remove this sanity check
+				if bytes.Compare(node.PrivateKey.PublicKey().Marshal(), node.PublicKeys[node.Id].Marshal()) != 0 {
+					logrus.Warn("Private and public keys mismatch: ",
+						node.PrivateKey.PublicKey().Marshal(), node.PublicKeys[node.Id].Marshal())
+				}
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				msg.Signature = signature

@@ -38,31 +38,31 @@ func WriteTxLookupEntries(db DatabaseWriter, block *chain.Block) {
 
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
-//func ReadTransaction(db DatabaseReader, hash []byte) (*chain.Transaction, common.Hash, uint64, uint64) {
-//	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, common.BytesToHash(hash))
-//	if blockHash == (common.Hash{}) {
-//		return nil, common.Hash{}, 0, 0
-//	}
-//	body := ReadBody(db, blockHash, blockNumber)
-//	if body == nil {
-//		//utils.Logger().Error().
-//		//	Uint64("number", blockNumber).
-//		//	Str("hash", blockHash.Hex()).
-//		//	Uint64("index", txIndex).
-//		//	Msg("block Body referenced missing")
-//		return nil, common.Hash{}, 0, 0
-//	}
-//	//tx := body.TransactionAt(int(txIndex))
-//	//if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
-//	//	//utils.Logger().Error().
-//	//	//	Uint64("number", blockNumber).
-//	//	//	Str("hash", blockHash.Hex()).
-//	//	//	Uint64("index", txIndex).
-//	//	//	Msg("Transaction referenced missing")
-//	//	return nil, common.Hash{}, 0, 0
-//	//}
-//	return  body.Transactions[], blockHash, blockNumber, txIndex
-//}
+func ReadTransaction(db DatabaseReader, hash []byte) (*chain.Transaction, common.Hash, uint64, uint64) {
+	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, common.BytesToHash(hash))
+	if blockHash == (common.Hash{}) {
+		return nil, common.Hash{}, 0, 0
+	}
+	body := ReadBody(db, blockHash, blockNumber)
+	if body == nil {
+		//utils.Logger().Error().
+		//	Uint64("number", blockNumber).
+		//	Str("hash", blockHash.Hex()).
+		//	Uint64("index", txIndex).
+		//	Msg("block Body referenced missing")
+		return nil, common.Hash{}, 0, 0
+	}
+	//tx := body.TransactionAt(int(txIndex))
+	//if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
+	//	//utils.Logger().Error().
+	//	//	Uint64("number", blockNumber).
+	//	//	Str("hash", blockHash.Hex()).
+	//	//	Uint64("index", txIndex).
+	//	//	Msg("Transaction referenced missing")
+	//	return nil, common.Hash{}, 0, 0
+	//}
+	return  body.Transactions[], blockHash, blockNumber, txIndex
+}
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.

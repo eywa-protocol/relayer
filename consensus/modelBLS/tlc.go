@@ -464,12 +464,14 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				err := node.verifyAckSignature(msg, msgHash)
 				if err != nil {
 					logrus.Error(err)
+					return
 				}
 				//fmt.Print("verified Ack Signature\n")
 				mutex.Lock()
 				err = node.SigMask.Merge(msg.Mask)
 				if err != nil {
 					logrus.Error(err)
+					return
 				}
 				//fmt.Print("node SigMask Merged\n")
 				// Count acks toward the threshold
@@ -516,6 +518,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					err = bdn.Verify(node.Suite, aggPubKey, msgHash, msg.Signature)
 					if err != nil {
 						logrus.Error(err)
+						return
 					}
 
 					msgBytes := node.ConvertMsg.MessageToBytes(*msg)

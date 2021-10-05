@@ -1,4 +1,4 @@
-package boltdb
+package storage
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-package boltdb
+package storage
 
 import (
 	"github.com/ethereum/go-ethereum/common"
@@ -8,13 +8,6 @@ import (
 	"os"
 	"testing"
 	"time"
-)
-
-var (
-	tmp, err            = ioutil.TempDir("", "test*")
-	genesisEpoch        = chain.CreateGenesisEpoch()
-	header              = chain.NewHeader(*genesisEpoch)
-	coinbaseTransaction = chain.NewCoinbaseTX(genesisEpoch.Serialize())
 )
 
 func TestStoreBoltOrder(t *testing.T) {

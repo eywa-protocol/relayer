@@ -10,7 +10,7 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/getsentry/raven-go v0.2.0 // indirect

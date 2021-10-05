@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core"
-	"github.com/linkpoolio/bridges"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
@@ -31,24 +30,6 @@ func AddressIsZero(address common.Address) bool {
 	return address.String() == common.Address{}.String()
 }
 
-func Health(helper *bridges.Helper, rpcUrl string) (out *Output, err error) {
-	out = &Output{}
-	client, err := Connect(rpcUrl)
-	if err != nil {
-		return
-	}
-	block, err := client.BlockNumber(context.Background())
-	if err != nil {
-		return
-	}
-	chainId, err := client.ChainID(context.Background())
-	if err != nil {
-		return
-	}
-	out.ChainId = fmt.Sprintf("%d", chainId)
-	out.BlockNum = fmt.Sprintf("%d", block)
-	return
-}
 
 func GetChainIdByurl(rpcUrl string) (chainId *big.Int, err error) {
 	client, err := Connect(rpcUrl)
@@ -215,12 +196,6 @@ func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, n
 	return
 }
 
-func ChainlinkData(helper *bridges.Helper) (o *Output, err error) {
-	o = &Output{}
-	fmt.Print(helper.Data)
-	o.Data2 = *helper.Data
-	return
-}
 
 func FileExists(filename string) bool {
 	info, err := os.Stat(filename)

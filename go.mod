@@ -29,12 +29,10 @@ require (
 	github.com/libp2p/go-libp2p-quic-transport v0.11.0
 	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/libp2p/go-ws-transport v0.4.0
-	github.com/linkpoolio/bridges v0.0.0-20200226172010-aa6f132d477e
 	github.com/multiformats/go-multiaddr v0.3.2
 	github.com/multiformats/go-multihash v0.0.15
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	go.etcd.io/bbolt v1.3.3

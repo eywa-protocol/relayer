@@ -64,7 +64,7 @@ func TestPutAndGetGenesisBlock(t *testing.T) {
 	txs := readBlock.Transactions
 
 	for _, tx := range txs {
-		readtx, hash, _, _ := rawdb.ReadTransaction(store, tx.Hash())
+		//readtx, hash, _, _ := rawdb.ReadTransaction(store, tx.Hash())
 		//t.Log(readtx, hash)
 		t.Log(tx.OriginData)
 	}

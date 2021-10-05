@@ -240,7 +240,7 @@ func (node *Node) verifyThresholdWitnesses(msg *MessageWithSig, msgBytes *[]byte
 	mask := msg.Mask
 
 	msg.Signature.Clear()
-	msg.Mask.SetInt64(0)
+	msg.Mask = common.EmptyMask
 	msg.MsgType = Raw
 
 	if Popcount(&mask) < node.ThresholdAck {
@@ -386,7 +386,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 				err := node.verifyAckSignature(msg, msgBytes)
 				if err != nil {
-					logrus.Error(err, " at node ", node.Id, msg.Signature.Marshal())
+					logrus.Error(err, " at node ", node.Id, msgBytes, msg.Signature.Marshal())
 					return
 				}
 				logrus.Warning("Verified Ack Signature at node ", node.Id)

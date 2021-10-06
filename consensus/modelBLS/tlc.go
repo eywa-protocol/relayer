@@ -401,7 +401,6 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					mutex.Unlock()
 					return
 				}
-				mutex.Unlock()
 
 				err := node.verifyAckSignature(*msg)
 				if err != nil {
@@ -410,7 +409,6 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				}
 				logrus.Warningf("Verified Ack Signature at node %d from node %d", node.Id, source)
 
-				mutex.Lock()
 				node.SigMask.SetBit(&node.SigMask, source, 1)
 				logrus.Warningf("Node SigMask Merged: %x", node.SigMask.Int64())
 

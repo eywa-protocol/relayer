@@ -10,9 +10,6 @@ import (
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/sirupsen/logrus"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/util/encoding"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -90,87 +87,6 @@ func WriteKey(priv crypto.PrivKey, keysPath, name string) error {
 	filename := name + ".key"
 	logrus.Infof("Exporting key to %s", filename)
 	return ioutil.WriteFile(keysPath+"/"+filename, privBytes, 0644)
-}
-
-func ReadScalarFromFile(fileName string) (p kyber.Scalar, err error) {
-	suite := pairing.NewSuiteBn256()
-	file, err := os.Open(fileName)
-	if err != nil {
-		return
-	}
-	p, err = encoding.ReadHexScalar(suite, file)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func GenAndSaveBN256Key(keysPath, name string) (strPub string, err error) {
-	suite := pairing.NewSuiteBn256()
-
-	nodeKeyFile := keysPath + "/" + name + "-bn256.key"
-
-	if !FileExists(nodeKeyFile) {
-		logrus.Tracef("CREATING KEYS")
-
-		prvKey := suite.Scalar().Pick(suite.RandomStream())
-		pubKey := suite.Point().Mul(prvKey, nil)
-		// blsAddr = common.BytesToAddress([]byte(pubKey.String()))
-		str, err := encoding.ScalarToStringHex(suite, prvKey)
-		if err != nil {
-			return "", err
-		}
-		err = os.WriteFile(nodeKeyFile, []byte(str), 0644)
-		if err != nil {
-			return "", err
-		}
-
-		strPub, err = encoding.PointToStringHex(suite, pubKey)
-		if err != nil {
-			return "", err
-		}
-
-		err = os.WriteFile(keysPath+"/"+name+"-bn256.pub.key", []byte(strPub), 0644)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		logrus.Warnf("Key %s exists, reusing it!", nodeKeyFile)
-		strPub, err = LoadBN256Key(keysPath, name)
-	}
-	return
-}
-
-func LoadBN256Key(keysPath, name string) (strPub string, err error) {
-	suite := pairing.NewSuiteBn256()
-
-	nodeKeyFile := keysPath + "/" + name + "-bn256.key"
-
-	p, err := ReadScalarFromFile(nodeKeyFile)
-	if err != nil {
-		return
-	}
-	pubKey := suite.Point().Mul(p, nil)
-	strPub, err = encoding.PointToStringHex(suite, pubKey)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-func BLSAddrFromKeyFile(nodeKeyFile string) (blsAddr common.Address, err error) {
-	suite := pairing.NewSuiteBn256()
-	p, err := ReadScalarFromFile(nodeKeyFile)
-	if err != nil {
-		return
-	}
-	pubKey := suite.Point().Mul(p, nil)
-	strPub, err := encoding.PointToStringHex(suite, pubKey)
-	if err != nil {
-		return
-	}
-	blsAddr = common.BytesToAddress(Keccak256([]byte(strPub)))
-	return
 }
 
 func CreateRSAKey(keysPath, name string) (err error) {

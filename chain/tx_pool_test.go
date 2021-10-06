@@ -26,7 +26,11 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
-func TestTxPool(t *testing.T) {
+func testTxPool(t *testing.T) {
+	RunMockTxPool()
+}
+
+func RunMockTxPool() {
 	logrus.SetLevel(logrus.Level(4))
 	// create mock blockchain
 	bc := &testBlockChain{}
@@ -37,11 +41,11 @@ func TestTxPool(t *testing.T) {
 	// emulate event OracleRequest during 50 sec
 	checkClientTimer := time.NewTicker(10 * time.Second)
 	go func(ch chan<- NewEventSourceChain) {
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer func() {
 			checkClientTimer.Stop()
 			cancel()
-			time.Sleep(10 * time.Second)
+			time.Sleep(3 * time.Second)
 			pending, _ := txPool.Pending()
 			logrus.Debugln("Ended...\n", spew.Sdump(pending))
 			logrus.Debugln("================================================================")

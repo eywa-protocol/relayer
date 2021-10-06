@@ -37,7 +37,7 @@ func InitNode(name, keysPath string) (err error) {
 		return
 	}
 
-	_, err = common2.GenAndSaveBN256Key(keysPath, name)
+	_, err = common2.GenAndSaveBlsKey(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -71,7 +71,7 @@ func RegisterNode(name, keysPath string) (err error) {
 	// Secp256k1 node key
 	// nodeKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name+"-signer")
 
-	pub, err := common2.LoadBN256Key(keysPath, name)
+	pub, err := common2.LoadBlsPublicKey(keysPath, name)
 	if err != nil {
 		return
 	}
@@ -100,7 +100,7 @@ func RegisterNode(name, keysPath string) (err error) {
 	}
 
 	for _, client := range n.Clients {
-		id, relayerPool, err := client.RegisterNode(n.gsnClient, signerKey, n.Host.ID(), pub)
+		id, relayerPool, err := client.RegisterNode(n.gsnClient, signerKey, n.Host.ID(), string(pub))
 		if err != nil {
 			return fmt.Errorf("register node on chain [%d] error: %w ", client.ChainCfg.Id, err)
 		}

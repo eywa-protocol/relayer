@@ -1,15 +1,14 @@
 package storage
 
 import (
-	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/chain"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/chain/rawdb"
-	"io/ioutil"
-	"os"
-	"testing"
-	"time"
 )
 
 var (
@@ -50,23 +49,32 @@ func TestPutAndGetGenesisBlock(t *testing.T) {
 	t.Log(coinbaseTransaction.OriginData)
 	genesisBlock := chain.NewGenesisBlock(*header, []chain.Transaction{*coinbaseTransaction})
 	t.Log(common.BytesToHash(genesisBlock.HashTransactions()))
-	require.NoError(t, store.Put([]byte(fmt.Sprint(genesisBlock.Number)), genesisBlock.Serialize()))
-	time.Sleep(10 * time.Millisecond)
+	rawdb.WriteBlock(store, genesisBlock)
+
+	//require.NoError(t, store.Put([]byte(fmt.Sprint(genesisBlock.Number)), genesisBlock.Serialize()))
 	rawdb.WriteTxLookupEntries(store, genesisBlock)
-	getGenesisBlock, err := store.Get([]byte(fmt.Sprint(genesisBlock.Number)))
+	//getGenesisBlock, err := store.Get([]byte(fmt.Sprint(genesisBlock.Number)))
+
+	getGenesisBlock := rawdb.ReadBody(store, genesisBlock.Hash, 1)
+
 	require.NoError(t, err)
-	t.Log(genesisBlock)
-	readBlock := chain.DeserializeBlock(getGenesisBlock)
-	t.Log(readBlock)
+	t.Log(getGenesisBlock)
+	//readBlock := chain.(getGenesisBlock)
+	//t.Log(readBlock)
 
-	require.Equal(t, genesisBlock, readBlock)
+	require.Equal(t, genesisBlock, &getGenesisBlock)
 
-	txs := readBlock.Transactions
+	//txs := readBlock.Transactions
 
-	for _, tx := range txs {
-		//readtx, hash, _, _ := rawdb.ReadTransaction(store, tx.Hash())
-		//t.Log(readtx, hash)
-		t.Log(tx.OriginData)
-	}
+	//for _, tx := range txs {
+	//	t.Log(tx.Hash())
+	//	readtx, hash, _, _ := rawdb.ReadTransaction(store, tx.Hash())
+	//	t.Log(readtx, hash)
+	//	t.Log(tx.OriginData)
+	//	require.Equal(t, *coinbaseTransaction, readtx)
+	//}
+	readtx, _, _, _ := rawdb.ReadTransaction(store, coinbaseTransaction.Hash())
+	require.Equal(t, getGenesisBlock.Hash,  common.BytesToHash(coinbaseTransaction.Hash()))
+	require.Equal(t, *coinbaseTransaction, readtx)
 
 }

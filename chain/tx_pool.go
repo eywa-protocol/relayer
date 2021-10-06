@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+
 )
 
 // PoolTransactions is a PoolTransactions slice type for basic sorting.
@@ -33,6 +34,7 @@ const (
 // some pre checks in tx pool and event subscribers.
 type blockChain interface {
 	CurrentBlock() *Block
+	StateAt(root common.Hash) error
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 }
 

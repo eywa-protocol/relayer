@@ -9,14 +9,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messagepb"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/test_utils"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign"
 
 	core "github.com/libp2p/go-libp2p-core"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
@@ -356,15 +354,13 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	// hosts used in libp2p communications
 	hosts := make([]*core.Host, n)
 
-	publicKeys := make([]kyber.Point, 0)
-	privateKeys := make([]kyber.Scalar, 0)
-	suite := pairing.NewSuiteBn256()
+	publicKeys := make([]common.BlsPublicKey, 0)
+	privateKeys := make([]common.BlsPrivateKey, 0)
 
 	for range nodes {
-		prvKey := suite.Scalar().Pick(suite.RandomStream())
-		privateKeys = append(privateKeys, prvKey)
-		// list of public keys
-		publicKeys = append(publicKeys, suite.Point().Mul(prvKey, nil))
+		priv, pub := common.GenRandomKey()
+		privateKeys = append(privateKeys, priv)
+		publicKeys = append(publicKeys, pub)
 	}
 
 	fmt.Println(publicKeys)
@@ -383,7 +379,6 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		// creating pubsubs
 		comm.InitializePubSub(*host)
 		comm.InitializeVictim(false)
-		mask, _ := sign.NewMask(suite, publicKeys, nil)
 		// ////
 
 		nodes[i] = &modelBLS.Node{
@@ -395,11 +390,10 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 			ConvertMsg:   &messageSigpb.Convert{},
 			Comm:         comm,
 			History:      make([]modelBLS.MessageWithSig, 0),
-			Signatures:   make([][]byte, n),
-			SigMask:      mask,
+			Signatures:   make([]common.BlsSignature, n),
+			SigMask:      common.EmptyMask,
 			PublicKeys:   publicKeys,
 			PrivateKey:   privateKeys[i],
-			Suite:        suite,
 		}
 
 	}

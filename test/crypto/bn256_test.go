@@ -7,7 +7,7 @@ import (
 )
 
 func TestBN256Pubkey(t *testing.T) {
-	pub, err := common2.GenAndSaveBN256Key(".", "test")
+	pub, err := common2.GenAndSaveBlsKey(".", "test")
 	if err != nil {
 		return
 	}

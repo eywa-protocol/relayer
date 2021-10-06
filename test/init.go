@@ -24,7 +24,8 @@ var err error
 var qwe big.Int
 var testData *big.Int
 
-func init() {
+
+func initNodeWithClients() {
 	err = config.LoadBridgeConfig("../.data/bridge.yaml", false)
 	if err != nil {
 		logrus.Fatal(err)
@@ -41,6 +42,7 @@ func init() {
 }
 
 func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testData *big.Int) {
+	initNodeWithClients()
 	logrus.Info("sending to contract ", testData)
 	clientFrom := node.Clients[chainidFrom.String()]
 	require.NoError(t, err)

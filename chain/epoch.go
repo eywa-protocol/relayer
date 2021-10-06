@@ -3,25 +3,26 @@ package chain
 import (
 	"bytes"
 	"encoding/gob"
+	"math/big"
 )
 
 type Epoch struct {
-	Number int
+	Number big.Int
 	Sign   []byte
 	Leader []byte
 }
 
 func CreateGenesisEpoch() *Epoch {
 	return &Epoch{
-		Number: 0,
-		Sign:   []byte("genesis gignature"),
+		Number: *big.NewInt(int64(0)),
+		Sign:   []byte("genesis signature"),
 		Leader: []byte("leader bytes"),
 	}
 }
 
 func CreateNewEpoch() *Epoch {
 	return &Epoch{
-		Number: 0,
+		Number: *big.NewInt(int64(0)),
 		Sign:   nil,
 		Leader: nil,
 	}

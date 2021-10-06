@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -74,14 +73,13 @@ func (tx Transaction) Serialize() []byte {
 }
 
 // Hash returns the hash of the Transaction
-func (tx *Transaction) Hash() []byte {
+func (tx *Transaction) Hash() common.Hash {
 	var hash [32]byte
 
 	txCopy := *tx
 
 	hash = sha256.Sum256(txCopy.Serialize())
-	logrus.Print("//////////", hash)
-	return hash[:]
+	return common.BytesToHash(hash[:])
 }
 
 // Sign signs each input of a Transaction
@@ -112,19 +110,18 @@ func (tx *Transaction) Verify(txs map[string]Transaction) bool {
 
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(epochId []byte) (tx *Transaction) {
-	//topics := []common.Hash{}
-	//topics = append(topics, common.BytesToHash(epochId))
 	tx = NewTransaction(
 		wrappers.BridgeOracleRequest{
 			Chainid:     big.NewInt(999),
 			RequestType: "GENESIS",
 			Bridge:      common.Address{},
+			Selector:    []byte{},
 
 			Raw: types.Log{
 				Address: common.Address{},
-				Topics:  []common.Hash{},
+				Topics:  []common.Hash{common.BytesToHash(epochId)},
 				Data:    epochId,
-				TxHash:  common.BytesToHash(epochId),
+				TxHash:  common.Hash{},
 			}},
 		0,
 		0,

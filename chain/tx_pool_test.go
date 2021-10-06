@@ -26,7 +26,7 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
-func TestTxPool(t *testing.T) {
+func testTxPool(t *testing.T) {
 	RunMockTxPool()
 }
 

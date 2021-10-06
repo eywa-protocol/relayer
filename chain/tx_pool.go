@@ -84,7 +84,7 @@ func (pool *TxPool) loop() {
 		case ev := <-pool.chainHeadCh:
 			if ev.Block != nil {
 				pool.mu.Lock()
-				pool.reset(&head.Header, &ev.Block.Header)
+				pool.reset(head.Header, ev.Block.Header)
 				head = ev.Block
 				pool.mu.Unlock()
 			}

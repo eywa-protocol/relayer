@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/chain"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/chain/rawdb"
@@ -31,7 +30,7 @@ func newLevelDBForTesting(t *testing.T) Store {
 	return newLevelStore
 }
 
-func TestPutAndGetGenesisBlock(t *testing.T) {
+func TestPutAndGetGenesisBlockFunction(t *testing.T) {
 
 	require.NotNil(t, coinbaseTransaction)
 	require.NoError(t, err)
@@ -42,39 +41,31 @@ func TestPutAndGetGenesisBlock(t *testing.T) {
 
 	store := newLevelDBForTesting(t)
 	require.NoError(t, err)
-	t.Log(genesisEpoch.Serialize())
-	t.Log(genesisEpoch)
-	t.Log(header)
 
-	t.Log(coinbaseTransaction.OriginData)
+	//t.Log(genesisEpoch.Serialize())
+	//t.Log(genesisEpoch)
+	//t.Log(header)
+	//t.Log(coinbaseTransaction.OriginData)
+
 	genesisBlock := chain.NewGenesisBlock(*header, []chain.Transaction{*coinbaseTransaction})
-	t.Log(common.BytesToHash(genesisBlock.HashTransactions()))
-	rawdb.WriteBlock(store, genesisBlock)
+	//t.Log(common.BytesToHash(genesisBlock.HashTransactions()))
+	rawdb.WriteBlock(store, genesisBlock.Hash, genesisBlock.Number, *genesisBlock)
 
-	//require.NoError(t, store.Put([]byte(fmt.Sprint(genesisBlock.Number)), genesisBlock.Serialize()))
 	rawdb.WriteTxLookupEntries(store, genesisBlock)
-	//getGenesisBlock, err := store.Get([]byte(fmt.Sprint(genesisBlock.Number)))
 
-	getGenesisBlock := rawdb.ReadBody(store, genesisBlock.Hash, 1)
+	readBlock := rawdb.ReadBlock(store, genesisBlock.Hash, genesisBlock.Number)
 
+	require.NotNil(t, readBlock)
 	require.NoError(t, err)
-	t.Log(getGenesisBlock)
-	//readBlock := chain.(getGenesisBlock)
 	//t.Log(readBlock)
 
-	require.Equal(t, genesisBlock, &getGenesisBlock)
+	require.Equal(t, genesisBlock, readBlock)
 
-	//txs := readBlock.Transactions
-
-	//for _, tx := range txs {
-	//	t.Log(tx.Hash())
-	//	readtx, hash, _, _ := rawdb.ReadTransaction(store, tx.Hash())
-	//	t.Log(readtx, hash)
-	//	t.Log(tx.OriginData)
-	//	require.Equal(t, *coinbaseTransaction, readtx)
-	//}
-	readtx, _, _, _ := rawdb.ReadTransaction(store, coinbaseTransaction.Hash())
-	require.Equal(t, getGenesisBlock.Hash,  common.BytesToHash(coinbaseTransaction.Hash()))
-	require.Equal(t, *coinbaseTransaction, readtx)
+	readtx, blockHash, _, _ := rawdb.ReadTransaction(store, coinbaseTransaction.Hash())
+	//t.Log(readtx)
+	//t.Log(blockHash)
+	require.Equal(t, readBlock.Hash, blockHash)
+	require.Equal(t, genesisBlock.Hash, blockHash)
+	require.Equal(t, coinbaseTransaction, readtx)
 
 }

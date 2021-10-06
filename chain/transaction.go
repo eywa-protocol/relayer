@@ -73,15 +73,14 @@ func (tx Transaction) Serialize() []byte {
 }
 
 // Hash returns the hash of the Transaction
-func (tx *Transaction) Hash() []byte {
+func (tx *Transaction) Hash() common.Hash {
 	var hash [32]byte
 
 	txCopy := *tx
 
 	hash = sha256.Sum256(txCopy.Serialize())
-	return hash[:]
+	return common.BytesToHash(hash[:])
 }
-
 
 // Sign signs each input of a Transaction
 func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
@@ -116,12 +115,13 @@ func NewCoinbaseTX(epochId []byte) (tx *Transaction) {
 			Chainid:     big.NewInt(999),
 			RequestType: "GENESIS",
 			Bridge:      common.Address{},
+			Selector:    []byte{},
 
 			Raw: types.Log{
 				Address: common.Address{},
 				Topics:  []common.Hash{common.BytesToHash(epochId)},
 				Data:    epochId,
-				TxHash:  common.BytesToHash(epochId),
+				TxHash:  common.Hash{},
 			}},
 		0,
 		0,

@@ -20,6 +20,10 @@ package rawdb
 type DatabaseReader interface {
 	Has(key []byte) (bool, error)
 	Get(key []byte) ([]byte, error)
+	//Ancient(string, uint64) ([]byte, error)
+	//AncientSize(string) (uint64, error)
+	//Ancients() (uint64, error)
+	//HasAncient(string, uint64) (bool, error)
 }
 
 // DatabaseWriter wraps the Put method of a backing data store.

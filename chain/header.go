@@ -29,9 +29,10 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // NewHeader creates a new header object.
 func NewHeader(e Epoch) *Header {
 	return &Header{headerFields{
-		Number: 1,
-		Time:   1111111111,
-		Epoch:  e,
+		Number:           1,
+		Time:             1111111111,
+		Epoch:            e,
+		LastCommitBitmap: []byte{},
 	}}
 }
 

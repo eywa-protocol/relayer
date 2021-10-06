@@ -27,8 +27,6 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/chain"
 )
 
-
-
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db DatabaseReader, number uint64) common.Hash {
 	data, _ := db.Get(headerHashKey(number))
@@ -172,28 +170,29 @@ func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
 	}
 }
 
-// ReadBody retrieves the block body corresponding to the hash.
-func ReadBody(db DatabaseReader, hash common.Hash, number uint64) chain.Block {
+// ReadBlock retrieves the block body corresponding to the hash.
+func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *chain.Block {
 	data := ReadBodyRLP(db, hash, number)
 	if len(data) == 0 {
-		return chain.Block{}
+		logrus.Fatal(data)
+		return nil
 	}
-	body := new(chain.Block)
-	if err := rlp.Decode(bytes.NewReader(data), body); err != nil {
-		//utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block body RLP")
-		return chain.Block{}
+	block := new(chain.Block)
+	if err := rlp.Decode(bytes.NewReader(data), block); err != nil {
+		logrus.Fatal("Invalid block body RLP")
+		return nil
 	}
-	return *body
+	return block
 }
-
-
 
 // ReadBodyRLP retrieves the block body (transactions and uncles) in RLP encoding.
 func ReadBodyRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValue {
-	data, _ := db.Get(blockBodyKey(number, hash))
+	data, err := db.Get(blockBodyKey(number, hash))
+	if err != nil {
+		panic(err)
+	}
 	return data
 }
-
 
 // WriteBodyRLP stores an RLP encoded block body into the database.
 func WriteBodyRLP(db DatabaseWriter, hash common.Hash, number uint64, rlp rlp.RawValue) {
@@ -210,13 +209,21 @@ func HasBody(db DatabaseReader, hash common.Hash, number uint64) bool {
 	return true
 }
 
-
+// WriteBody storea a block body into the database.
+func WriteBodyBytes(db DatabaseWriter, hash common.Hash, number uint64, data []byte) {
+	//data, err := rlp.EncodeToBytes(data)
+	//if err != nil {
+	//	logrus.Fatalf("Failed to RLP encode body: %v", err)
+	//}
+	//logrus.Print(hash, number, data)
+	WriteBodyRLP(db, hash, number, data)
+}
 
 // WriteBody storea a block body into the database.
-func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body []byte) {
-	data, err := rlp.EncodeToBytes(body)
+func WriteBlock(db DatabaseWriter, hash common.Hash, number uint64, block chain.Block) {
+	data, err := rlp.EncodeToBytes(block)
 	if err != nil {
-		logrus.Error("Failed to RLP encode body")
+		logrus.Fatalf("Failed to RLP encode body: %v", err)
 	}
 	WriteBodyRLP(db, hash, number, data)
 }
@@ -260,19 +267,9 @@ func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	}
 }
 
-
-
 // DeleteReceipts removes all receipt data associated with a block hash.
 func DeleteReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
 	if err := db.Delete(blockReceiptsKey(number, hash)); err != nil {
 		logrus.Error("Failed to delete block receipts")
 	}
 }
-
-
-// WriteBlock serializes a block into the database, header and body separately.
-func WriteBlock(db DatabaseWriter, block *chain.Block) {
-	data, _
-	WriteBody(db, block.Hash, block.Number, block.Marshal())
-}
-

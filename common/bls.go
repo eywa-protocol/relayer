@@ -162,7 +162,7 @@ func UnmarshalBlsPublicKey(raw []byte) (BlsPublicKey, error) {
 	return BlsPublicKey{p: p}, err
 }
 
-func GenRandomKey() (BlsPrivateKey, BlsPublicKey) {
+func GenRandomBlsKey() (BlsPrivateKey, BlsPublicKey) {
 	priv, pub, _ := bn256.RandomG2(rand.Reader)
 	return BlsPrivateKey{p: priv}, BlsPublicKey{p: pub}
 }

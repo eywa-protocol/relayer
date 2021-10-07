@@ -358,7 +358,7 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	privateKeys := make([]common.BlsPrivateKey, 0)
 
 	for range nodes {
-		priv, pub := common.GenRandomKey()
+		priv, pub := common.GenRandomBlsKey()
 		privateKeys = append(privateKeys, priv)
 		publicKeys = append(publicKeys, pub)
 	}

@@ -2,6 +2,7 @@ package common
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"math/big"
 	"os"
 
@@ -126,14 +127,13 @@ func AggregateBlsSignatures(sigs []BlsSignature, mask *big.Int) BlsSignature {
 	return BlsSignature{p: &p}
 }
 
-func AggregateBlsPublicKeys(pubs []BlsPublicKey, mask *big.Int) BlsPublicKey {
-	p := *new(bn256.G2).Set(&zeroG2)
-	for i, pub := range pubs {
-		if mask.Bit(i) != 0 {
-			p.Add(&p, pub.p)
-		}
+// AggregateBlsPublicKeys calculates P1*A1 + P2*A2 + ...
+func AggregateBlsPublicKeys(pubs []BlsPublicKey, anticoefs []big.Int) BlsPublicKey {
+	res := *new(bn256.G2).Set(&zeroG2)
+	for i := 0; i < len(pubs); i++ {
+		res.Add(&res, new(bn256.G2).ScalarMult(pubs[i].p, &anticoefs[i]))
 	}
-	return BlsPublicKey{p: &p}
+	return BlsPublicKey{p: &res}
 }
 
 func (pub BlsPublicKey) Marshal() []byte {
@@ -165,4 +165,49 @@ func UnmarshalBlsPublicKey(raw []byte) (BlsPublicKey, error) {
 func GenRandomBlsKey() (BlsPrivateKey, BlsPublicKey) {
 	priv, pub, _ := bn256.RandomG2(rand.Reader)
 	return BlsPrivateKey{p: priv}, BlsPublicKey{p: pub}
+}
+
+// CalculateAntiRogueCoefficients returns an array of bigints used for
+// subsequent key aggregations:
+//
+// Ai = hash(Pi, {P1, P2, ...})
+func CalculateAntiRogueCoefficients(pubs []BlsPublicKey) []big.Int {
+	as := make([]big.Int, len(pubs))
+	data := pubs[0].p.Marshal()
+	for i := 0; i < len(pubs); i++ {
+		data = append(data, pubs[i].p.Marshal()...)
+	}
+
+	for i := 0; i < len(pubs); i++ {
+		cur := pubs[i].p.Marshal()
+		copy(data[0:len(cur)], cur)
+		hash := sha256.Sum256(data)
+		as[i].SetBytes(hash[:])
+	}
+	return as
+}
+
+// HashToPointMsg performs "message augmentation": hashes the message and the
+// point to the point of G1 curve (a signature)
+func hashToPointMsg(p *bn256.G2, message []byte) *bn256.G1 {
+	var data []byte
+	data = append(data, p.Marshal()...)
+	data = append(data, message...)
+	return altbn128.G1HashToPoint(data)
+}
+
+// HashToPointIndex hashes the aggregated public key (G2 point) and the given
+// index (of the signer within a group of signers) to the point in G1 curve (a
+// signature)
+func hashToPointIndex(pub *bn256.G2, index byte) *bn256.G1 {
+	data := make([]byte, 32)
+	data[31] = index
+	return hashToPointMsg(pub, data)
+}
+
+// GenBlsMembershipKeyPart generates the participant signature to be aggregated into membership key
+func GenBlsMembershipKeyPart(priv BlsPrivateKey, index byte, aggPub BlsPublicKey, anticoef big.Int) BlsSignature {
+	res := new(bn256.G1).ScalarMult(hashToPointIndex(aggPub.p, index), priv.p)
+	res.ScalarMult(res, &anticoef)
+	return BlsSignature{p: res}
 }

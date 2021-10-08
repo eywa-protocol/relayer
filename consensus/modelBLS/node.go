@@ -23,8 +23,11 @@ type Node struct {
 	Signatures         []common.BlsSignature // Signatures collected by this node
 	SigMask            big.Int               // Bitmask of nodes that the right signature is received from
 	PrivateKey         common.BlsPrivateKey  // Private key of the node
+	AntiCoefs          []big.Int             // Coefficients to prevent "anti rogue key" attack
+	EpochPublicKey     common.BlsPublicKey   // Arrtegated public key of all participants of the current epoch
 	MembershipKeyParts []common.BlsSignature // Parts of membership key from other nodes
 	MembershipKey      common.BlsSignature   // Membership key of this node
+	MembershipKeyMask  big.Int               // Bitmask of MembershipKeyParts received
 	Participants       []peer.ID
 	CurrentRendezvous  string
 	Leader             peer.ID

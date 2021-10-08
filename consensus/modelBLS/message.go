@@ -13,6 +13,8 @@ const (
 	Ack
 	Wit
 	Catchup
+	BlsSetupPhase
+	MembershipKeysParts
 )
 
 type MessageWithSig struct {

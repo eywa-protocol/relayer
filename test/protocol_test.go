@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"sync"
 	"testing"
@@ -363,9 +364,15 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		publicKeys = append(publicKeys, pub)
 	}
 
-	fmt.Println(publicKeys)
+	anticoefs := common.CalculateAntiRogueCoefficients(publicKeys)
+	aggregatedPublicKey := common.AggregateBlsPublicKeys(publicKeys, anticoefs)
 
 	for i := range nodes {
+		priv := privateKeys[i]
+		membershipKeyParts := make([]common.BlsSignature, n)
+		membershipKeyMask := big.NewInt((1 << n) - 1)
+		membershipKeyParts[i] = common.GenBlsMembershipKeyPart(priv, byte(i), aggregatedPublicKey, anticoefs[i])
+		membershipKeyMask.SetBit(membershipKeyMask, i, 0)
 
 		// var comm modelBLS.CommunicationInterface
 		var comm *consensus.Protocol
@@ -382,18 +389,22 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		// ////
 
 		nodes[i] = &modelBLS.Node{
-			Id:           i,
-			TimeStep:     0,
-			ThresholdWit: n/2 + 1,
-			ThresholdAck: n/2 + 1,
-			Acks:         0,
-			ConvertMsg:   &messageSigpb.Convert{},
-			Comm:         comm,
-			History:      make([]modelBLS.MessageWithSig, 0),
-			Signatures:   make([]common.BlsSignature, n),
-			SigMask:      common.EmptyMask,
-			PublicKeys:   publicKeys,
-			PrivateKey:   privateKeys[i],
+			Id:                 i,
+			TimeStep:           0,
+			ThresholdWit:       n/2 + 1,
+			ThresholdAck:       n/2 + 1,
+			Acks:               0,
+			ConvertMsg:         &messageSigpb.Convert{},
+			Comm:               comm,
+			History:            make([]modelBLS.MessageWithSig, 0),
+			Signatures:         make([]common.BlsSignature, n),
+			SigMask:            common.EmptyMask,
+			PublicKeys:         publicKeys,
+			PrivateKey:         priv,
+			AntiCoefs:          anticoefs,
+			EpochPublicKey:     aggregatedPublicKey,
+			MembershipKeyParts: membershipKeyParts,
+			MembershipKeyMask:  *membershipKeyMask,
 		}
 
 	}

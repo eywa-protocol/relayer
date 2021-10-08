@@ -254,10 +254,8 @@ func (node *Node) verifyThresholdWitnesses(msg MessageWithSig) (err error) {
 		return
 	}
 
-	aggPubKey := common.AggregateBlsPublicKeys(node.PublicKeys, &mask)
-
 	// Verify message signature
-	if sig.Verify(aggPubKey, *msgBytes) == false {
+	if sig.Verify(node.EpochPublicKey, *msgBytes) == false {
 		return fmt.Errorf("Threshold signature mismatch for %v", *msgBytes)
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")

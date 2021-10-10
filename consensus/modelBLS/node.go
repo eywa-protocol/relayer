@@ -20,10 +20,11 @@ type Node struct {
 	CurrentMsg         MessageWithSig        // Message which the node is waiting for acks
 	History            []MessageWithSig      // History of received messages by a node
 	PublicKeys         []common.BlsPublicKey // Public keys of all nodes
-	Signatures         []common.BlsSignature // Signatures collected by this node
+	PartSignature      common.BlsSignature   // Aggregated partial signature collected by this node in this step
+	PartPublicKey      common.BlsPublicKey   // Aggregated partial public key collected by this node in this step
 	SigMask            big.Int               // Bitmask of nodes that the right signature is received from
 	PrivateKey         common.BlsPrivateKey  // Private key of the node
-	AntiCoefs          []big.Int             // Coefficients to prevent "anti rogue key" attack
+	AntiCoefs          []big.Int             // Coefficients to prevent "anti rogue key" attack // TODO
 	EpochPublicKey     common.BlsPublicKey   // Arrtegated public key of all participants of the current epoch
 	MembershipKeyParts []common.BlsSignature // Parts of membership key from other nodes
 	MembershipKey      common.BlsSignature   // Membership key of this node

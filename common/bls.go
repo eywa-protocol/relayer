@@ -99,8 +99,16 @@ func LoadBlsPublicKey(keysPath, name string) (strPub []byte, err error) {
 	return
 }
 
-func (signature *BlsSignature) Clear() {
-	signature.p = nil
+func ZeroSignature() BlsSignature {
+	return BlsSignature{p: new(bn256.G1).Set(&zeroG1)}
+}
+
+func ZeroPublicKey() BlsPublicKey {
+	return BlsPublicKey{p: new(bn256.G2).Set(&zeroG2)}
+}
+
+func (signature *BlsSignature) IsSet() bool {
+	return signature.p != nil
 }
 
 func (secretKey BlsPrivateKey) Sign(message []byte) BlsSignature {
@@ -108,21 +116,56 @@ func (secretKey BlsPrivateKey) Sign(message []byte) BlsSignature {
 	return BlsSignature{p: new(bn256.G1).ScalarMult(hashPoint, secretKey.p)}
 }
 
+func (secretKey BlsPrivateKey) Multisign(message []byte, aggPublicKey BlsPublicKey, membershipKey BlsSignature) BlsSignature {
+	s := new(bn256.G1).ScalarMult(hashToPointMsg(aggPublicKey.p, message), secretKey.p)
+	s.Add(s, membershipKey.p)
+	return BlsSignature{p: s}
+}
+
 func (signature BlsSignature) Verify(publicKey BlsPublicKey, message []byte) bool {
 	hashPoint := altbn128.G1HashToPoint(message)
 
 	a := []*bn256.G1{new(bn256.G1).Neg(signature.p), hashPoint}
 	b := []*bn256.G2{&g2, publicKey.p}
-
 	return bn256.PairingCheck(a, b)
 }
 
-func AggregateBlsSignatures(sigs []BlsSignature, mask *big.Int) BlsSignature {
-	p := *new(bn256.G1).Set(&zeroG1)
-	for i, sig := range sigs {
-		if mask.Bit(i) != 0 {
-			p.Add(&p, sig.p)
+func (signature BlsSignature) VerifyMembershipKey(publicKey BlsPublicKey, index byte) bool {
+	hashPoint := hashToPointIndex(publicKey.p, index)
+
+	a := []*bn256.G1{new(bn256.G1).Neg(signature.p), hashPoint}
+	b := []*bn256.G2{&g2, publicKey.p}
+	return bn256.PairingCheck(a, b)
+}
+
+func (signature BlsSignature) VerifyMultisig(allPublicKey BlsPublicKey, publicKey BlsPublicKey, message []byte, bitmask *big.Int) bool {
+	sum := new(bn256.G1).Set(&zeroG1)
+	mask := new(big.Int).Set(bitmask)
+	for index := 0; mask.Sign() != 0; index++ {
+		if bitmask.Bit(index) != 0 {
+			mask.SetBit(mask, index, 0)
+			sum.Add(sum, hashToPointIndex(allPublicKey.p, byte(index)))
 		}
+	}
+
+	a := []*bn256.G1{new(bn256.G1).Neg(signature.p), hashToPointMsg(allPublicKey.p, message), sum}
+	b := []*bn256.G2{&g2, publicKey.p, allPublicKey.p}
+	return bn256.PairingCheck(a, b)
+}
+
+func (signature *BlsSignature) Aggregate(onemore BlsSignature) {
+	signature.p.Add(signature.p, onemore.p)
+}
+
+func (pub *BlsPublicKey) Aggregate(onemore BlsPublicKey) {
+	pub.p.Add(pub.p, onemore.p)
+}
+
+// AggregateBlsSignatures sums the given array of signatures
+func AggregateBlsSignatures(sigs []BlsSignature) BlsSignature {
+	p := *new(bn256.G1).Set(&zeroG1)
+	for _, sig := range sigs {
+		p.Add(&p, sig.p)
 	}
 	return BlsSignature{p: &p}
 }

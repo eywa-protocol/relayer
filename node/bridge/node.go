@@ -151,7 +151,6 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 						ConvertMsg:        &messageSigPb.Convert{},
 						Comm:              n.P2PPubSub,
 						History:           make([]modelBLS.MessageWithSig, 0),
-						Signatures:        make([]common2.BlsSignature, len(publicKeys)),
 						SigMask:           common2.EmptyMask,
 						PublicKeys:        publicKeys,
 						PrivateKey:        n.PrivKey,

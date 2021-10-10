@@ -14,16 +14,23 @@ const (
 	Wit
 	Catchup
 	BlsSetupPhase
-	MembershipKeysParts
+	BlsMembershipKeysParts
 )
 
+type Body struct {
+	Step       int     // Time step of message
+	ActionRoot big.Int // Merkle root of actions in this block
+}
+
 type MessageWithSig struct {
-	Source    int     // NodeID of message's source
-	Step      int     // Time step of message
-	MsgType   MsgType // Type of message
-	History   []MessageWithSig
-	Signature common.BlsSignature
-	Mask      big.Int
+	Body
+	Source             int     // NodeID of message's source
+	MsgType            MsgType // Type of message
+	History            []MessageWithSig
+	Signature          common.BlsSignature   // Aggregated signature // TODO
+	Mask               big.Int               // Bitmask of those who signed
+	PublicKey          common.BlsPublicKey   // Aggregated public key of those who signed
+	MembershipKeyParts []common.BlsSignature // Used only in BlsMembershipKeysParts msg
 }
 
 type MessageInterface interface {

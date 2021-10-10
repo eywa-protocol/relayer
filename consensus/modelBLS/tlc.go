@@ -1,6 +1,7 @@
 package modelBLS
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -24,16 +25,15 @@ func (node *Node) Advance(step int) {
 	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
+		Body:    Body{node.TimeStep, *big.NewInt(0xCAFEBABE)},
 		Source:  node.Id,
 		MsgType: Raw,
-		Step:    node.TimeStep,
 		History: make([]MessageWithSig, 0),
 	}
 
 	node.CurrentMsg = msg
-	for i := range node.PublicKeys {
-		node.Signatures[i].Clear()
-	}
+	node.PartSignature = common.ZeroSignature()
+	node.PartPublicKey = common.ZeroPublicKey()
 	node.SigMask = common.EmptyMask
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
@@ -136,13 +136,12 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 			case Ack:
 				// Checking that the ack is for message of this step
-				source := int(msg.Mask.Int64())
 				mutex.Lock()
-				if (msg.Step != node.CurrentMsg.Step) || (node.Acks >= node.ThresholdAck) || (node.SigMask.Bit(source) != 0) {
+				if (msg.Step != node.CurrentMsg.Step) || (node.Acks >= node.ThresholdAck) || (node.SigMask.Bit(msg.Source) != 0) {
 					mutex.Unlock()
 					return
 				}
-				fmt.Printf("node %d received ACK from node %d\n", node.Id, source)
+				fmt.Printf("node %d received ACK from node %d\n", node.Id, msg.Source)
 
 				err := node.verifyAckSignature(*msg)
 				if err != nil {
@@ -151,36 +150,40 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				}
 
 				// add message's mask to existing mask
-				node.SigMask.SetBit(&node.SigMask, source, 1)
+				node.SigMask.SetBit(&node.SigMask, msg.Source, 1)
 
 				// Count acks toward the threshold
 				node.Acks += 1
-				node.Signatures[source] = msg.Signature
+				node.PartSignature.Aggregate(msg.Signature)
+				node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
 
 				if node.Acks >= node.ThresholdAck {
-					// Add aggregate signatures to message
-					msg.Mask = node.SigMask
-					msg.Signature = common.AggregateBlsSignatures(node.Signatures, &node.SigMask)
+					// Send witnessed message if the acks are more than threshold
+					outmsg := MessageWithSig{
+						Body:      msg.Body,
+						MsgType:   Wit,
+						Source:    node.Id,
+						Mask:      node.SigMask,
+						Signature: node.PartSignature,
+						PublicKey: node.PartPublicKey,
+					}
 
 					// Verify before sending message to others
-					if err := node.verifyThresholdWitnesses(*msg); err != nil {
-						logrus.Error("verifyThresholdWitnesses ", err, ", node: ", node.Id, ", mask: ", msg.Mask.Text(16))
-						//panic(err)
+					if err := node.verifyThresholdWitnesses(outmsg); err != nil {
+						logrus.Error("verifyThresholdWitnesses0 ", err, ", node: ", node.Id, ", mask: ", msg.Mask.Text(16))
 						return
 					}
 
-					// Send witnessed message if the acks are more than threshold
-					msg.MsgType = Wit
-
-					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
+					msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
 					node.Comm.Broadcast(*msgBytes)
 				}
 				mutex.Unlock()
 
 			case Raw:
-				if msg.Step > nodeTimeStep+1 {
+				if (msg.Step > nodeTimeStep+1) || !node.MembershipKey.IsSet() {
 					return
-				} else if msg.Step == nodeTimeStep+1 {
+				}
+				if msg.Step == nodeTimeStep+1 {
 					// Node needs to catch up with the message
 					// Update nodes local history. Append history from message to local history
 					mutex.Lock()
@@ -191,24 +194,19 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 					mutex.Unlock()
 				}
 
-				source := msg.Source
-				msg.MsgType = Raw
-				msg.Source = -1
-				msg.Mask = common.EmptyMask
-				msg.Signature.Clear()
-				msgBytes := node.ConvertMsg.MessageToBytes(*msg)
-
-				logrus.Tracef("Signing message %v at node %d", *msgBytes, node.Id)
-				signature := node.PrivateKey.Sign(*msgBytes)
+				body, _ := json.Marshal(msg.Body)
+				signature := node.PrivateKey.Multisign(body, node.EpochPublicKey, node.MembershipKey)
+				logrus.Debugf("Sign message '%s' at node %d", body, node.Id)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
-				msg.MsgType = Ack
-				msg.Source = source
-				msg.Source = node.Id
-				msg.Mask.SetInt64(int64(node.Id))
-				msg.Signature = signature
-				msgBytes = node.ConvertMsg.MessageToBytes(*msg)
-				node.Comm.Send(*msgBytes, msg.Source)
+				outmsg := MessageWithSig{
+					Body:      msg.Body,
+					MsgType:   Ack,
+					Source:    node.Id,
+					Signature: signature,
+				}
+				msgBytes = node.ConvertMsg.MessageToBytes(outmsg)
+				node.Comm.Broadcast(*msgBytes)
 
 			case Catchup:
 				mutex.Lock()
@@ -238,43 +236,28 @@ func Popcount(z *big.Int) int {
 	return count
 }
 
+// verifyThresholdWitnesses verifies that it's really witnessed by majority of nodes by checking the signature and number of them
 func (node *Node) verifyThresholdWitnesses(msg MessageWithSig) (err error) {
-	// Verify that it's really witnessed by majority of nodes by checking the signature and number of them
-	sig := msg.Signature
-	mask := msg.Mask
-
-	msg.MsgType = Raw
-	msg.Source = -1
-	msg.Mask = common.EmptyMask
-	msg.Signature.Clear()
-	msgBytes := node.ConvertMsg.MessageToBytes(msg)
-
-	if pop := Popcount(&mask); pop < node.ThresholdAck {
-		err = fmt.Errorf("Not enough sigantures: %d < %d", pop, node.ThresholdAck)
+	if pop := Popcount(&msg.Mask); pop < node.ThresholdAck {
+		err = fmt.Errorf("Not enough sigantures: %d(%s) < %d", pop, msg.Mask.Text(16), node.ThresholdAck)
 		return
 	}
 
 	// Verify message signature
-	if sig.Verify(node.EpochPublicKey, *msgBytes) == false {
-		return fmt.Errorf("Threshold signature mismatch for %v", *msgBytes)
+	body, _ := json.Marshal(msg.Body)
+	if !msg.Signature.VerifyMultisig(node.EpochPublicKey, msg.PublicKey, body, &msg.Mask) {
+		return fmt.Errorf("Threshold signature mismatch for '%s'", body)
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 	return
 }
 
 func (node *Node) verifyAckSignature(msg MessageWithSig) (err error) {
-	sig := msg.Signature
-	//source := msg.Source
-	mask := msg.Mask
-
-	msg.MsgType = Raw
-	msg.Source = -1
-	msg.Mask = common.EmptyMask
-	msg.Signature.Clear()
-	msgBytes := node.ConvertMsg.MessageToBytes(msg)
-
-	if sig.Verify(node.PublicKeys[int(mask.Int64())], *msgBytes) == false {
-		err = fmt.Errorf("ACK signature mismatch for %v", *msgBytes)
+	body, _ := json.Marshal(msg.Body)
+	mask := big.NewInt(0)
+	mask.SetBit(mask, msg.Source, 1)
+	if !msg.Signature.VerifyMultisig(node.EpochPublicKey, node.PublicKeys[msg.Source], body, mask) {
+		err = fmt.Errorf("ACK signature mismatch for '%s'", body)
 		return
 	}
 	return
@@ -290,16 +273,15 @@ func (node *Node) AdvanceWithTopic(step int, topic string, wg *sync.WaitGroup) {
 	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
+		Body:    Body{node.TimeStep, *big.NewInt(0xCAFEBABE)},
 		Source:  node.Id,
 		MsgType: Raw,
-		Step:    node.TimeStep,
 		History: make([]MessageWithSig, 0),
 	}
 
 	node.CurrentMsg = msg
-	for i := range node.PublicKeys {
-		node.Signatures[i].Clear()
-	}
+	node.PartSignature = common.ZeroSignature()
+	node.PartPublicKey = common.ZeroPublicKey()
 	node.SigMask = common.EmptyMask
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
@@ -373,15 +355,43 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 			}
 
 			switch msg.MsgType {
-			case Wit:
 
+			case BlsSetupPhase:
+				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
+				for i, _ := range membershipKeyParts {
+					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
+				}
+				outmsg := MessageWithSig{
+					Source:             node.Id,
+					MsgType:            BlsMembershipKeysParts,
+					MembershipKeyParts: membershipKeyParts,
+				}
+				msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
+				node.Comm.Broadcast(*msgBytes)
+
+			case BlsMembershipKeysParts:
+				mutex.Lock()
+				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
+				// TODO: verify the received part!
+				node.MembershipKeyParts[msg.Source] = msg.MembershipKeyParts[node.Id]
+				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
+				if node.MembershipKeyMask.Sign() == 0 {
+					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
+					if !node.MembershipKey.VerifyMembershipKey(node.EpochPublicKey, byte(node.Id)) {
+						logrus.Errorf("Failed to verify membership key on node %d", node.Id)
+					}
+					node.Advance(0)
+				}
+				mutex.Unlock()
+
+			case Wit:
 				if msg.Step > nodeTimeStep+1 {
 					return
 				}
 
 				err := node.verifyThresholdWitnesses(*msg)
 				if err != nil {
-					logrus.Error(err, " at node ", node.Id, msg.Signature.Marshal())
+					logrus.Error("Vit threshold failed: ", err, " at node ", node.Id, msg.Signature.Marshal())
 					return
 				}
 				logrus.Debugf("Verified Vit Signature at node %d from node %d", node.Id, msg.Source)
@@ -394,51 +404,55 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 			case Ack:
 				// Checking that the ack is for message of this step
-				source := int(msg.Mask.Int64())
 				mutex.Lock()
-				if (msg.Step != node.CurrentMsg.Step) || (node.Acks >= node.ThresholdAck) || (node.SigMask.Bit(source) != 0) {
+				if (msg.Step != node.CurrentMsg.Step) || (node.Acks >= node.ThresholdAck) || (node.SigMask.Bit(msg.Source) != 0) {
 					mutex.Unlock()
 					return
 				}
 
 				err := node.verifyAckSignature(*msg)
 				if err != nil {
-					logrus.Error(err, " at node ", node.Id, msg.Source, msg.Mask.Int64(), msg.Signature.Marshal())
+					logrus.Error(err, " at node ", node.Id, msg.Source, msg.Signature.Marshal())
 					return
 				}
-				logrus.Tracef("Verified Ack Signature at node %d from node %d", node.Id, source)
+				logrus.Debugf("Verified Ack Signature at node %d from node %d", node.Id, msg.Source)
 
-				node.SigMask.SetBit(&node.SigMask, source, 1)
-				logrus.Tracef("Node SigMask Merged: %x", node.SigMask.Int64())
+				node.SigMask.SetBit(&node.SigMask, msg.Source, 1)
+				logrus.Debugf("Node SigMask Merged: %x", node.SigMask.Int64())
 
 				// Count acks toward the threshold
 				node.Acks += 1
-				node.Signatures[source] = msg.Signature
+				node.PartSignature.Aggregate(msg.Signature)
+				node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
 
 				if node.Acks >= node.ThresholdAck {
-					// Add aggregate signatures to message
-					msg.Mask = node.SigMask
-					msg.Signature = common.AggregateBlsSignatures(node.Signatures, &node.SigMask)
+					// Send witnessed message if the acks are more than threshold
+					outmsg := MessageWithSig{
+						Body:      msg.Body,
+						MsgType:   Wit,
+						Source:    node.Id,
+						Mask:      node.SigMask,
+						Signature: node.PartSignature,
+						PublicKey: node.PartPublicKey,
+					}
 
 					// Verify before sending message to others
-					if err := node.verifyThresholdWitnesses(*msg); err != nil {
+					if err := node.verifyThresholdWitnesses(outmsg); err != nil {
 						logrus.Error("verifyThresholdWitnesses1 ", err, ", node: ", node.Id, ", mask: ", msg.Mask.Text(16))
 						return
 					}
 
-					// Send witnessed message if the acks are more than threshold
-					msg.MsgType = Wit
-
-					msgBytes := node.ConvertMsg.MessageToBytes(*msg)
+					msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
 					node.Comm.Broadcast(*msgBytes)
 				}
 
 				mutex.Unlock()
 
 			case Raw:
-				if msg.Step > nodeTimeStep+1 {
+				if (msg.Step > nodeTimeStep+1) || !node.MembershipKey.IsSet() {
 					return
-				} else if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
+				}
+				if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
 					// Update nodes local history. Append history from message to local history
 					mutex.Lock()
 					node.History = append(node.History, *msg)
@@ -448,23 +462,19 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 					mutex.Unlock()
 				}
 
-				source := msg.Source
-				msg.MsgType = Raw
-				msg.Source = -1
-				msg.Mask = common.EmptyMask
-				msg.Signature.Clear()
-				msgBytes := node.ConvertMsg.MessageToBytes(*msg)
-
-				logrus.Tracef("Signing message %v at node %d", *msgBytes, node.Id)
-				signature := node.PrivateKey.Sign(*msgBytes)
+				body, _ := json.Marshal(msg.Body)
+				signature := node.PrivateKey.Multisign(body, node.EpochPublicKey, node.MembershipKey)
+				logrus.Debugf("Sign message '%s' at node %d", body, node.Id)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
-				msg.MsgType = Ack
-				msg.Source = source
-				msg.Mask.SetInt64(int64(node.Id))
-				msg.Signature = signature
-				msgBytes = node.ConvertMsg.MessageToBytes(*msg)
-				node.Comm.Send(*msgBytes, msg.Source)
+				outmsg := MessageWithSig{
+					Body:      msg.Body,
+					MsgType:   Ack,
+					Source:    node.Id,
+					Signature: signature,
+				}
+				msgBytes = node.ConvertMsg.MessageToBytes(outmsg)
+				node.Comm.Broadcast(*msgBytes)
 
 			case Catchup:
 				mutex.Lock()

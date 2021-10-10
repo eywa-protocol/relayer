@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
@@ -368,12 +369,6 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	aggregatedPublicKey := common.AggregateBlsPublicKeys(publicKeys, anticoefs)
 
 	for i := range nodes {
-		priv := privateKeys[i]
-		membershipKeyParts := make([]common.BlsSignature, n)
-		membershipKeyMask := big.NewInt((1 << n) - 1)
-		membershipKeyParts[i] = common.GenBlsMembershipKeyPart(priv, byte(i), aggregatedPublicKey, anticoefs[i])
-		membershipKeyMask.SetBit(membershipKeyMask, i, 0)
-
 		// var comm modelBLS.CommunicationInterface
 		var comm *consensus.Protocol
 		comm = new(consensus.Protocol)
@@ -397,14 +392,13 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 			ConvertMsg:         &messageSigpb.Convert{},
 			Comm:               comm,
 			History:            make([]modelBLS.MessageWithSig, 0),
-			Signatures:         make([]common.BlsSignature, n),
 			SigMask:            common.EmptyMask,
 			PublicKeys:         publicKeys,
-			PrivateKey:         priv,
+			PrivateKey:         privateKeys[i],
 			AntiCoefs:          anticoefs,
 			EpochPublicKey:     aggregatedPublicKey,
-			MembershipKeyParts: membershipKeyParts,
-			MembershipKeyMask:  *membershipKeyMask,
+			MembershipKeyParts: make([]common.BlsSignature, n),
+			MembershipKeyMask:  *big.NewInt((1 << n) - 1),
 		}
 
 	}
@@ -413,16 +407,17 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 
 // StartTest is used for starting tlc nodes
 func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
-	fmt.Print("START")
+	logrus.Info("START")
 	wg := &sync.WaitGroup{}
 
-	for _, node := range nodes {
-		node.Advance(0)
-	}
 	for _, node := range nodes {
 		wg.Add(1)
 		go runNodeBLS(node, stop, wg)
 	}
+	msg := modelBLS.MessageWithSig{MsgType: modelBLS.BlsSetupPhase}
+	node := nodes[len(nodes)-1]
+	node.Comm.Broadcast(*node.ConvertMsg.MessageToBytes(msg))
+
 	wg.Add(-fails)
 	wg.Wait()
 	fmt.Println("The END")
@@ -430,13 +425,10 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 
 // StartTest is used for starting tlc nodes
 func StartTestOneStepBLS(nodes []*modelBLS.Node) (consensuses []bool) {
-	fmt.Print("START")
+	logrus.Info("START")
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
-	for _, node := range nodes {
 
-		node.Advance(0)
-	}
 	var consensusesChan []chan bool
 	for _, node := range nodes {
 		wg.Add(1)
@@ -445,6 +437,10 @@ func StartTestOneStepBLS(nodes []*modelBLS.Node) (consensuses []bool) {
 		consensusesChan = append(consensusesChan, consensusChannel)
 
 	}
+
+	msg := modelBLS.MessageWithSig{MsgType: modelBLS.BlsSetupPhase}
+	node := nodes[len(nodes)-1]
+	node.Comm.Broadcast(*node.ConvertMsg.MessageToBytes(msg))
 
 	for i := 0; i < len(consensusesChan); i++ {
 		consensuses = append(consensuses, <-consensusesChan[i])

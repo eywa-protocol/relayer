@@ -114,14 +114,14 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 			case BlsMembershipKeysParts:
 				mutex.Lock()
 				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
-				// TODO: verify the received part!
-				node.MembershipKeyParts[msg.Source] = msg.MembershipKeyParts[node.Id]
+				part := msg.MembershipKeyParts[node.Id]
+				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], byte(node.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
+				}
+				node.MembershipKeyParts[msg.Source] = part
 				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
 				if node.MembershipKeyMask.Sign() == 0 {
 					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
-					if !node.MembershipKey.VerifyMembershipKey(node.EpochPublicKey, byte(node.Id)) {
-						logrus.Errorf("Failed to verify membership key on node %d", node.Id)
-					}
 					node.Advance(0)
 				}
 				mutex.Unlock()
@@ -400,14 +400,14 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 			case BlsMembershipKeysParts:
 				mutex.Lock()
 				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
-				// TODO: verify the received part!
-				node.MembershipKeyParts[msg.Source] = msg.MembershipKeyParts[node.Id]
+				part := msg.MembershipKeyParts[node.Id]
+				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], byte(node.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
+				}
+				node.MembershipKeyParts[msg.Source] = part
 				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
 				if node.MembershipKeyMask.Sign() == 0 {
 					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
-					if !node.MembershipKey.VerifyMembershipKey(node.EpochPublicKey, byte(node.Id)) {
-						logrus.Errorf("Failed to verify membership key on node %d", node.Id)
-					}
 					node.Advance(0)
 				}
 				mutex.Unlock()

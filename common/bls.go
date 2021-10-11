@@ -130,11 +130,13 @@ func (signature BlsSignature) Verify(publicKey BlsPublicKey, message []byte) boo
 	return bn256.PairingCheck(a, b)
 }
 
-func (signature BlsSignature) VerifyMembershipKey(publicKey BlsPublicKey, index byte) bool {
-	hashPoint := hashToPointIndex(publicKey.p, index)
+// VerifyMembershipKeyPart verifies membership key part i ((a⋅pk)×H(P, i))
+// against aggregated public key (P) and public key of the party (pk×G)
+func (signature BlsSignature) VerifyMembershipKeyPart(aggPublicKey BlsPublicKey, partPublicKey BlsPublicKey, index byte) bool {
+	hashPoint := hashToPointIndex(aggPublicKey.p, index)
 
 	a := []*bn256.G1{new(bn256.G1).Neg(signature.p), hashPoint}
-	b := []*bn256.G2{&g2, publicKey.p}
+	b := []*bn256.G2{&g2, partPublicKey.p}
 	return bn256.PairingCheck(a, b)
 }
 

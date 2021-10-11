@@ -272,13 +272,13 @@ func (node *Node) WaitForBlsSetup(done chan bool) {
 				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
 				if node.MembershipKeyMask.Sign() == 0 {
 					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
-					done <- true
 					node.Advance(0)
 				}
 				mutex.Unlock()
 			}
 		}()
 	}
+	done <- true
 	return
 }
 

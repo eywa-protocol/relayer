@@ -24,20 +24,14 @@ func convertModelMessage(msg modelBLS.MessageWithSig) (message *PbMessageSig) {
 		history = append(history, convertModelMessage(hist))
 	}
 
-	mkp := make([][]byte, 0)
-	for _, mki := range msg.MembershipKeyParts {
-		mkp = append(mkp, mki.Marshal())
-	}
-
 	message = &PbMessageSig{
-		Source:             &source,
-		Step:               &step,
-		MsgType:            &msgType,
-		History:            history,
-		Signature:          msg.Signature.Marshal(),
-		Mask:               msg.Mask.Bytes(),
-		PublicKey:          msg.PublicKey.Marshal(),
-		PartMembershipKeys: mkp,
+		Source:    &source,
+		Step:      &step,
+		MsgType:   &msgType,
+		History:   history,
+		Signature: msg.Signature.Marshal(),
+		Mask:      msg.Mask.Bytes(),
+		PublicKey: msg.PublicKey.Marshal(),
 	}
 	return
 }
@@ -68,24 +62,13 @@ func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 		//logrus.Error("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
 	}
 
-	mks := make([]common.BlsSignature, 0)
-	for _, raw := range msg.PartMembershipKeys {
-		mki, err := common.UnmarshalBlsSignature(raw)
-		if err != nil {
-			logrus.Error("UnmarshalBlsSignature error: ", err.Error(), mki)
-		}
-		mks = append(mks, mki)
-	}
-
 	message = modelBLS.MessageWithSig{
-		Body:               modelBLS.Body{int(msg.GetStep()), *big.NewInt(0xCAFEBABE)}, // TODO: add ActionRoot to pb
-		Source:             int(msg.GetSource()),
-		MsgType:            modelBLS.MsgType(int(msg.GetMsgType())),
-		History:            history,
-		Signature:          sig,
-		Mask:               *new(big.Int).SetBytes(msg.Mask),
-		PublicKey:          pub,
-		MembershipKeyParts: mks,
+		Header:    modelBLS.Header{int(msg.GetSource()), modelBLS.MsgType(int(msg.GetMsgType()))},
+		Body:      modelBLS.Body{int(msg.GetStep()), *big.NewInt(0xCAFEBABE)}, // TODO: add ActionRoot to pb
+		History:   history,
+		Signature: sig,
+		Mask:      *new(big.Int).SetBytes(msg.Mask),
+		PublicKey: pub,
 	}
 	return
 }
@@ -94,7 +77,7 @@ func (c *Convert) BytesToModelMessage(msgBytes []byte) *modelBLS.MessageWithSig 
 	var PbMessageSig PbMessageSig
 	err := proto.Unmarshal(msgBytes, &PbMessageSig)
 	if err != nil {
-		fmt.Printf("Error : %v\n", err)
+		logrus.Error("Unmarshal MessageWithSig ", err, string(msgBytes))
 		return nil
 	}
 

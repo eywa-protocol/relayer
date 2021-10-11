@@ -3,6 +3,8 @@ package common
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"os"
 
@@ -132,11 +134,12 @@ func (signature BlsSignature) Verify(publicKey BlsPublicKey, message []byte) boo
 
 // VerifyMembershipKeyPart verifies membership key part i ((a⋅pk)×H(P, i))
 // against aggregated public key (P) and public key of the party (pk×G)
-func (signature BlsSignature) VerifyMembershipKeyPart(aggPublicKey BlsPublicKey, partPublicKey BlsPublicKey, index byte) bool {
+func (signature BlsSignature) VerifyMembershipKeyPart(aggPublicKey BlsPublicKey, partPublicKey BlsPublicKey, anticoef big.Int, index byte) bool {
 	hashPoint := hashToPointIndex(aggPublicKey.p, index)
+	pub := new(bn256.G2).ScalarMult(partPublicKey.p, &anticoef)
 
 	a := []*bn256.G1{new(bn256.G1).Neg(signature.p), hashPoint}
-	b := []*bn256.G2{&g2, partPublicKey.p}
+	b := []*bn256.G2{&g2, pub}
 	return bn256.PairingCheck(a, b)
 }
 
@@ -193,6 +196,24 @@ func (signature BlsSignature) Marshal() []byte {
 		return nil
 	}
 	return signature.p.Marshal()
+}
+
+func (signature BlsSignature) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(signature.Marshal()))
+}
+
+func (signature *BlsSignature) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	raw, err := hex.DecodeString(str)
+	if err != nil {
+		return err
+	}
+	sig, err := UnmarshalBlsSignature(raw)
+	*signature = sig
+	return err
 }
 
 func UnmarshalBlsSignature(raw []byte) (BlsSignature, error) {

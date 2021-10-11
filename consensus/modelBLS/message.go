@@ -14,7 +14,7 @@ const (
 	Wit
 	Catchup
 	BlsSetupPhase
-	BlsMembershipKeysParts
+	BlsSetupParts
 )
 
 type Body struct {
@@ -22,14 +22,22 @@ type Body struct {
 	ActionRoot big.Int // Merkle root of actions in this block
 }
 
+type Header struct {
+	Source  int     // NodeID of message's source
+	MsgType MsgType // Type of message
+}
+
 type MessageWithSig struct {
+	Header
 	Body
-	Source             int     // NodeID of message's source
-	MsgType            MsgType // Type of message
-	History            []MessageWithSig
-	Signature          common.BlsSignature   // Aggregated signature // TODO
-	Mask               big.Int               // Bitmask of those who signed
-	PublicKey          common.BlsPublicKey   // Aggregated public key of those who signed
+	History   []MessageWithSig
+	Signature common.BlsSignature // Aggregated signature // TODO
+	Mask      big.Int             // Bitmask of those who signed
+	PublicKey common.BlsPublicKey // Aggregated public key of those who signed
+}
+
+type MessageBlsSetup struct {
+	Header
 	MembershipKeyParts []common.BlsSignature // Used only in BlsMembershipKeysParts msg
 }
 

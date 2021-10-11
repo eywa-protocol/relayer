@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -405,18 +406,33 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	return nodes, hosts
 }
 
+func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
+	var blsSetupDone []chan bool
+	for _, node := range nodes {
+		done := make(chan bool)
+		wg.Add(1)
+		go runNodeBLSSetup(node, wg, done)
+		blsSetupDone = append(blsSetupDone, done)
+	}
+	msg := modelBLS.MessageBlsSetup{Header: modelBLS.Header{0, modelBLS.BlsSetupPhase}}
+	msgBytes, _ := json.Marshal(msg)
+	nodes[0].Comm.Broadcast(msgBytes)
+
+	for _, done := range blsSetupDone {
+		<-done
+	}
+}
+
 // StartTest is used for starting tlc nodes
 func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 	logrus.Info("START")
 	wg := &sync.WaitGroup{}
 
+	StartBlsSetup(nodes, wg)
 	for _, node := range nodes {
 		wg.Add(1)
 		go runNodeBLS(node, stop, wg)
 	}
-	msg := modelBLS.MessageWithSig{MsgType: modelBLS.BlsSetupPhase}
-	node := nodes[len(nodes)-1]
-	node.Comm.Broadcast(*node.ConvertMsg.MessageToBytes(msg))
 
 	wg.Add(-fails)
 	wg.Wait()
@@ -429,18 +445,14 @@ func StartTestOneStepBLS(nodes []*modelBLS.Node) (consensuses []bool) {
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
 
+	StartBlsSetup(nodes, wg)
 	var consensusesChan []chan bool
 	for _, node := range nodes {
 		wg.Add(1)
 		consensusChannel := make(chan bool)
 		go runOneStepNodeBLS(node, wg, consensusChannel)
 		consensusesChan = append(consensusesChan, consensusChannel)
-
 	}
-
-	msg := modelBLS.MessageWithSig{MsgType: modelBLS.BlsSetupPhase}
-	node := nodes[len(nodes)-1]
-	node.Comm.Broadcast(*node.ConvertMsg.MessageToBytes(msg))
 
 	for i := 0; i < len(consensusesChan); i++ {
 		consensuses = append(consensuses, <-consensusesChan[i])
@@ -474,4 +486,9 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 
 	//achieved = <-consensusChannel
 	//return
+}
+
+func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bool) {
+	defer wg.Done()
+	node.WaitForBlsSetup(done)
 }

@@ -25,9 +25,8 @@ func (node *Node) Advance(step int) {
 	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
+		Header:  Header{node.Id, Raw},
 		Body:    Body{node.TimeStep, *big.NewInt(0xCAFEBABE)},
-		Source:  node.Id,
-		MsgType: Raw,
 		History: make([]MessageWithSig, 0),
 	}
 
@@ -98,33 +97,6 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 			}
 
 			switch msg.MsgType {
-			case BlsSetupPhase:
-				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
-				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
-				}
-				outmsg := MessageWithSig{
-					Source:             node.Id,
-					MsgType:            BlsMembershipKeysParts,
-					MembershipKeyParts: membershipKeyParts,
-				}
-				msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
-				node.Comm.Broadcast(*msgBytes)
-
-			case BlsMembershipKeysParts:
-				mutex.Lock()
-				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
-				part := msg.MembershipKeyParts[node.Id]
-				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], byte(node.Id)) {
-					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
-				}
-				node.MembershipKeyParts[msg.Source] = part
-				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
-				if node.MembershipKeyMask.Sign() == 0 {
-					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
-					node.Advance(0)
-				}
-				mutex.Unlock()
 
 			case Wit:
 
@@ -188,9 +160,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
 					outmsg := MessageWithSig{
+						Header:    Header{node.Id, Wit},
 						Body:      msg.Body,
-						MsgType:   Wit,
-						Source:    node.Id,
 						Mask:      node.SigMask,
 						Signature: node.PartSignature,
 						PublicKey: node.PartPublicKey,
@@ -208,10 +179,9 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 				mutex.Unlock()
 
 			case Raw:
-				if (msg.Step > nodeTimeStep+1) || !node.MembershipKey.IsSet() {
+				if msg.Step > nodeTimeStep+1 {
 					return
-				}
-				if msg.Step == nodeTimeStep+1 {
+				} else if msg.Step == nodeTimeStep+1 {
 					// Node needs to catch up with the message
 					// Update nodes local history. Append history from message to local history
 					mutex.Lock()
@@ -228,9 +198,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				outmsg := MessageWithSig{
+					Header:    Header{node.Id, Ack},
 					Body:      msg.Body,
-					MsgType:   Ack,
-					Source:    node.Id,
 					Signature: signature,
 				}
 				msgBytes = node.ConvertMsg.MessageToBytes(outmsg)
@@ -251,6 +220,66 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 	}
 	return err
+}
+
+// WaitForBlsSetup handles BLS setup phase and sets node.membershipKey as a result
+func (node *Node) WaitForBlsSetup(done chan bool) {
+	mutex := &sync.Mutex{}
+	msgChan := make(chan *[]byte, ChanLen)
+
+	finished := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return node.MembershipKey.IsSet()
+	}
+
+	for !finished() {
+		rcvdMsg := node.Comm.Receive()
+		if rcvdMsg == nil {
+			continue
+		}
+		msgChan <- rcvdMsg
+
+		go func() {
+			msgBytes := <-msgChan
+			var msg MessageBlsSetup
+			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
+				logrus.Errorf("Unable to decode received message, skipped: %v %d", msgBytes, node.Id)
+				return
+			}
+
+			switch msg.MsgType {
+			case BlsSetupPhase:
+				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
+				for i, _ := range membershipKeyParts {
+					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
+				}
+				outmsg := MessageBlsSetup{
+					Header:             Header{node.Id, BlsSetupParts},
+					MembershipKeyParts: membershipKeyParts,
+				}
+				msgBytes, _ := json.Marshal(outmsg)
+				node.Comm.Broadcast(msgBytes)
+
+			case BlsSetupParts:
+				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, node.Id)
+				part := msg.MembershipKeyParts[node.Id]
+				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], node.AntiCoefs[msg.Source], byte(node.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
+				}
+				mutex.Lock()
+				node.MembershipKeyParts[msg.Source] = part
+				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
+				if node.MembershipKeyMask.Sign() == 0 {
+					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
+					done <- true
+					node.Advance(0)
+				}
+				mutex.Unlock()
+			}
+		}()
+	}
+	return
 }
 
 func Popcount(z *big.Int) int {
@@ -301,9 +330,8 @@ func (node *Node) AdvanceWithTopic(step int, topic string, wg *sync.WaitGroup) {
 	// fmt.Printf("Node ID %d, STEP %d\n", node.Id, node.TimeStep)
 
 	msg := MessageWithSig{
+		Header:  Header{node.Id, Raw},
 		Body:    Body{node.TimeStep, *big.NewInt(0xCAFEBABE)},
-		Source:  node.Id,
-		MsgType: Raw,
 		History: make([]MessageWithSig, 0),
 	}
 
@@ -383,35 +411,6 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 			}
 
 			switch msg.MsgType {
-
-			case BlsSetupPhase:
-				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
-				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
-				}
-				outmsg := MessageWithSig{
-					Source:             node.Id,
-					MsgType:            BlsMembershipKeysParts,
-					MembershipKeyParts: membershipKeyParts,
-				}
-				msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
-				node.Comm.Broadcast(*msgBytes)
-
-			case BlsMembershipKeysParts:
-				mutex.Lock()
-				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
-				part := msg.MembershipKeyParts[node.Id]
-				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], byte(node.Id)) {
-					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
-				}
-				node.MembershipKeyParts[msg.Source] = part
-				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
-				if node.MembershipKeyMask.Sign() == 0 {
-					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
-					node.Advance(0)
-				}
-				mutex.Unlock()
-
 			case Wit:
 				if msg.Step > nodeTimeStep+1 {
 					return
@@ -456,9 +455,8 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
 					outmsg := MessageWithSig{
+						Header:    Header{node.Id, Wit},
 						Body:      msg.Body,
-						MsgType:   Wit,
-						Source:    node.Id,
 						Mask:      node.SigMask,
 						Signature: node.PartSignature,
 						PublicKey: node.PartPublicKey,
@@ -477,10 +475,9 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				mutex.Unlock()
 
 			case Raw:
-				if (msg.Step > nodeTimeStep+1) || !node.MembershipKey.IsSet() {
+				if msg.Step > nodeTimeStep+1 {
 					return
-				}
-				if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
+				} else if msg.Step == nodeTimeStep+1 { // Node needs to catch up with the message
 					// Update nodes local history. Append history from message to local history
 					mutex.Lock()
 					node.History = append(node.History, *msg)
@@ -496,9 +493,8 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				outmsg := MessageWithSig{
+					Header:    Header{node.Id, Ack},
 					Body:      msg.Body,
-					MsgType:   Ack,
-					Source:    node.Id,
 					Signature: signature,
 				}
 				msgBytes = node.ConvertMsg.MessageToBytes(outmsg)

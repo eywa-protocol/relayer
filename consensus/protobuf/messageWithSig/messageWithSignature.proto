@@ -6,8 +6,6 @@ enum Msg_type {
     Ack = 1;
     Wit = 2;
     Catchup = 3;
-    BlsSetupPhase = 4;
-    BlsMembershipKeysParts = 5;
 }
 
 message PbMessageSig{
@@ -18,5 +16,4 @@ message PbMessageSig{
     optional bytes signature = 5;
     optional bytes mask = 6;
     optional bytes public_key = 7;
-    repeated bytes part_membership_keys = 8;
 }

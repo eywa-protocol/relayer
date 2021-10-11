@@ -98,6 +98,34 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 			}
 
 			switch msg.MsgType {
+			case BlsSetupPhase:
+				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
+				for i, _ := range membershipKeyParts {
+					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
+				}
+				outmsg := MessageWithSig{
+					Source:             node.Id,
+					MsgType:            BlsMembershipKeysParts,
+					MembershipKeyParts: membershipKeyParts,
+				}
+				msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
+				node.Comm.Broadcast(*msgBytes)
+
+			case BlsMembershipKeysParts:
+				mutex.Lock()
+				logrus.Debugf("MembershipKeyParts of node %d received by node %d", msg.Source, node.Id)
+				// TODO: verify the received part!
+				node.MembershipKeyParts[msg.Source] = msg.MembershipKeyParts[node.Id]
+				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
+				if node.MembershipKeyMask.Sign() == 0 {
+					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
+					if !node.MembershipKey.VerifyMembershipKey(node.EpochPublicKey, byte(node.Id)) {
+						logrus.Errorf("Failed to verify membership key on node %d", node.Id)
+					}
+					node.Advance(0)
+				}
+				mutex.Unlock()
+
 			case Wit:
 
 				if msg.Step > nodeTimeStep+1 {

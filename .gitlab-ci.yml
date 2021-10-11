@@ -1,0 +1,27 @@
+services:
+  - docker:bind
+
+stages:
+  - build:app
+
+### Build ###
+
+build:app:
+  stage: build:app
+  before_script:
+    - curl --output wrappers.zip --header "${JOB_TOKEN}" "https://gitlab.digiu.ai/api/v4/projects/${PROJECT_ID}/jobs/artifacts/${TAG}/download?job=${JOB_NAME}"
+    - unzip wrappers.zip
+  script:
+    - docker build -f .ci/Dockerfile -t "registry.digiu.ai/${CI_PROJECT_NAME}/bridge:${CI_COMMIT_SHORT_SHA}" .
+  after_script:
+    - docker login -u ${DOCKER_REGISTRY_USER_NAME} -p ${DOCKER_REGISTRY_USER_PASSWORD} registry.digiu.ai
+    - docker push registry.digiu.ai/${CI_PROJECT_NAME}/bridge:${CI_COMMIT_SHORT_SHA}
+  only:
+    - branches
+  tags:
+    - docker
+  variables:
+    PROJECT_ID: "${DIGIU_CONTRACTS_PROJECT_ID}"
+    TAG: "${DIGIU_CONTRACTS_TAG}"
+    JOB_NAME: "${DIGIU_CONTRACTS_JOB_NAME}"
+    JOB_TOKEN: "JOB-TOKEN: $CI_JOB_TOKEN"

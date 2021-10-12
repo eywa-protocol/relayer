@@ -11,12 +11,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messagepb"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/test_utils"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 
 	core "github.com/libp2p/go-libp2p-core"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
@@ -356,17 +356,17 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	// hosts used in libp2p communications
 	hosts := make([]*core.Host, n)
 
-	publicKeys := make([]common.BlsPublicKey, 0)
-	privateKeys := make([]common.BlsPrivateKey, 0)
+	publicKeys := make([]bls.PublicKey, 0)
+	privateKeys := make([]bls.PrivateKey, 0)
 
 	for range nodes {
-		priv, pub := common.GenRandomBlsKey()
+		priv, pub := bls.GenerateRandomKey()
 		privateKeys = append(privateKeys, priv)
 		publicKeys = append(publicKeys, pub)
 	}
 
-	anticoefs := common.CalculateAntiRogueCoefficients(publicKeys)
-	aggregatedPublicKey := common.AggregateBlsPublicKeys(publicKeys, anticoefs)
+	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
+	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
 
 	for i := range nodes {
 		// var comm modelBLS.CommunicationInterface
@@ -392,7 +392,7 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 			ConvertMsg:     &messageSigpb.Convert{},
 			Comm:           comm,
 			History:        make([]modelBLS.MessageWithSig, 0),
-			SigMask:        common.EmptyMask,
+			SigMask:        bls.EmptyMultisigMask(),
 			PublicKeys:     publicKeys,
 			PrivateKey:     privateKeys[i],
 			EpochPublicKey: aggregatedPublicKey,
@@ -403,9 +403,9 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 }
 
 func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
-	var blsSetupDone []chan common.BlsSignature
+	var blsSetupDone []chan bls.Signature
 	for _, node := range nodes {
-		done := make(chan common.BlsSignature)
+		done := make(chan bls.Signature)
 		wg.Add(1)
 		go runNodeBLSSetup(node, wg, done)
 		blsSetupDone = append(blsSetupDone, done)
@@ -484,7 +484,7 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 	//return
 }
 
-func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan common.BlsSignature) {
+func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bls.Signature) {
 	defer wg.Done()
 	node.WaitForBlsSetup(done)
 }

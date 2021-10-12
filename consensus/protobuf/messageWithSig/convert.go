@@ -6,8 +6,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 )
 
 type Convert struct{}
@@ -54,12 +54,12 @@ func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 		history = append(history, convertPbMessageSig(hist))
 	}
 
-	sig, err := common.UnmarshalBlsSignature(msg.Signature)
+	sig, err := bls.UnmarshalSignature(msg.Signature)
 	if err != nil {
 		logrus.Trace("UnmarshalBlsSignature error: ", err.Error(), msg.Signature)
 	}
 
-	pub, err := common.UnmarshalBlsPublicKey(msg.PublicKey)
+	pub, err := bls.UnmarshalPublicKey(msg.PublicKey)
 	if err != nil {
 		logrus.Trace("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
 	}

@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 )
 
 const ChanLen = 500
@@ -31,9 +31,9 @@ func (node *Node) Advance(step int) {
 	}
 
 	node.CurrentMsg = msg
-	node.PartSignature = common.ZeroSignature()
-	node.PartPublicKey = common.ZeroPublicKey()
-	node.SigMask = common.EmptyMask
+	node.PartSignature = bls.ZeroSignature()
+	node.PartPublicKey = bls.ZeroPublicKey()
+	node.SigMask = bls.EmptyMultisigMask()
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
 	node.Comm.Broadcast(*msgBytes)
@@ -223,13 +223,13 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 }
 
 // WaitForBlsSetup handles BLS setup phase and sets node.membershipKey as a result
-func (node *Node) WaitForBlsSetup(done chan common.BlsSignature) {
+func (node *Node) WaitForBlsSetup(done chan bls.Signature) {
 	mutex := &sync.Mutex{}
 	n := len(node.PublicKeys)
-	anticoefs := common.CalculateAntiRogueCoefficients(node.PublicKeys)
-	receivedMembershipKeyParts := make([]common.BlsSignature, n)
+	anticoefs := bls.CalculateAntiRogueCoefficients(node.PublicKeys)
+	receivedMembershipKeyParts := make([]bls.Signature, n)
 	receivedMembershipKeyMask := *big.NewInt((1 << n) - 1)
-	membershipKey := common.BlsSignature{}
+	membershipKey := bls.Signature{}
 	msgChan := make(chan *[]byte, ChanLen)
 
 	finished := func() bool {
@@ -255,9 +255,9 @@ func (node *Node) WaitForBlsSetup(done chan common.BlsSignature) {
 
 			switch msg.MsgType {
 			case BlsSetupPhase:
-				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
+				membershipKeyParts := make([]bls.Signature, len(node.PublicKeys))
 				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, anticoefs[node.Id])
+					membershipKeyParts[i] = bls.GenerateMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, anticoefs[node.Id])
 				}
 				outmsg := MessageBlsSetup{
 					Header:             Header{node.Id, BlsSetupParts},
@@ -276,7 +276,7 @@ func (node *Node) WaitForBlsSetup(done chan common.BlsSignature) {
 				receivedMembershipKeyParts[msg.Source] = part
 				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
 				if receivedMembershipKeyMask.Sign() == 0 {
-					membershipKey = common.AggregateBlsSignatures(receivedMembershipKeyParts)
+					membershipKey = bls.AggregateSignatures(receivedMembershipKeyParts)
 					node.Advance(0)
 				}
 				mutex.Unlock()
@@ -341,9 +341,9 @@ func (node *Node) AdvanceWithTopic(step int, topic string, wg *sync.WaitGroup) {
 	}
 
 	node.CurrentMsg = msg
-	node.PartSignature = common.ZeroSignature()
-	node.PartPublicKey = common.ZeroPublicKey()
-	node.SigMask = common.EmptyMask
+	node.PartSignature = bls.ZeroSignature()
+	node.PartPublicKey = bls.ZeroPublicKey()
+	node.SigMask = bls.EmptyMultisigMask()
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
 	node.Comm.Broadcast(*msgBytes)

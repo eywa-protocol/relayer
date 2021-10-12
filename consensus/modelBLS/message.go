@@ -3,7 +3,7 @@ package modelBLS
 import (
 	"math/big"
 
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 )
 
 type MsgType int
@@ -31,14 +31,14 @@ type MessageWithSig struct {
 	Header
 	Body
 	History   []MessageWithSig
-	Signature common.BlsSignature // Aggregated signature // TODO
-	Mask      big.Int             // Bitmask of those who signed
-	PublicKey common.BlsPublicKey // Aggregated public key of those who signed
+	Signature bls.Signature // Aggregated signature
+	Mask      big.Int       // Bitmask of those who signed
+	PublicKey bls.PublicKey // Aggregated public key of those who signed
 }
 
 type MessageBlsSetup struct {
 	Header
-	MembershipKeyParts []common.BlsSignature // Used only in BlsMembershipKeysParts msg
+	MembershipKeyParts []bls.Signature
 }
 
 type MessageInterface interface {

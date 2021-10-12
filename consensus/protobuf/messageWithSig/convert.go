@@ -6,8 +6,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 )
 
 type Convert struct{}

@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 )
 
 // Node is the struct used for keeping everything related to a node in TLC.

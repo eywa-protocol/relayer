@@ -11,12 +11,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messagepb"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/test_utils"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 
 	core "github.com/libp2p/go-libp2p-core"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"

@@ -3,7 +3,7 @@ package modelBLS
 import (
 	"math/big"
 
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 )
 
 type MsgType int

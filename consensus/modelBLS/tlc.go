@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 )
 
 const ChanLen = 500
@@ -227,15 +227,15 @@ func (node *Node) WaitForBlsSetup(done chan bls.Signature) {
 	mutex := &sync.Mutex{}
 	n := len(node.PublicKeys)
 	anticoefs := bls.CalculateAntiRogueCoefficients(node.PublicKeys)
-	receivedMembershipKeyParts := make([]bls.Signature, n)
 	receivedMembershipKeyMask := *big.NewInt((1 << n) - 1)
-	membershipKey := bls.Signature{}
+	membershipKey := bls.ZeroSignature()
+	complete := false
 	msgChan := make(chan *[]byte, ChanLen)
 
 	finished := func() bool {
 		mutex.Lock()
 		defer mutex.Unlock()
-		return membershipKey.IsSet()
+		return complete
 	}
 
 	for !finished() {
@@ -273,10 +273,10 @@ func (node *Node) WaitForBlsSetup(done chan bls.Signature) {
 					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
 				}
 				mutex.Lock()
-				receivedMembershipKeyParts[msg.Source] = part
+				membershipKey.Aggregate(part)
 				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
 				if receivedMembershipKeyMask.Sign() == 0 {
-					membershipKey = bls.AggregateSignatures(receivedMembershipKeyParts)
+					complete = true
 					node.Advance(0)
 				}
 				mutex.Unlock()

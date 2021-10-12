@@ -11,9 +11,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/libp2p/go-flow-metrics"
+	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/crypto/bls"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/uptime"

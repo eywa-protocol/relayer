@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/big"
 	"os"
 	"sync"
 	"testing"
@@ -385,21 +384,18 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		// ////
 
 		nodes[i] = &modelBLS.Node{
-			Id:                 i,
-			TimeStep:           0,
-			ThresholdWit:       n/2 + 1,
-			ThresholdAck:       n/2 + 1,
-			Acks:               0,
-			ConvertMsg:         &messageSigpb.Convert{},
-			Comm:               comm,
-			History:            make([]modelBLS.MessageWithSig, 0),
-			SigMask:            common.EmptyMask,
-			PublicKeys:         publicKeys,
-			PrivateKey:         privateKeys[i],
-			AntiCoefs:          anticoefs,
-			EpochPublicKey:     aggregatedPublicKey,
-			MembershipKeyParts: make([]common.BlsSignature, n),
-			MembershipKeyMask:  *big.NewInt((1 << n) - 1),
+			Id:             i,
+			TimeStep:       0,
+			ThresholdWit:   n/2 + 1,
+			ThresholdAck:   n/2 + 1,
+			Acks:           0,
+			ConvertMsg:     &messageSigpb.Convert{},
+			Comm:           comm,
+			History:        make([]modelBLS.MessageWithSig, 0),
+			SigMask:        common.EmptyMask,
+			PublicKeys:     publicKeys,
+			PrivateKey:     privateKeys[i],
+			EpochPublicKey: aggregatedPublicKey,
 		}
 
 	}
@@ -407,9 +403,9 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 }
 
 func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
-	var blsSetupDone []chan bool
+	var blsSetupDone []chan common.BlsSignature
 	for _, node := range nodes {
-		done := make(chan bool)
+		done := make(chan common.BlsSignature)
 		wg.Add(1)
 		go runNodeBLSSetup(node, wg, done)
 		blsSetupDone = append(blsSetupDone, done)
@@ -418,8 +414,8 @@ func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
 	msgBytes, _ := json.Marshal(msg)
 	nodes[0].Comm.Broadcast(msgBytes)
 
-	for _, done := range blsSetupDone {
-		<-done
+	for i, done := range blsSetupDone {
+		nodes[i].MembershipKey = <-done
 	}
 }
 
@@ -488,7 +484,7 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 	//return
 }
 
-func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bool) {
+func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan common.BlsSignature) {
 	defer wg.Done()
 	node.WaitForBlsSetup(done)
 }

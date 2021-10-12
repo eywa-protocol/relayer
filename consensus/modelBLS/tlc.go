@@ -223,14 +223,19 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 }
 
 // WaitForBlsSetup handles BLS setup phase and sets node.membershipKey as a result
-func (node *Node) WaitForBlsSetup(done chan bool) {
+func (node *Node) WaitForBlsSetup(done chan common.BlsSignature) {
 	mutex := &sync.Mutex{}
+	n := len(node.PublicKeys)
+	anticoefs := common.CalculateAntiRogueCoefficients(node.PublicKeys)
+	receivedMembershipKeyParts := make([]common.BlsSignature, n)
+	receivedMembershipKeyMask := *big.NewInt((1 << n) - 1)
+	membershipKey := common.BlsSignature{}
 	msgChan := make(chan *[]byte, ChanLen)
 
 	finished := func() bool {
 		mutex.Lock()
 		defer mutex.Unlock()
-		return node.MembershipKey.IsSet()
+		return membershipKey.IsSet()
 	}
 
 	for !finished() {
@@ -252,7 +257,7 @@ func (node *Node) WaitForBlsSetup(done chan bool) {
 			case BlsSetupPhase:
 				membershipKeyParts := make([]common.BlsSignature, len(node.PublicKeys))
 				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, node.AntiCoefs[node.Id])
+					membershipKeyParts[i] = common.GenBlsMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, anticoefs[node.Id])
 				}
 				outmsg := MessageBlsSetup{
 					Header:             Header{node.Id, BlsSetupParts},
@@ -264,21 +269,21 @@ func (node *Node) WaitForBlsSetup(done chan bool) {
 			case BlsSetupParts:
 				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, node.Id)
 				part := msg.MembershipKeyParts[node.Id]
-				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], node.AntiCoefs[msg.Source], byte(node.Id)) {
+				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], anticoefs[msg.Source], byte(node.Id)) {
 					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
 				}
 				mutex.Lock()
-				node.MembershipKeyParts[msg.Source] = part
-				node.MembershipKeyMask.SetBit(&node.MembershipKeyMask, msg.Source, 0)
-				if node.MembershipKeyMask.Sign() == 0 {
-					node.MembershipKey = common.AggregateBlsSignatures(node.MembershipKeyParts)
+				receivedMembershipKeyParts[msg.Source] = part
+				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
+				if receivedMembershipKeyMask.Sign() == 0 {
+					membershipKey = common.AggregateBlsSignatures(receivedMembershipKeyParts)
 					node.Advance(0)
 				}
 				mutex.Unlock()
 			}
 		}()
 	}
-	done <- true
+	done <- membershipKey
 	return
 }
 

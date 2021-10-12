@@ -15,11 +15,12 @@ type Convert struct{}
 // ConvertModelMessage is for converting message defined in model to message used by protobuf
 func convertModelMessage(msg modelBLS.MessageWithSig) (message *PbMessageSig) {
 	source := int64(msg.Source)
-	step := int64(msg.Body.Step)
+	step := int64(msg.Step)
 
 	msgType := MsgType(int(msg.MsgType))
 
 	history := make([]*PbMessageSig, 0)
+
 	for _, hist := range msg.History {
 		history = append(history, convertModelMessage(hist))
 	}
@@ -48,18 +49,19 @@ func (c *Convert) MessageToBytes(msg modelBLS.MessageWithSig) *[]byte {
 // ConvertPbMessageSig is for converting protobuf message to message used in model
 func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 	history := make([]modelBLS.MessageWithSig, 0)
+
 	for _, hist := range msg.History {
 		history = append(history, convertPbMessageSig(hist))
 	}
 
 	sig, err := common.UnmarshalBlsSignature(msg.Signature)
 	if err != nil {
-		//logrus.Error("UnmarshalBlsSignature error: ", err.Error(), msg.Signature)
+		logrus.Trace("UnmarshalBlsSignature error: ", err.Error(), msg.Signature)
 	}
 
 	pub, err := common.UnmarshalBlsPublicKey(msg.PublicKey)
 	if err != nil {
-		//logrus.Error("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
+		logrus.Trace("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
 	}
 
 	message = modelBLS.MessageWithSig{

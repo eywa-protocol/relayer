@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+touch ../.env.prom
+
 HARDHAT="../external/eth-contracts/hardhat"
 EXAMPLE="/.env.example"
 CONFIG="/.env"
@@ -80,8 +82,4 @@ done
 cat ../.data/bsn.yaml >> ../.data/bridge.yaml
 cat ../.data/bsn.yaml >> ../.data/gsn.yaml
 
-
-
-
-
-
+./build_prom_config.sh

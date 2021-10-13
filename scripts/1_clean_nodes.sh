@@ -24,8 +24,16 @@ else
 fi
 
 
+prom=$(docker ps -a --format "{{.Names}}" | grep prometheus | sort -n)
+if [[ "prom" == "" ]] ;then
+  echo "prometheus container not found"
+else
+  docker stop $prom
+  docker rm $prom
+fi
+
 if [[ "$(docker images p2p-bridge_img | grep p2p-bridge_img)" == "" ]];then
-  echo "bootstrap nodes image not found"
+  echo "nodes image not found"
 else
   docker rmi -f p2p-bridge_img
 fi

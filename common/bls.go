@@ -3,7 +3,7 @@ package common
 import (
 	"os"
 
-	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
+	"github.com/eywa-protocol/bls-crypto/bls"
 )
 
 func ReadBlsPrivateKeyFromFile(fileName string) (priv bls.PrivateKey, err error) {

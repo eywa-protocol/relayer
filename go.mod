@@ -2,7 +2,7 @@ module gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge
 
 go 1.16
 
-replace gitlab.digiu.ai/blockchainlaboratory/bls-crypto => ../bls-crypto/
+//replace github.com/eywa-protocol/bls-crypto => ../bls-crypto/
 
 replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contracts/wrappers/
 
@@ -15,6 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.8
 	github.com/evalphobia/logrus_sentry v0.8.2
+	github.com/eywa-protocol/bls-crypto v0.1.1
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/ipfs/go-cid v0.0.7
@@ -36,7 +37,6 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
-	gitlab.digiu.ai/blockchainlaboratory/bls-crypto v0.1.0
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a

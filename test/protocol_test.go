@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"

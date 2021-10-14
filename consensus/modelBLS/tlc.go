@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/bls-crypto/bls"
 )
 
 const ChanLen = 500
@@ -154,8 +154,8 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 
 				// Count acks toward the threshold
 				node.Acks += 1
-				node.PartSignature.Aggregate(msg.Signature)
-				node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
+				node.PartSignature = node.PartSignature.Aggregate(msg.Signature)
+				node.PartPublicKey = node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
 
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
@@ -257,7 +257,7 @@ func (node *Node) WaitForBlsSetup(done chan bls.Signature) {
 			case BlsSetupPhase:
 				membershipKeyParts := make([]bls.Signature, len(node.PublicKeys))
 				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = bls.GenerateMembershipKeyPart(node.PrivateKey, byte(i), node.EpochPublicKey, anticoefs[node.Id])
+					membershipKeyParts[i] = node.PrivateKey.GenerateMembershipKeyPart(byte(i), node.EpochPublicKey, anticoefs[node.Id])
 				}
 				outmsg := MessageBlsSetup{
 					Header:             Header{node.Id, BlsSetupParts},
@@ -273,7 +273,7 @@ func (node *Node) WaitForBlsSetup(done chan bls.Signature) {
 					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
 				}
 				mutex.Lock()
-				membershipKey.Aggregate(part)
+				membershipKey = membershipKey.Aggregate(part)
 				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
 				if receivedMembershipKeyMask.Sign() == 0 {
 					complete = true
@@ -454,8 +454,8 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 				// Count acks toward the threshold
 				node.Acks += 1
-				node.PartSignature.Aggregate(msg.Signature)
-				node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
+				node.PartSignature = node.PartSignature.Aggregate(msg.Signature)
+				node.PartPublicKey = node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
 
 				if node.Acks >= node.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold

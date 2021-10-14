@@ -8,7 +8,7 @@ import (
 	"math/big"
 )
 
-func (c *client) ChainId(ctx context.Context) (*big.Int, error) {
+func (c *client) ChainID(ctx context.Context) (*big.Int, error) {
 	if _, err := c.getClient(); err != nil {
 		return nil, err
 	} else {

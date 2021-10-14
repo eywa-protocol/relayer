@@ -2,7 +2,6 @@ package extChains
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 )
 
@@ -24,8 +23,9 @@ func NewService(ctx context.Context, chainsConfig ChainsConfig) (*service, error
 
 			return nil, err
 		} else {
+
 			s.clients = append(s.clients, client)
 		}
-
 	}
+	return s, nil
 }

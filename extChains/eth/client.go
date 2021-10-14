@@ -73,13 +73,13 @@ func (c *client) subLoop() {
 			case <-c.reSubWatchers:
 				c.mx.Lock()
 				if c.connected && c.recreated {
+					c.mx.Unlock()
 					for _, watcher := range c.watchers {
-						if err := watcher.Resubscribe(); err != nil {
-							logrus.Error(fmt.Errorf("watcher resubscribe error: %w"))
-						}
+						watcher.Resubscribe()
 					}
+				} else {
+					c.mx.Unlock()
 				}
-				c.mx.Unlock()
 			case <-c.ctx.Done():
 				break
 			}
@@ -95,9 +95,13 @@ func (c *client) AddWatcher(contract ContractWatcher) {
 	}
 	key := c.watcherKey(contract)
 	if _, exists := c.watchers[key]; !exists {
-		c.watchers[key] = NewClientWatcher(c.ctx, c, contract)
-	}
+		watcher := NewClientWatcher(c.ctx, c, contract)
+		c.watchers[key] = watcher
+		if err := watcher.Subscribe(); err != nil {
 
+			logrus.Error(fmt.Errorf("watcher subscribe error: %w", err))
+		}
+	}
 }
 
 func (c *client) RemoveWatcher(contract ContractWatcher) {

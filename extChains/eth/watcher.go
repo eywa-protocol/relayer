@@ -9,24 +9,22 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"math/big"
 	"sync"
+	"time"
 )
-
 
 type ContractWatcher interface {
 	Abi() abi.ABI
 	Name() string
 	Address() common.Address
 	Query() [][]interface{}
-	NewEventPointer() interface{}
-	SetEventRaw(interface{}, types.Log)
-	OnEvent(event interface{}) error
-	OnSubscribe(chainId *big.Int)
-	OnResubscribe(chainId *big.Int)
+	NewEvent() interface{}
+	SetEventRaw(eventPointer interface{}, log types.Log)
+	OnEvent(event interface{})
 }
 
 type ClientWatcher interface {
 	Subscribe() error
-	Resubscribe() error
+	Resubscribe()
 	Close()
 }
 
@@ -34,9 +32,8 @@ func NewClientWatcher(ctx context.Context, client *client, contract ContractWatc
 	w := &clientWatcher{
 		client:   client,
 		cache:    NewLogCache(),
-		wg:       new(sync.WaitGroup),
-		mx:       new(sync.Mutex),
 		contract: contract,
+		mx:       new(sync.Mutex),
 	}
 
 	w.ctx, w.cancel = context.WithCancel(ctx)
@@ -48,20 +45,19 @@ type clientWatcher struct {
 	cancel   context.CancelFunc
 	client   *client
 	cache    *LogCache
-	wg       *sync.WaitGroup
-	mx       *sync.Mutex
 	contract ContractWatcher
 	sub      event.Subscription
+	mx       *sync.Mutex
 }
 
-func (cw *clientWatcher) unpackLog(out interface{}, log types.Log) error {
+func (w *clientWatcher) unpackLog(out interface{}, log types.Log) error {
 	if len(log.Data) > 0 {
-		if err := cw.contract.Abi().UnpackIntoInterface(out, cw.contract.Name(), log.Data); err != nil {
+		if err := w.contract.Abi().UnpackIntoInterface(out, w.contract.Name(), log.Data); err != nil {
 			return err
 		}
 	}
 	var indexed abi.Arguments
-	for _, arg := range cw.contract.Abi().Events[cw.contract.Name()].Inputs {
+	for _, arg := range w.contract.Abi().Events[w.contract.Name()].Inputs {
 		if arg.Indexed {
 			indexed = append(indexed, arg)
 		}
@@ -69,9 +65,9 @@ func (cw *clientWatcher) unpackLog(out interface{}, log types.Log) error {
 	return abi.ParseTopics(out, indexed, log.Topics[1:])
 }
 
-func (cw *clientWatcher) watchEvents(ch chan<- interface{}) (event.Subscription, error) {
+func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 
-	if logChan, sub, err := cw.watchLogs(); err != nil {
+	if logChan, sub, err := w.watchLogs(); err != nil {
 
 		return nil, err
 	} else {
@@ -80,21 +76,27 @@ func (cw *clientWatcher) watchEvents(ch chan<- interface{}) (event.Subscription,
 			for {
 				select {
 				case log := <-logChan:
-					eventPointer := cw.contract.NewEventPointer()
-					if err := cw.unpackLog(eventPointer, log); err != nil {
-						return err
+					if !w.cache.Exists(log) {
+						contractEvent := w.contract.NewEvent()
+						if err := w.unpackLog(&contractEvent, log); err != nil {
+							return err
+						}
+						w.contract.SetEventRaw(&contractEvent, log)
+						w.client.wg.Add(1)
+						go func() {
+							defer w.client.wg.Done()
+							w.contract.OnEvent(contractEvent)
+						}()
+						select {
+
+						case err := <-sub.Err():
+
+							return err
+						case <-quit:
+
+							return nil
+						}
 					}
-					cw.contract.SetEventRaw(eventPointer, log)
-					select {
-					case ch <- eventPointer:
-					case err := <-sub.Err():
-
-						return err
-					case <-quit:
-
-						return nil
-					}
-
 				case err := <-sub.Err():
 
 					return err
@@ -107,10 +109,10 @@ func (cw *clientWatcher) watchEvents(ch chan<- interface{}) (event.Subscription,
 	}
 }
 
-func (cw *clientWatcher) watchLogs() (chan types.Log, event.Subscription, error) {
+func (w *clientWatcher) watchLogs() (chan types.Log, event.Subscription, error) {
 
 	// Append the event selector to the query parameters and construct the topic set
-	query := append([][]interface{}{{cw.contract.Abi().Events[cw.contract.Name()].ID}}, cw.contract.Query()...)
+	query := append([][]interface{}{{w.contract.Abi().Events[w.contract.Name()].ID}}, w.contract.Query()...)
 
 	logs := make(chan types.Log, 128)
 
@@ -120,16 +122,16 @@ func (cw *clientWatcher) watchLogs() (chan types.Log, event.Subscription, error)
 	} else {
 
 		filterQuery := ethereum.FilterQuery{
-			Addresses: []common.Address{cw.contract.Address()},
+			Addresses: []common.Address{w.contract.Address()},
 			Topics:    topics,
 		}
 
-		if blockNumber := cw.cache.BlockNumber(); blockNumber > 0 {
+		if blockNumber := w.cache.BlockNumber(); blockNumber > 0 {
 
 			filterQuery.FromBlock = new(big.Int).SetUint64(blockNumber)
 		}
 
-		if sub, err := cw.client.SubscribeFilterLogs(cw.ctx, filterQuery, logs); err != nil {
+		if sub, err := w.client.SubscribeFilterLogs(w.ctx, filterQuery, logs); err != nil {
 
 			return nil, nil, err
 		} else {
@@ -139,20 +141,33 @@ func (cw *clientWatcher) watchLogs() (chan types.Log, event.Subscription, error)
 	}
 }
 
-func (cw *clientWatcher) Subscribe(ch chan<- interface{}) error {
-    var err
-    if cw.sub,err = cw.watchEvents(ch);err!= nil {
+func (w *clientWatcher) Subscribe() error {
+	w.mx.Lock()
+	defer w.mx.Unlock()
+	var err error
+	if w.sub, err = w.watchEvents(); err != nil {
 
-    	return err
-    }else {
-    	return err
+		return err
+	} else {
+		return nil
 	}
 }
 
-func (cw *clientWatcher) Resubscribe() error {
-	panic("implement me")
+func (w *clientWatcher) Resubscribe() {
+	w.mx.Lock()
+	defer w.mx.Unlock()
+
+	w.sub = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
+		return w.watchEvents()
+	})
 }
 
-func (cw *clientWatcher) Close() {
-	cw.cancel()
+func (w *clientWatcher) Close() {
+	w.mx.Lock()
+	defer w.mx.Unlock()
+
+	if w.sub != nil {
+		w.sub.Unsubscribe()
+	}
+	w.cancel()
 }

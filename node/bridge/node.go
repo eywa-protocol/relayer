@@ -80,7 +80,7 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		if leaderPeerId.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
 			sendStartTime := time.Now().UTC()
-			_, err := n.ReceiveRequestV2(event)
+			_, err := n.ReceiveRequestV2(event, common2.ToHex(event.Raw.TxHash))
 			if err != nil {
 				m.SentFailed(event.Chainid.String())
 				logrus.WithFields(logrus.Fields{
@@ -419,7 +419,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 			case e := <-channel:
 				if e != nil {
 					m.Received()
-					logrus.Debugf("receive event tx: %s", e.Raw.TxHash.Hex())
+					logrus.Infof("receive event tx: %s,  on chainId: %s", e.Raw.TxHash.Hex(), e.Chainid.String())
 					if !n.IsClientReady(e.Chainid) {
 						logrus.WithFields(logrus.Fields{
 							field.BridgeRequest: field.ListFromBridgeOracleRequest(e),
@@ -491,10 +491,10 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 	return
 }
 
-func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *types.Receipt, err error) {
+func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, sourceTx string) (receipt *types.Receipt, err error) {
 	logrus.Infof("event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
 		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
-
+n.
 	client, err := n.GetNodeClient(event.Chainid)
 	if err != nil {
 		logrus.WithFields(
@@ -522,8 +522,8 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	}
 	n.nonceMx.Unlock()
 	if tx != nil {
-		logrus.Infof("ReceiveRequestV2 tx: %s, event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
-			tx.Hash().Hex(), event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
+		logrus.Infof("SourceTopic tx %v, ReceiveRequestV2 tx: %s, event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
+			sourceTx, tx.Hash().Hex(), event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
 
 		receipt, err = helpers.WaitTransaction(client.EthClient, tx)
 		if err != nil || receipt == nil {

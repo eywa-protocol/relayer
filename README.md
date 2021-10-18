@@ -38,9 +38,9 @@ cd scripts
 ./deploy.sh local
 ```
 
-#### Problem fixing.
+#### Troubleshooting
 
-In case of the problem
+1. In case of the problem
 
 ```bash
 Creating network "dev_net_1" with the default driver
@@ -51,6 +51,13 @@ try to remove old networks from
 ```bash
 docker network ls
 ```
+
+2. If you see the error like this:
+```
+go: github.com/eywa-protocol/bls-crypto@v0.1.0: verifying go.mod: github.com/eywa-protocol/bls-crypto@v0.1.1/go.mod: reading https://sum.golang.org/lookup/github.com/eywa-protocol/bls-crypto@v0.1.1: 410 Gone
+```
+
+try to run `export GOSUMDB=off` and try again -- from here https://github.com/golang/go/issues/35164.
 
 ### запуск тестов
 
@@ -67,7 +74,7 @@ make -C external/eth-contracts local-test
 
 ### Работа с репозиторием
 Чтобы зафиксировать версию подмодуля в родительском репозитории:
-```
+```shell
 cd external/eth-contracts
 git checkout develop (или другая необходимая ветка)
 *ВНОCИМ ИЗМЕНЕНИЯ В КОНТРАКТЫ*

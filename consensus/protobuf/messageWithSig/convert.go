@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 )
 
@@ -32,6 +32,7 @@ func convertModelMessage(msg modelBLS.MessageWithSig) (message *PbMessageSig) {
 		History:   history,
 		Signature: msg.Signature.Marshal(),
 		Mask:      msg.Mask.Bytes(),
+		PublicKey: msg.PublicKey.Marshal(),
 	}
 	return
 }
@@ -53,17 +54,23 @@ func convertPbMessageSig(msg *PbMessageSig) (message modelBLS.MessageWithSig) {
 		history = append(history, convertPbMessageSig(hist))
 	}
 
-	sig, err := common.UnmarshalBlsSignature(msg.Signature)
+	sig, err := bls.UnmarshalSignature(msg.Signature)
 	if err != nil {
-		logrus.Debug("UnmarshalBlsSignature error: ", err.Error(), msg.Signature, sig.Marshal())
+		logrus.Trace("UnmarshalBlsSignature error: ", err.Error(), msg.Signature)
 	}
+
+	pub, err := bls.UnmarshalPublicKey(msg.PublicKey)
+	if err != nil {
+		logrus.Trace("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
+	}
+
 	message = modelBLS.MessageWithSig{
-		Source:    int(msg.GetSource()),
-		Step:      int(msg.GetStep()),
-		MsgType:   modelBLS.MsgType(int(msg.GetMsgType())),
+		Header:    modelBLS.Header{int(msg.GetSource()), modelBLS.MsgType(int(msg.GetMsgType()))},
+		Body:      modelBLS.Body{int(msg.GetStep()), *big.NewInt(0xCAFEBABE)}, // TODO: add ActionRoot to pb
 		History:   history,
 		Signature: sig,
 		Mask:      *new(big.Int).SetBytes(msg.Mask),
+		PublicKey: pub,
 	}
 	return
 }
@@ -72,7 +79,7 @@ func (c *Convert) BytesToModelMessage(msgBytes []byte) *modelBLS.MessageWithSig 
 	var PbMessageSig PbMessageSig
 	err := proto.Unmarshal(msgBytes, &PbMessageSig)
 	if err != nil {
-		fmt.Printf("Error : %v\n", err)
+		logrus.Error("Unmarshal MessageWithSig ", err, string(msgBytes))
 		return nil
 	}
 

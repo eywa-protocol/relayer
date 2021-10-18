@@ -15,4 +15,5 @@ message PbMessageSig{
     repeated PbMessageSig history = 4;
     optional bytes signature = 5;
     optional bytes mask = 6;
+    optional bytes public_key = 7;
 }

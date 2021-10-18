@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -8,8 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eywa-protocol/bls-crypto/bls"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
@@ -354,19 +356,19 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 	// hosts used in libp2p communications
 	hosts := make([]*core.Host, n)
 
-	publicKeys := make([]common.BlsPublicKey, 0)
-	privateKeys := make([]common.BlsPrivateKey, 0)
+	publicKeys := make([]bls.PublicKey, 0)
+	privateKeys := make([]bls.PrivateKey, 0)
 
 	for range nodes {
-		priv, pub := common.GenRandomKey()
+		priv, pub := bls.GenerateRandomKey()
 		privateKeys = append(privateKeys, priv)
 		publicKeys = append(publicKeys, pub)
 	}
 
-	fmt.Println(publicKeys)
+	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
+	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
 
 	for i := range nodes {
-
 		// var comm modelBLS.CommunicationInterface
 		var comm *consensus.Protocol
 		comm = new(consensus.Protocol)
@@ -382,36 +384,52 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 		// ////
 
 		nodes[i] = &modelBLS.Node{
-			Id:           i,
-			TimeStep:     0,
-			ThresholdWit: n/2 + 1,
-			ThresholdAck: n/2 + 1,
-			Acks:         0,
-			ConvertMsg:   &messageSigpb.Convert{},
-			Comm:         comm,
-			History:      make([]modelBLS.MessageWithSig, 0),
-			Signatures:   make([]common.BlsSignature, n),
-			SigMask:      common.EmptyMask,
-			PublicKeys:   publicKeys,
-			PrivateKey:   privateKeys[i],
+			Id:             i,
+			TimeStep:       0,
+			ThresholdWit:   n/2 + 1,
+			ThresholdAck:   n/2 + 1,
+			Acks:           0,
+			ConvertMsg:     &messageSigpb.Convert{},
+			Comm:           comm,
+			History:        make([]modelBLS.MessageWithSig, 0),
+			SigMask:        bls.EmptyMultisigMask(),
+			PublicKeys:     publicKeys,
+			PrivateKey:     privateKeys[i],
+			EpochPublicKey: aggregatedPublicKey,
 		}
 
 	}
 	return nodes, hosts
 }
 
+func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
+	var blsSetupDone []chan bls.Signature
+	for _, node := range nodes {
+		done := make(chan bls.Signature)
+		wg.Add(1)
+		go runNodeBLSSetup(node, wg, done)
+		blsSetupDone = append(blsSetupDone, done)
+	}
+	msg := modelBLS.MessageBlsSetup{Header: modelBLS.Header{0, modelBLS.BlsSetupPhase}}
+	msgBytes, _ := json.Marshal(msg)
+	nodes[0].Comm.Broadcast(msgBytes)
+
+	for i, done := range blsSetupDone {
+		nodes[i].MembershipKey = <-done
+	}
+}
+
 // StartTest is used for starting tlc nodes
 func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
-	fmt.Print("START")
+	logrus.Info("START")
 	wg := &sync.WaitGroup{}
 
-	for _, node := range nodes {
-		node.Advance(0)
-	}
+	StartBlsSetup(nodes, wg)
 	for _, node := range nodes {
 		wg.Add(1)
 		go runNodeBLS(node, stop, wg)
 	}
+
 	wg.Add(-fails)
 	wg.Wait()
 	fmt.Println("The END")
@@ -419,20 +437,17 @@ func StartTestBLS(nodes []*modelBLS.Node, stop int, fails int) {
 
 // StartTest is used for starting tlc nodes
 func StartTestOneStepBLS(nodes []*modelBLS.Node) (consensuses []bool) {
-	fmt.Print("START")
+	logrus.Info("START")
 	wg := &sync.WaitGroup{}
 	defer wg.Done()
-	for _, node := range nodes {
 
-		node.Advance(0)
-	}
+	StartBlsSetup(nodes, wg)
 	var consensusesChan []chan bool
 	for _, node := range nodes {
 		wg.Add(1)
 		consensusChannel := make(chan bool)
 		go runOneStepNodeBLS(node, wg, consensusChannel)
 		consensusesChan = append(consensusesChan, consensusChannel)
-
 	}
 
 	for i := 0; i < len(consensusesChan); i++ {
@@ -467,4 +482,9 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 
 	//achieved = <-consensusChannel
 	//return
+}
+
+func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bls.Signature) {
+	defer wg.Done()
+	node.WaitForBlsSetup(done)
 }

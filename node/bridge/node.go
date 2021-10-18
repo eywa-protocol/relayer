@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/libp2p/go-flow-metrics"
 	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
@@ -47,7 +48,7 @@ type Node struct {
 	nonceMx        *sync.Mutex
 	P2PPubSub      *bls_consensus.Protocol
 	signerKey      *ecdsa.PrivateKey
-	PrivKey        common2.BlsPrivateKey
+	PrivKey        bls.PrivateKey
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
 }
@@ -89,14 +90,14 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract(client Client) (publicKeys []common2.BlsPublicKey, err error) {
-	publicKeys = make([]common2.BlsPublicKey, 0)
+func (n Node) GetPubKeysFromContract(client Client) (publicKeys []bls.PublicKey, err error) {
+	publicKeys = make([]bls.PublicKey, 0)
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
 		return
 	}
 	for _, node := range nodes {
-		p, err := common2.UnmarshalBlsPublicKey([]byte(node.BlsPubKey))
+		p, err := bls.UnmarshalPublicKey([]byte(node.BlsPubKey))
 		if err != nil {
 			panic(err)
 		}
@@ -105,7 +106,7 @@ func (n Node) GetPubKeysFromContract(client Client) (publicKeys []common2.BlsPub
 	return
 }
 
-func (n Node) KeysFromFilesByConfigName(name string) (prvKey common2.BlsPrivateKey, err error) {
+func (n Node) KeysFromFilesByConfigName(name string) (prvKey bls.PrivateKey, err error) {
 
 	nodeKeyFile := "keys/" + name + "-bn256.key"
 	prvKey, err = common2.ReadBlsPrivateKeyFromFile(nodeKeyFile)
@@ -151,8 +152,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 						ConvertMsg:        &messageSigPb.Convert{},
 						Comm:              n.P2PPubSub,
 						History:           make([]modelBLS.MessageWithSig, 0),
-						Signatures:        make([]common2.BlsSignature, len(publicKeys)),
-						SigMask:           common2.EmptyMask,
+						SigMask:           bls.EmptyMultisigMask(),
 						PublicKeys:        publicKeys,
 						PrivateKey:        n.PrivKey,
 						Participants:      topicParticipants,

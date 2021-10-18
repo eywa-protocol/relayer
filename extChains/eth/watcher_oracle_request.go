@@ -1,7 +1,6 @@
 package eth
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -13,17 +12,21 @@ import (
 type oracleRequestWatcher struct {
 	contractAbi     abi.ABI
 	contractAddress common.Address
+	eventTrap       EventHandler
 }
 
-func NewOracleRequestWatcher(address common.Address) (*oracleRequestWatcher, error) {
-	if abi, err := abi.JSON(strings.NewReader(wrappers.BridgeABI)); err != nil {
+type EventHandler func(eventPointer interface{})
+
+func NewOracleRequestWatcher(address common.Address, eventTrap EventHandler) (*oracleRequestWatcher, error) {
+	if contractAbi, err := abi.JSON(strings.NewReader(wrappers.BridgeABI)); err != nil {
 
 		return nil, err
 	} else {
 
 		return &oracleRequestWatcher{
-			contractAbi:     abi,
+			contractAbi:     contractAbi,
 			contractAddress: address,
+			eventTrap:       eventTrap,
 		}, nil
 	}
 
@@ -46,18 +49,22 @@ func (o oracleRequestWatcher) Query() [][]interface{} {
 	return nil
 }
 
-func (o oracleRequestWatcher) NewEvent() interface{} {
-	return wrappers.BridgeOracleRequest{}
+func (o oracleRequestWatcher) NewEventPointer() interface{} {
+	return &wrappers.BridgeOracleRequest{}
 }
 
 func (o oracleRequestWatcher) SetEventRaw(eventPointer interface{}, log types.Log) {
 	eventPointer.(*wrappers.BridgeOracleRequest).Raw = log
 }
 
-func (o oracleRequestWatcher) OnEvent(event interface{}) {
-	if req, ok := event.(wrappers.BridgeOracleRequest); !ok {
-		logrus.Error(fmt.Println("unsupported event"))
+func (o oracleRequestWatcher) OnEvent(eventPointer interface{}) {
+	if o.eventTrap != nil {
+		o.eventTrap(eventPointer)
 	} else {
-		logrus.Infof("bridge oracle request received tx: %s", req.Raw.TxHash.Hex())
+		if req, ok := eventPointer.(*wrappers.BridgeOracleRequest); !ok {
+			logrus.Error(ErrUnsupportedEvent)
+		} else {
+			logrus.Infof("bridge oracle request received tx: %s", req.Raw.TxHash.Hex())
+		}
 	}
 }

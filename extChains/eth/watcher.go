@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/sirupsen/logrus"
 	"math/big"
 	"sync"
 	"time"
@@ -17,9 +18,9 @@ type ContractWatcher interface {
 	Name() string
 	Address() common.Address
 	Query() [][]interface{}
-	NewEvent() interface{}
+	NewEventPointer() interface{}
 	SetEventRaw(eventPointer interface{}, log types.Log)
-	OnEvent(event interface{})
+	OnEvent(eventPointer interface{})
 }
 
 type ClientWatcher interface {
@@ -76,16 +77,17 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 			for {
 				select {
 				case log := <-logChan:
+					logrus.Debugf("log recived: %s\n", log.TxHash.Hex())
 					if !w.cache.Exists(log) {
-						contractEvent := w.contract.NewEvent()
-						if err := w.unpackLog(&contractEvent, log); err != nil {
+						eventPointer := w.contract.NewEventPointer()
+						if err := w.unpackLog(eventPointer, log); err != nil {
 							return err
 						}
-						w.contract.SetEventRaw(&contractEvent, log)
+						w.contract.SetEventRaw(eventPointer, log)
 						w.client.wg.Add(1)
 						go func() {
 							defer w.client.wg.Done()
-							w.contract.OnEvent(contractEvent)
+							w.contract.OnEvent(eventPointer)
 						}()
 						select {
 
@@ -146,9 +148,12 @@ func (w *clientWatcher) Subscribe() error {
 	defer w.mx.Unlock()
 	var err error
 	if w.sub, err = w.watchEvents(); err != nil {
+		logrus.Warnf("subscribe error: %v", err)
 
 		return err
 	} else {
+		logrus.Infof("subscribed to %s", w.contract.Name())
+
 		return nil
 	}
 }
@@ -156,9 +161,16 @@ func (w *clientWatcher) Subscribe() error {
 func (w *clientWatcher) Resubscribe() {
 	w.mx.Lock()
 	defer w.mx.Unlock()
-
 	w.sub = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
-		return w.watchEvents()
+		if sub, err := w.watchEvents(); err != nil {
+			logrus.Warnf("resubscribe error: %v", err)
+
+			return nil, err
+		} else {
+			logrus.Infof("resubscribed to %s", w.contract.Name())
+
+			return sub, err
+		}
 	})
 }
 

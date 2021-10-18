@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/sirupsen/logrus"
@@ -33,26 +34,59 @@ type Client interface {
 	ChainID(ctx context.Context) (*big.Int, error)
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error)
+	WaitForBlockCompletion(txHash common.Hash) (int, *types.Receipt)
+	CallOpt(privateKey *ecdsa.PrivateKey) (*bind.TransactOpts, error)
 	AddWatcher(contract ContractWatcher)
 	RemoveWatcher(contract ContractWatcher)
 	Close()
 }
 
 type client struct {
-	ctx           context.Context
-	cancel        context.CancelFunc
-	ethClient     *ethclient.Client
-	watchers      map[string]ClientWatcher
-	chainId       *big.Int
-	callTimeout   time.Duration
-	dialTimeout   time.Duration
-	mx            *sync.Mutex
-	wg            *sync.WaitGroup
-	connected     bool
-	recreated     bool
-	reSubWatchers chan struct{}
-	currentUrl    string
-	urls          []string
+	ctx                context.Context
+	cancel             context.CancelFunc
+	ethClient          *ethclient.Client
+	watchers           map[string]ClientWatcher
+	chainId            *big.Int
+	callTimeout        time.Duration
+	dialTimeout        time.Duration
+	mx                 *sync.Mutex
+	wg                 *sync.WaitGroup
+	connected          bool
+	recreated          bool
+	subLoopInitialized bool
+	subLoopMx          *sync.Mutex
+	reSubWatchers      chan struct{}
+	currentUrl         string
+	urls               []string
+}
+
+func NewClient(ctx context.Context, cfg *Config) (*client, error) {
+	if len(cfg.Urls) <= 0 {
+		return nil, ErrClientUrlsEmpty
+	}
+	c := &client{
+		watchers:    make(map[string]ClientWatcher),
+		chainId:     big.NewInt(int64(cfg.Id)),
+		callTimeout: defaultCallTimeout,
+		dialTimeout: defaultDialTimeout,
+		mx:          new(sync.Mutex),
+		wg:          new(sync.WaitGroup),
+		subLoopMx:   new(sync.Mutex),
+		currentUrl:  "",
+		urls:        cfg.Urls,
+	}
+
+	if cfg.CallTimeout > 0 {
+		c.callTimeout = cfg.CallTimeout
+	}
+
+	if cfg.DialTimeout > 0 {
+		c.dialTimeout = cfg.DialTimeout
+	}
+	c.ctx, c.cancel = context.WithCancel(ctx)
+
+	return c, nil
 }
 
 func (c *client) watcherKey(contract ContractWatcher) string {
@@ -64,10 +98,17 @@ func (c *client) watcherKey(contract ContractWatcher) string {
 }
 
 func (c *client) subLoop() {
+	c.subLoopMx.Lock()
+	if c.subLoopInitialized {
+		c.subLoopMx.Unlock()
+		return
+	} else {
+		c.reSubWatchers = make(chan struct{}, 1)
+		c.subLoopInitialized = true
+		c.subLoopMx.Unlock()
+	}
 	c.wg.Add(1)
 	go func() {
-		c.reSubWatchers = make(chan struct{}, 1)
-		defer close(c.reSubWatchers)
 		for {
 			select {
 			case <-c.reSubWatchers:
@@ -89,18 +130,18 @@ func (c *client) subLoop() {
 
 func (c *client) AddWatcher(contract ContractWatcher) {
 	c.mx.Lock()
-	defer c.mx.Unlock()
-	if c.reSubWatchers == nil {
-		c.subLoop()
-	}
 	key := c.watcherKey(contract)
 	if _, exists := c.watchers[key]; !exists {
 		watcher := NewClientWatcher(c.ctx, c, contract)
 		c.watchers[key] = watcher
+		c.mx.Unlock()
 		if err := watcher.Subscribe(); err != nil {
 
 			logrus.Error(fmt.Errorf("watcher subscribe error: %w", err))
 		}
+		c.subLoop()
+	} else {
+		c.mx.Unlock()
 	}
 }
 
@@ -114,43 +155,24 @@ func (c *client) RemoveWatcher(contract ContractWatcher) {
 	}
 }
 
-func NewClient(ctx context.Context, cfg *Config) (*client, error) {
-	if len(cfg.Urls) <= 0 {
-		return nil, ErrClientUrlsEmpty
-	}
-	c := &client{
-		watchers:    make(map[string]ClientWatcher),
-		chainId:     big.NewInt(int64(cfg.Id)),
-		callTimeout: defaultCallTimeout,
-		dialTimeout: defaultDialTimeout,
-		mx:          new(sync.Mutex),
-		wg:          new(sync.WaitGroup),
-		currentUrl:  "",
-		urls:        cfg.Urls,
-	}
-
-	if cfg.CallTimeout > 0 {
-		c.callTimeout = cfg.CallTimeout
-	}
-
-	if cfg.DialTimeout > 0 {
-		c.dialTimeout = cfg.DialTimeout
-	}
-	c.ctx, c.cancel = context.WithCancel(ctx)
-
-	return c, nil
-}
-
 func (c *client) closeWatchers() {
-	for _, watcher := range c.watchers {
+	for key, watcher := range c.watchers {
 		watcher.Close()
+		delete(c.watchers, key)
 	}
 }
 
 func (c *client) Close() {
+	c.mx.Lock()
 	c.closeWatchers()
+	c.mx.Unlock()
 	c.cancel()
 	c.wg.Wait()
+	c.subLoopMx.Lock()
+	defer c.subLoopMx.Unlock()
+	if c.subLoopInitialized {
+		close(c.reSubWatchers)
+	}
 }
 
 func (c *client) dial(ctx context.Context, url string) (*ethclient.Client, error) {
@@ -161,6 +183,7 @@ func (c *client) dial(ctx context.Context, url string) (*ethclient.Client, error
 
 func (c *client) getClient() (client *ethclient.Client, err error) {
 	c.mx.Lock()
+	c.recreated = false
 	if c.ethClient == nil {
 		for _, url := range c.urls {
 			if c.currentUrl != "" && len(c.urls) > 1 && url == c.currentUrl {
@@ -187,9 +210,11 @@ func (c *client) getClient() (client *ethclient.Client, err error) {
 				c.ethClient = client
 				c.connected = true
 				c.recreated = true
-				if len(c.watchers) > 0 {
+				c.subLoopMx.Lock()
+				if c.subLoopInitialized {
 					c.reSubWatchers <- struct{}{}
 				}
+				c.subLoopMx.Unlock()
 				c.mx.Unlock()
 
 				return c.ethClient, nil

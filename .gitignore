@@ -7,5 +7,6 @@ node*.env
 .idea
 bsn.yaml
 .env.sentry
+.env.prom
 bsn
 bridge

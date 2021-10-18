@@ -6,6 +6,7 @@ WORKDIR /p2p-bridge-b
 COPY    ./go.mod .
 COPY    ./go.sum .
 ADD     ./external/eth-contracts/wrappers ./external/eth-contracts/wrappers
+ADD     ./external/eywa-overhead-chain ./external/eywa-overhead-chain
 
 RUN go mod download
 

@@ -9,3 +9,4 @@ docker-compose.yaml.OLD
 .dockerignore
 ./external
 !./external/eth-contracts/wrappers
+!./external/eywa-overhead-chain

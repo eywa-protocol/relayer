@@ -30,6 +30,7 @@ type Configuration struct {
 	Rendezvous           string         `yaml:"rendezvous"`
 	Chains               []*BridgeChain `yaml:"chains"`
 	BootstrapAddrs       []string       `yaml:"bootstrap-addrs"`
+	PromListenPort       *string        `yaml:"prom_listen_port"`
 }
 
 type BridgeKeys struct {
@@ -85,6 +86,10 @@ func LoadBridgeConfig(path string, useGsn bool) error {
 	// override config fields from env
 	if rendezvous := os.Getenv("RANDEVOUE"); rendezvous != "" {
 		Bridge.Rendezvous = rendezvous
+	}
+
+	if promListenPort := os.Getenv("PROM_LISTEN_PORT"); promListenPort != "" {
+		Bridge.PromListenPort = &promListenPort
 	}
 
 	return nil

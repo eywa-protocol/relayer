@@ -18,6 +18,7 @@ COPY    ./forward ./forward
 COPY    ./helpers ./helpers
 COPY    ./libp2p ./libp2p
 COPY    ./node ./node
+COPY    ./prom ./prom
 COPY    ./runa ./runa
 COPY    ./Makefile .
 COPY    ./sentry ./sentry

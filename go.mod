@@ -8,9 +8,11 @@ replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contract
 
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
+replace gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain => ./external/eywa-overhead-chain/
+
 require (
 	github.com/boltdb/bolt v1.3.1
-	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.8
@@ -34,10 +36,12 @@ require (
 	github.com/libp2p/go-ws-transport v0.4.0
 	github.com/multiformats/go-multiaddr v0.3.2
 	github.com/multiformats/go-multihash v0.0.15
+	github.com/ontio/ontology-crypto v1.2.1 // indirect
 	github.com/prometheus/client_golang v1.9.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+	gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain v0.0.0-20211018150134-95faf4c0fee4 // indirect
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a

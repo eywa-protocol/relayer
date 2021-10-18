@@ -2,3 +2,6 @@
 	path = external/eth-contracts
 	url = git@gitlab.digiu.ai:blockchainlaboratory/eywa-contracts.git
     branch = develop
+[submodule "external/eywa-overhead-chain"]
+	path = external/eywa-overhead-chain
+	url = git@gitlab.digiu.ai:blockchainlaboratory/eywa-overhead-chain.git

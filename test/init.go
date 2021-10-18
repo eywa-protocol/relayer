@@ -24,7 +24,6 @@ var err error
 var qwe big.Int
 var testData *big.Int
 
-
 func initNodeWithClients() {
 	err = config.LoadBridgeConfig("../.data/bridge.yaml", false)
 	if err != nil {
@@ -59,7 +58,8 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, clientFrom.EthClient)
 
 	dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
-
+	testData = qwe.SetUint64(rand.Uint64())
+	require.NotNil(t, testData)
 	tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
 		testData,
 		dexPoolTo,

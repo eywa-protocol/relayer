@@ -55,13 +55,17 @@ type Node struct {
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
 	defer wg.Done()
-	consensusChannel := make(chan bool)
+	// TODO switched off for now - to restore after epoch and setup phase intagrated
+	/*consensusChannel := make(chan bool)*/
 	logrus.Tracef("сurrentRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
 	wg.Add(1)
 	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
-	wg.Add(1)
-	go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
-	consensus := <-consensusChannel
+	time.Sleep(time.Second)
+	/*	wg.Add(1)
+		go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
+		consensus := <-consensusChannel*/
+	consensus := true
+
 	if consensus == true {
 		logrus.Tracef("Starting Leader election !!!")
 		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)

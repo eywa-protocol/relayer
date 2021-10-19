@@ -494,7 +494,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, sourceTx string) (receipt *types.Receipt, err error) {
 	logrus.Infof("event.Bridge: %v, event.Chainid: %v, event.OppositeBridge: %v, event.ReceiveSide: %v, event.Selector: %v, event.RequestType: %v",
 		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
-n.
+
 	client, err := n.GetNodeClient(event.Chainid)
 	if err != nil {
 		return nil, err

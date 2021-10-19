@@ -430,7 +430,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 						mx.Unlock()
 						continue
 					}
-					logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", e.Chainid.String())
 					currentTopic := common2.ToHex(e.Raw.TxHash)
 					logrus.Debugf("currentTopic %s", currentTopic)
 					if sendTopic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
@@ -441,6 +440,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 						}).Error(fmt.Errorf("join topic error: %w", err))
 						continue reqLoop
 					} else {
+						logrus.Infof("InitializedPubSubWithTopicAndPeers on chainId: %s, by topic: %s", e.Chainid.String(), sendTopic.String())
 						go func(topic *pubSub.Topic) {
 							defer func() {
 								if err := topic.Close(); err != nil {
@@ -496,6 +496,9 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, sourceTx st
 		event.Bridge, event.Chainid, event.OppositeBridge, event.ReceiveSide, common2.BytesToHex(event.Selector), event.RequestType)
 n.
 	client, err := n.GetNodeClient(event.Chainid)
+	if err != nil {
+		return nil, err
+	}
 	if err != nil {
 		logrus.WithFields(
 			field.ListFromBridgeOracleRequest(event),

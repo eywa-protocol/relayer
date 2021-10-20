@@ -93,7 +93,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node1:/go/keys
+      - .data/node1/keys:/go/keys
+      - .data/node1/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.11
@@ -116,7 +117,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node2:/go/keys
+      - .data/node2/keys:/go/keys
+      - .data/node2/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.12
@@ -139,7 +141,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node3:/go/keys
+      - .data/node3/keys:/go/keys
+      - .data/node3/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.13
@@ -162,7 +165,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node4:/go/keys
+      - .data/node4/keys:/go/keys
+      - .data/node4/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.14
@@ -185,7 +189,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node5:/go/keys
+      - .data/node5/keys:/go/keys
+      - .data/node5/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.15
@@ -208,7 +213,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node6:/go/keys
+      - .data/node6/keys:/go/keys
+      - .data/node6/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.16
@@ -231,7 +237,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # https://github.com/docker/compose/issues/3584
       - .data/bridge.yaml:/go/bridge.yaml
-      - .data/keys/node7:/go/keys
+      - .data/node7/keys:/go/keys
+      - .data/node7/leveldb:/go/leveldb
     networks:
       static-network:
         ipv4_address: 172.20.32.17

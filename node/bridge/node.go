@@ -55,7 +55,7 @@ type Node struct {
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
 	defer wg.Done()
-	// TODO switched off for now - to restore after epoch and setup phase intagrated
+	// TODO AdvanceWithTopic switched off for now - to restore after epoch and setup phase intagrated
 	/*consensusChannel := make(chan bool)*/
 	logrus.Tracef("сurrentRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
 	wg.Add(1)
@@ -551,13 +551,16 @@ func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
 
 func (n *Node) startUptimeProtocol(t time.Time, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
 	defer wg.Done()
-	consensusChannel := make(chan bool)
+	// TODO AdvanceWithTopic switched off for now - to restore after epoch and setup phase intagrated
+	//consensusChannel := make(chan bool)
 	logrus.Tracef("uptimeRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
 	wg.Add(1)
 	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
-	wg.Add(1)
-	go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
-	consensus := <-consensusChannel
+	time.Sleep(time.Second)
+	//wg.Add(1)
+	//go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
+	//consensus := <-consensusChannel
+	consensus := true
 	if consensus == true {
 		logrus.Tracef("Starting uptime Leader election !!!")
 		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)

@@ -5,6 +5,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
+	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
+	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -202,6 +206,16 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		if err != nil {
 			return err
 		}
+
+		ledger.DefLedger, err = initLedger()
+		if err != nil {
+			logrus.Errorf("initLedger %s", err)
+			return err
+		}
+		defer ledger.DefLedger.Close()
+
+		//ledger.DefLedger, err = ledger.NewLedger("leveldb")
+
 		eventChan := make(chan *wrappers.BridgeOracleRequest)
 
 		for chainIdString, client := range n.Clients {
@@ -310,4 +324,33 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 		n.Clients[client.ChainCfg.ChainId.String()] = client
 	}
 	return
+}
+
+func initLedger() (*ledger.Ledger, error) {
+	// TODO init events here
+	//events.Init() //Init event hub
+
+	var err error
+	dbDir := utils.GetStoreDirPath("leveldb", _config.DefConfig.P2PNode.NetworkName)
+	ledger.DefLedger, err = ledger.NewLedger(dbDir)
+	if err != nil {
+		return nil, fmt.Errorf("NewLedger error:%s", err)
+	}
+	bookKeepers, err := _config.DefConfig.GetBookkeepers()
+	if err != nil {
+		return nil, fmt.Errorf("GetBookkeepers error:%s", err)
+	}
+	genesisConfig := _config.DefConfig.Genesis
+	genesisBlock, err := _genesis.BuildGenesisBlock(bookKeepers, genesisConfig)
+	if err != nil {
+		return nil, fmt.Errorf("genesisBlock error %s", err)
+	}
+	logrus.Infof("Current ChainId: %d", genesisBlock.Header.ChainID)
+	err = ledger.DefLedger.Init(bookKeepers, genesisBlock)
+	if err != nil {
+		return nil, fmt.Errorf("Init ledger error:%s", err)
+	}
+
+	logrus.Infof("Ledger init success")
+	return ledger.DefLedger, nil
 }

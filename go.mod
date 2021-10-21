@@ -15,9 +15,9 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1
-	github.com/ethereum/go-ethereum v1.10.8
+	github.com/ethereum/go-ethereum v1.10.11
 	github.com/evalphobia/logrus_sentry v0.8.2
-	github.com/eywa-protocol/bls-crypto v0.1.1
+	github.com/eywa-protocol/bls-crypto v0.1.2-0.20211020150244-23d82d97468b
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/ipfs/go-cid v0.0.7
@@ -40,11 +40,12 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain v0.0.0-20211018150134-95faf4c0fee4
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
 	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/sys v0.0.0-20211020174200-9d6173849985 // indirect
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b

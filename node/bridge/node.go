@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/libp2p/go-flow-metrics"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
@@ -41,6 +43,13 @@ var ErrContextDone = errors.New("interrupt on context done")
 
 const minConsensusNodesCount = 5
 
+type EpochKeys struct {
+	Id             int             // Id of the node, starting from 0
+	EpochPublicKey bls.PublicKey   // Arrtegated public key of all participants of the current epoch
+	MembershipKey  bls.Signature   // Membership key of this node
+	PublicKeys     []bls.PublicKey // Public keys of all nodes
+}
+
 type Node struct {
 	base.Node
 	cMx            *sync.Mutex
@@ -51,6 +60,7 @@ type Node struct {
 	PrivKey        bls.PrivateKey
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
+	EpochKeys
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
@@ -94,7 +104,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract(client Client) (publicKeys []bls.PublicKey, err error) {
+func GetPubKeysFromContract(client Client) (publicKeys []bls.PublicKey, err error) {
 	publicKeys = make([]bls.PublicKey, 0)
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
@@ -122,7 +132,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey bls.PrivateKey, err
 }
 
 func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
-	publicKeys, err := n.GetPubKeysFromContract(client)
+	publicKeys, err := GetPubKeysFromContract(client)
 	if err != nil {
 		return
 	}
@@ -613,4 +623,137 @@ func (n *Node) GetForwarderAddress(chainId *big.Int) (common.Address, error) {
 
 		return c.ChainCfg.ForwarderAddress, nil
 	}
+}
+
+const ChanLen = 500
+
+const (
+	BlsSetupPhase = iota
+	BlsSetupParts
+)
+
+type MessageBlsSetup struct {
+	Source             int // NodeID of message's source
+	MsgType            int // Type of message
+	MembershipKeyParts []bls.Signature
+}
+
+// BlsSetup handles BLS setup phase and returns membership key as a result
+func BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub modelBLS.CommunicationInterface) bls.Signature {
+	mutex := &sync.Mutex{}
+	n := len(node.PublicKeys)
+	anticoefs := bls.CalculateAntiRogueCoefficients(node.PublicKeys)
+	receivedMembershipKeyMask := *big.NewInt((1 << n) - 1)
+	membershipKey := bls.ZeroSignature()
+	complete := false
+	msgChan := make(chan *[]byte, ChanLen)
+
+	finished := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return complete
+	}
+
+	for !finished() {
+		rcvdMsg := pubsub.Receive()
+		if rcvdMsg == nil {
+			continue
+		}
+		msgChan <- rcvdMsg
+
+		go func() {
+			msgBytes := <-msgChan
+			var msg MessageBlsSetup
+			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
+				logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, node.Id)
+				return
+			}
+
+			switch msg.MsgType {
+			case BlsSetupPhase:
+				membershipKeyParts := make([]bls.Signature, len(node.PublicKeys))
+				for i, _ := range membershipKeyParts {
+					membershipKeyParts[i] = privateKey.GenerateMembershipKeyPart(byte(i), node.EpochPublicKey, anticoefs[node.Id])
+				}
+				outmsg := MessageBlsSetup{
+					Source:             node.Id,
+					MsgType:            BlsSetupParts,
+					MembershipKeyParts: membershipKeyParts,
+				}
+				msgBytes, _ := json.Marshal(outmsg)
+				pubsub.Broadcast(msgBytes)
+
+			case BlsSetupParts:
+				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, node.Id)
+				part := msg.MembershipKeyParts[node.Id]
+				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], anticoefs[msg.Source], byte(node.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
+				}
+				mutex.Lock()
+				membershipKey = membershipKey.Aggregate(part)
+				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
+				if receivedMembershipKeyMask.Sign() == 0 {
+					complete = true
+					pubsub.Broadcast(nil)
+				}
+				mutex.Unlock()
+			}
+		}()
+	}
+	return membershipKey
+}
+
+func StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string, pubsub *consensus.Protocol, epoch *EpochKeys) error {
+	nodeFromContract, err := client.NodeRegistry.GetNode(nodeIdAddress)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("Node address: %x nodeAddress from contract: %x", nodeIdAddress, nodeFromContract.NodeIdAddress)
+	if nodeFromContract.NodeIdAddress != nodeIdAddress {
+		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, nodeIdAddress)
+	}
+
+	publicKeys, err := GetPubKeysFromContract(client)
+	if err != nil {
+		return err
+	}
+	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
+	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
+
+	epoch.Id = int(nodeFromContract.NodeId.Int64())
+	epoch.PublicKeys = publicKeys
+	epoch.EpochPublicKey = aggregatedPublicKey
+
+	topic, err := pubsub.JoinTopic(rendezvous + ".bls-setup")
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			field.ConsensusRendezvous: topic.String(),
+		}).Error(fmt.Errorf("join topic error: %w", err))
+		return err
+	}
+	defer func() {
+		if err := topic.Close(); err != nil {
+			logrus.WithFields(logrus.Fields{
+				field.ConsensusRendezvous: topic.String(),
+			}).Error(fmt.Errorf("close topic error: %w", err))
+		}
+		logrus.Tracef("Topic %s closed", topic.String())
+	}()
+
+	p2pSub, err := topic.Subscribe()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			field.ConsensusRendezvous: topic.String(),
+		}).Error(fmt.Errorf("subscribe error: %w", err))
+		return err
+	}
+	defer p2pSub.Cancel()
+	logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
+
+	for len(topic.ListPeers()) < len(publicKeys)-1 {
+		logrus.Infof("Waiting for all members to come, sendTopic.ListPeers(): ", topic.ListPeers())
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	return nil
 }

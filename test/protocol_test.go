@@ -17,6 +17,7 @@ import (
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messageWithSig"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/messagepb"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/test_utils"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 
 	core "github.com/libp2p/go-libp2p-core"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
@@ -403,20 +404,22 @@ func setupHostsBLS(n int, initialPort int) ([]*modelBLS.Node, []*core.Host) {
 }
 
 func StartBlsSetup(nodes []*modelBLS.Node, wg *sync.WaitGroup) {
-	var blsSetupDone []chan bls.Signature
+	var blsSetupDone []chan bool
 	for _, node := range nodes {
-		done := make(chan bls.Signature)
+		done := make(chan bool)
 		wg.Add(1)
 		go runNodeBLSSetup(node, wg, done)
 		blsSetupDone = append(blsSetupDone, done)
 	}
-	msg := modelBLS.MessageBlsSetup{Header: modelBLS.Header{0, modelBLS.BlsSetupPhase}}
+	msg := bridge.MessageBlsSetup{MsgType: bridge.BlsSetupPhase}
 	msgBytes, _ := json.Marshal(msg)
 	nodes[0].Comm.Broadcast(msgBytes)
 
-	for i, done := range blsSetupDone {
-		nodes[i].MembershipKey = <-done
+	for _, done := range blsSetupDone {
+		<-done
 	}
+
+	logrus.Warning("BLS setup done")
 }
 
 // StartTest is used for starting tlc nodes
@@ -484,7 +487,14 @@ func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel
 	//return
 }
 
-func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bls.Signature) {
+func runNodeBLSSetup(node *modelBLS.Node, wg *sync.WaitGroup, done chan bool) {
 	defer wg.Done()
-	node.WaitForBlsSetup(done)
+	epoch := bridge.EpochKeys{
+		Id:             node.Id,
+		PublicKeys:     node.PublicKeys,
+		EpochPublicKey: node.EpochPublicKey,
+	}
+
+	node.MembershipKey = bridge.BlsSetup(&epoch, node.PrivateKey, node.Comm)
+	done <- true
 }

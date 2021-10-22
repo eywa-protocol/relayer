@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/libp2p/go-flow-metrics"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
@@ -170,6 +169,10 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 						SigMask:           bls.EmptyMultisigMask(),
 						PublicKeys:        publicKeys,
 						PrivateKey:        n.PrivKey,
+						EpochPublicKey:    n.EpochPublicKey,
+						MembershipKey:     n.MembershipKey,
+						PartPublicKey:     bls.ZeroPublicKey(),
+						PartSignature:     bls.ZeroSignature(),
 						Participants:      topicParticipants,
 						CurrentRendezvous: topic.String(),
 						Leader:            "",
@@ -698,7 +701,7 @@ func (n *Node) BlsSetup() bls.Signature {
 	return membershipKey
 }
 
-func StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string, pubsub *consensus.Protocol, epoch *EpochKeys) error {
+func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string) error {
 	nodeFromContract, err := client.NodeRegistry.GetNode(nodeIdAddress)
 	if err != nil {
 		return err
@@ -715,11 +718,11 @@ func StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string, 
 	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
 	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
 
-	epoch.Id = int(nodeFromContract.NodeId.Int64())
-	epoch.PublicKeys = publicKeys
-	epoch.EpochPublicKey = aggregatedPublicKey
+	n.Id = int(nodeFromContract.NodeId.Int64())
+	n.PublicKeys = publicKeys
+	n.EpochPublicKey = aggregatedPublicKey
 
-	topic, err := pubsub.JoinTopic(rendezvous + ".bls-setup")
+	topic, err := n.P2PPubSub.JoinTopic(rendezvous + ".bls-setup")
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			field.ConsensusRendezvous: topic.String(),
@@ -743,12 +746,13 @@ func StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string, 
 		return err
 	}
 	defer p2pSub.Cancel()
-	logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
+	logrus.Info("p2pSub.Topic: ", p2pSub.Topic())
 
-	for len(topic.ListPeers()) < len(publicKeys)-1 {
-		logrus.Infof("Waiting for all members to come, sendTopic.ListPeers(): ", topic.ListPeers())
+	for len(topic.ListPeers()) < len(publicKeys)-1 && n.Ctx.Err() == nil {
+		logrus.Info("Waiting for all members to come, sendTopic.ListPeers(): ", topic.ListPeers())
 		time.Sleep(300 * time.Millisecond)
 	}
 
+	n.MembershipKey = n.BlsSetup()
 	return nil
 }

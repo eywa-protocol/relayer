@@ -198,7 +198,7 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			return err
 		}
 
-		err := StartEpoch(c1, nodeIdAddress, rendezvous, n.P2PPubSub, &n.EpochKeys)
+		err := n.StartEpoch(c1, nodeIdAddress, rendezvous)
 		if err != nil {
 			return err
 		}

@@ -45,7 +45,7 @@ func (node *Node) WaitForMsg(stop int) {
 	msgChan := make(chan *[]byte, ChanLen)
 	for node.TimeStep <= stop && !end {
 		// For now we assume that the underlying receive function is blocking
-		rcvdMsg := node.Comm.Receive()
+		rcvdMsg := node.Comm.Receive(node.Ctx)
 		if rcvdMsg == nil {
 			continue
 		}

@@ -640,23 +640,18 @@ type MessageBlsSetup struct {
 }
 
 // BlsSetup handles BLS setup phase and returns membership key as a result
-func (n *Node) BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub modelBLS.CommunicationInterface) bls.Signature {
+func (n *Node) BlsSetup() bls.Signature {
+	ctx, cancel := context.WithCancel(n.Ctx)
+	defer cancel()
 	mutex := &sync.Mutex{}
-	np := len(node.PublicKeys)
-	anticoefs := bls.CalculateAntiRogueCoefficients(node.PublicKeys)
+	np := len(n.PublicKeys)
+	anticoefs := bls.CalculateAntiRogueCoefficients(n.PublicKeys)
 	receivedMembershipKeyMask := *big.NewInt((1 << np) - 1)
 	membershipKey := bls.ZeroSignature()
-	complete := false
 	msgChan := make(chan *[]byte, ChanLen)
 
-	finished := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return complete
-	}
-
-	for !finished() {
-		rcvdMsg := pubsub.Receive(n.Ctx)
+	for ctx.Err() == nil {
+		rcvdMsg := n.P2PPubSub.Receive(ctx)
 		if rcvdMsg == nil {
 			continue
 		}
@@ -666,36 +661,35 @@ func (n *Node) BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub model
 			msgBytes := <-msgChan
 			var msg MessageBlsSetup
 			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
-				logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, node.Id)
+				logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, n.Id)
 				return
 			}
 
 			switch msg.MsgType {
 			case BlsSetupPhase:
-				membershipKeyParts := make([]bls.Signature, len(node.PublicKeys))
+				membershipKeyParts := make([]bls.Signature, len(n.PublicKeys))
 				for i, _ := range membershipKeyParts {
-					membershipKeyParts[i] = privateKey.GenerateMembershipKeyPart(byte(i), node.EpochPublicKey, anticoefs[node.Id])
+					membershipKeyParts[i] = n.PrivKey.GenerateMembershipKeyPart(byte(i), n.EpochPublicKey, anticoefs[n.Id])
 				}
 				outmsg := MessageBlsSetup{
-					Source:             node.Id,
+					Source:             n.Id,
 					MsgType:            BlsSetupParts,
 					MembershipKeyParts: membershipKeyParts,
 				}
 				msgBytes, _ := json.Marshal(outmsg)
-				pubsub.Broadcast(msgBytes)
+				n.P2PPubSub.Broadcast(msgBytes)
 
 			case BlsSetupParts:
-				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, node.Id)
-				part := msg.MembershipKeyParts[node.Id]
-				if !part.VerifyMembershipKeyPart(node.EpochPublicKey, node.PublicKeys[msg.Source], anticoefs[msg.Source], byte(node.Id)) {
-					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, node.Id)
+				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
+				part := msg.MembershipKeyParts[n.Id]
+				if !part.VerifyMembershipKeyPart(n.EpochPublicKey, n.PublicKeys[msg.Source], anticoefs[msg.Source], byte(n.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, n.Id)
 				}
 				mutex.Lock()
 				membershipKey = membershipKey.Aggregate(part)
 				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
 				if receivedMembershipKeyMask.Sign() == 0 {
-					complete = true
-					pubsub.Broadcast(nil)
+					cancel()
 				}
 				mutex.Unlock()
 			}

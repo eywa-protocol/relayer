@@ -62,7 +62,7 @@ func (node *Node) WaitForMsg(stop int) (err error) {
 		}
 		mutex.Unlock()
 
-		rcvdMsg := node.Comm.Receive()
+		rcvdMsg := node.Comm.Receive(node.Ctx)
 		if rcvdMsg == nil {
 			continue
 		}
@@ -313,7 +313,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 		}
 		mutex.Unlock()
 
-		rcvdMsg := node.Comm.Receive()
+		rcvdMsg := node.Comm.Receive(node.Ctx)
 		logrus.Trace("rcvdMsg:", rcvdMsg)
 		if rcvdMsg == nil {
 			node.DisconnectPubSub()

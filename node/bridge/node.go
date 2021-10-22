@@ -158,6 +158,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
+						Ctx:               n.Ctx,
 						Id:                int(node.NodeId.Int64()),
 						TimeStep:          0,
 						ThresholdWit:      len(topicParticipants)/2 + 1,
@@ -639,11 +640,11 @@ type MessageBlsSetup struct {
 }
 
 // BlsSetup handles BLS setup phase and returns membership key as a result
-func BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub modelBLS.CommunicationInterface) bls.Signature {
+func (n *Node) BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub modelBLS.CommunicationInterface) bls.Signature {
 	mutex := &sync.Mutex{}
-	n := len(node.PublicKeys)
+	np := len(node.PublicKeys)
 	anticoefs := bls.CalculateAntiRogueCoefficients(node.PublicKeys)
-	receivedMembershipKeyMask := *big.NewInt((1 << n) - 1)
+	receivedMembershipKeyMask := *big.NewInt((1 << np) - 1)
 	membershipKey := bls.ZeroSignature()
 	complete := false
 	msgChan := make(chan *[]byte, ChanLen)
@@ -655,7 +656,7 @@ func BlsSetup(node *EpochKeys, privateKey bls.PrivateKey, pubsub modelBLS.Commun
 	}
 
 	for !finished() {
-		rcvdMsg := pubsub.Receive()
+		rcvdMsg := pubsub.Receive(n.Ctx)
 		if rcvdMsg == nil {
 			continue
 		}

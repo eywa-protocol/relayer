@@ -683,7 +683,7 @@ func (n *Node) BlsSetup() bls.Signature {
 				n.P2PPubSub.Broadcast(msgBytes)
 
 			case BlsSetupParts:
-				logrus.Tracef("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
+				logrus.Infof("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
 				part := msg.MembershipKeyParts[n.Id]
 				if !part.VerifyMembershipKeyPart(n.EpochPublicKey, n.PublicKeys[msg.Source], anticoefs[msg.Source], byte(n.Id)) {
 					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, n.Id)
@@ -722,37 +722,27 @@ func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvou
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
-	topic, err := n.P2PPubSub.JoinTopic(rendezvous + ".bls-setup")
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			field.ConsensusRendezvous: topic.String(),
-		}).Error(fmt.Errorf("join topic error: %w", err))
-		return err
-	}
-	defer func() {
-		if err := topic.Close(); err != nil {
-			logrus.WithFields(logrus.Fields{
-				field.ConsensusRendezvous: topic.String(),
-			}).Error(fmt.Errorf("close topic error: %w", err))
-		}
-		logrus.Tracef("Topic %s closed", topic.String())
-	}()
+	// for n.P2PPubSub.TopicObj() == nil || len(n.P2PPubSub.TopicObj().ListPeers()) < len(publicKeys)-1 {
+	// 	if n.P2PPubSub.TopicObj() == nil {
+	// 		logrus.Info("Waiting to join the initial topic")
+	// 	} else {
+	// 		logrus.Info("Waiting for all members to come, sendTopic.ListPeers(): ", n.P2PPubSub.TopicObj().ListPeers())
+	// 	}
+	// 	time.Sleep(300 * time.Millisecond)
+	// }
 
-	p2pSub, err := topic.Subscribe()
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			field.ConsensusRendezvous: topic.String(),
-		}).Error(fmt.Errorf("subscribe error: %w", err))
-		return err
-	}
-	defer p2pSub.Cancel()
-	logrus.Info("p2pSub.Topic: ", p2pSub.Topic())
+	if n.Id == 0 {
+		logrus.Info("Preparing to start BLS setup phase...")
+		go func() {
+			// TODO: wait until every participant is online
+			time.Sleep(9000 * time.Millisecond)
 
-	for len(topic.ListPeers()) < len(publicKeys)-1 && n.Ctx.Err() == nil {
-		logrus.Info("Waiting for all members to come, sendTopic.ListPeers(): ", topic.ListPeers())
-		time.Sleep(300 * time.Millisecond)
+			// Fire the setip phase
+			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
+			msgBytes, _ := json.Marshal(msg)
+			n.P2PPubSub.Broadcast(msgBytes)
+		}()
 	}
-
 	n.MembershipKey = n.BlsSetup()
 	return nil
 }

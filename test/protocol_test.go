@@ -422,22 +422,16 @@ func makeSession(n int, node *bridge.Node) *modelBLS.Node {
 	}
 }
 
-func StartBlsSetup(nodes []*bridge.Node, wg *sync.WaitGroup) {
-	var blsSetupDone []chan bool
+func StartBlsSetup(nodes []*bridge.Node) {
+	wg := &sync.WaitGroup{}
 	for _, node := range nodes {
-		done := make(chan bool)
 		wg.Add(1)
-		go runNodeBLSSetup(node, wg, done)
-		blsSetupDone = append(blsSetupDone, done)
+		go runNodeBLSSetup(node, wg)
 	}
 	msg := bridge.MessageBlsSetup{MsgType: bridge.BlsSetupPhase}
 	msgBytes, _ := json.Marshal(msg)
 	nodes[0].P2PPubSub.Broadcast(msgBytes)
-
-	for _, done := range blsSetupDone {
-		<-done
-	}
-
+	wg.Wait()
 	logrus.Info("BLS setup done")
 }
 
@@ -445,9 +439,10 @@ func StartBlsSetup(nodes []*bridge.Node, wg *sync.WaitGroup) {
 func StartTestBLS(nodes []*bridge.Node, stop int, fails int) (sessions []*modelBLS.Node) {
 	logrus.Info("START")
 	n := len(nodes)
-	wg := &sync.WaitGroup{}
 
-	StartBlsSetup(nodes, wg)
+	StartBlsSetup(nodes)
+
+	wg := &sync.WaitGroup{}
 	sessions = make([]*modelBLS.Node, n)
 	for i, node := range nodes {
 		sessions[i] = makeSession(n, node)
@@ -469,21 +464,21 @@ func StartTestBLS(nodes []*bridge.Node, stop int, fails int) (sessions []*modelB
 func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*modelBLS.Node) {
 	logrus.Info("START")
 	n := len(nodes)
-	wg := &sync.WaitGroup{}
-	defer wg.Done()
 
-	StartBlsSetup(nodes, wg)
+	StartBlsSetup(nodes)
+
 	sessions = make([]*modelBLS.Node, n)
 	for i, node := range nodes {
 		sessions[i] = makeSession(n, node)
 	}
 	sessions[0].Advance(0)
 
+	wg := &sync.WaitGroup{}
 	var consensusesChan []chan bool
 	for _, session := range sessions {
 		wg.Add(1)
 		consensusChannel := make(chan bool)
-		go runOneStepNodeBLS(session, wg, consensusChannel)
+		go session.WaitForProtocolMsg(consensusChannel, wg)
 		consensusesChan = append(consensusesChan, consensusChannel)
 	}
 
@@ -491,7 +486,7 @@ func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*
 		consensuses = append(consensuses, <-consensusesChan[i])
 	}
 	fmt.Println("CONSENSUSES", consensuses)
-
+	wg.Wait()
 	return
 }
 
@@ -511,18 +506,7 @@ func runNodeBLS(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
 
 }
 
-func runOneStepNodeBLS(node *modelBLS.Node, wg *sync.WaitGroup, consensusChannel chan bool) {
+func runNodeBLSSetup(node *bridge.Node, wg *sync.WaitGroup) {
 	defer wg.Done()
-	//consensusChannel := make(chan bool)
-	wg.Add(1)
-	go node.WaitForProtocolMsg(consensusChannel, wg)
-
-	//achieved = <-consensusChannel
-	//return
-}
-
-func runNodeBLSSetup(node *bridge.Node, wg *sync.WaitGroup, done chan bool) {
-	defer wg.Done()
-	node.MembershipKey = node.BlsSetup()
-	done <- true
+	node.MembershipKey = node.BlsSetup(wg)
 }

@@ -1,6 +1,7 @@
 package modelBLS
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -292,28 +293,14 @@ func (node *Node) DisconnectPubSub() {
 // WaitForProtocolMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
 func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
+	ctx, cancel := context.WithCancel(node.Ctx)
+	defer cancel()
 	mutex := &sync.Mutex{}
-	end := false
 	msgChan := make(chan *[]byte, ChanLen)
-	nodeTimeStep := 0
 	stop := 1
-	isNeedToStop := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return nodeTimeStep <= stop
-	}
-	for isNeedToStop() {
+	for ctx.Err() == nil {
 		// For now we assume that the underlying receive function is blocking
-
-		mutex.Lock()
-		nodeTimeStep = node.TimeStep
-		if end {
-			mutex.Unlock()
-			break
-		}
-		mutex.Unlock()
-
-		rcvdMsg := node.Comm.Receive(node.Ctx)
+		rcvdMsg := node.Comm.Receive(ctx)
 		logrus.Trace("rcvdMsg:", rcvdMsg)
 		if rcvdMsg == nil {
 			node.DisconnectPubSub()
@@ -321,19 +308,23 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 		}
 		msgChan <- rcvdMsg
 		wg.Add(1)
-		go func(nodeTimeStep int) {
+		go func() {
 			defer wg.Done()
 			msgBytes := <-msgChan
 			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
 
+			mutex.Lock()
+			nodeTimeStep := node.TimeStep
+			mutex.Unlock()
+
 			if nodeTimeStep == stop {
 				logrus.Infof(" Consensus achieved by node %v", node.Id)
 				mutex.Lock()
-				end = true
-				node.TimeStep++
-				node.Advance(node.TimeStep)
+				if ctx.Err() == nil {
+					consensusAgreed <- true
+					cancel()
+				}
 				mutex.Unlock()
-				consensusAgreed <- true
 				return
 			}
 
@@ -365,7 +356,6 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 
 				mutex.Lock()
 				node.Wits += 1
-				node.TimeStep += 1
 				node.Advance(nodeTimeStep + 1)
 				mutex.Unlock()
 
@@ -451,8 +441,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				}
 				mutex.Unlock()
 			}
-		}(nodeTimeStep)
-
+		}()
 	}
 	return
 }

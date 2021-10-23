@@ -643,7 +643,7 @@ type MessageBlsSetup struct {
 }
 
 // BlsSetup handles BLS setup phase and returns membership key as a result
-func (n *Node) BlsSetup() bls.Signature {
+func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	ctx, cancel := context.WithCancel(n.Ctx)
 	defer cancel()
 	mutex := &sync.Mutex{}
@@ -659,8 +659,9 @@ func (n *Node) BlsSetup() bls.Signature {
 			continue
 		}
 		msgChan <- rcvdMsg
-
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			msgBytes := <-msgChan
 			var msg MessageBlsSetup
 			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
@@ -743,6 +744,7 @@ func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvou
 			n.P2PPubSub.Broadcast(msgBytes)
 		}()
 	}
-	n.MembershipKey = n.BlsSetup()
+	wg := &sync.WaitGroup{}
+	n.MembershipKey = n.BlsSetup(wg)
 	return nil
 }

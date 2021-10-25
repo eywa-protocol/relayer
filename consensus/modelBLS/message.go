@@ -13,8 +13,6 @@ const (
 	Ack
 	Wit
 	Catchup
-	BlsSetupPhase
-	BlsSetupParts
 )
 
 type Body struct {
@@ -34,11 +32,6 @@ type MessageWithSig struct {
 	Signature bls.Signature // Aggregated signature
 	Mask      big.Int       // Bitmask of those who signed
 	PublicKey bls.PublicKey // Aggregated public key of those who signed
-}
-
-type MessageBlsSetup struct {
-	Header
-	MembershipKeyParts []bls.Signature
 }
 
 type MessageInterface interface {

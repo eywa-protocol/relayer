@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -41,6 +42,13 @@ var ErrContextDone = errors.New("interrupt on context done")
 
 const minConsensusNodesCount = 5
 
+type EpochKeys struct {
+	Id             int             // Id of the node, starting from 0
+	EpochPublicKey bls.PublicKey   // Arrtegated public key of all participants of the current epoch
+	MembershipKey  bls.Signature   // Membership key of this node
+	PublicKeys     []bls.PublicKey // Public keys of all nodes
+}
+
 type Node struct {
 	base.Node
 	cMx            *sync.Mutex
@@ -51,6 +59,7 @@ type Node struct {
 	PrivKey        bls.PrivateKey
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
+	EpochKeys
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
@@ -94,7 +103,7 @@ func (n Node) nodeExists(client Client, nodeIdAddress common.Address) bool {
 
 }
 
-func (n Node) GetPubKeysFromContract(client Client) (publicKeys []bls.PublicKey, err error) {
+func GetPubKeysFromContract(client Client) (publicKeys []bls.PublicKey, err error) {
 	publicKeys = make([]bls.PublicKey, 0)
 	nodes, err := common2.GetNodesFromContract(client.EthClient, client.ChainCfg.NodeRegistryAddress)
 	if err != nil {
@@ -122,7 +131,7 @@ func (n Node) KeysFromFilesByConfigName(name string) (prvKey bls.PrivateKey, err
 }
 
 func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.Node, err error) {
-	publicKeys, err := n.GetPubKeysFromContract(client)
+	publicKeys, err := GetPubKeysFromContract(client)
 	if err != nil {
 		return
 	}
@@ -148,6 +157,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					blsNode = &modelBLS.Node{
+						Ctx:               n.Ctx,
 						Id:                int(node.NodeId.Int64()),
 						TimeStep:          0,
 						ThresholdWit:      len(topicParticipants)/2 + 1,
@@ -159,6 +169,10 @@ func (n Node) NewBLSNode(topic *pubSub.Topic, client Client) (blsNode *modelBLS.
 						SigMask:           bls.EmptyMultisigMask(),
 						PublicKeys:        publicKeys,
 						PrivateKey:        n.PrivKey,
+						EpochPublicKey:    n.EpochPublicKey,
+						MembershipKey:     n.MembershipKey,
+						PartPublicKey:     bls.ZeroPublicKey(),
+						PartSignature:     bls.ZeroSignature(),
 						Participants:      topicParticipants,
 						CurrentRendezvous: topic.String(),
 						Leader:            "",
@@ -613,4 +627,124 @@ func (n *Node) GetForwarderAddress(chainId *big.Int) (common.Address, error) {
 
 		return c.ChainCfg.ForwarderAddress, nil
 	}
+}
+
+const ChanLen = 500
+
+const (
+	BlsSetupPhase = iota
+	BlsSetupParts
+)
+
+type MessageBlsSetup struct {
+	Source             int // NodeID of message's source
+	MsgType            int // Type of message
+	MembershipKeyParts []bls.Signature
+}
+
+// BlsSetup handles BLS setup phase and returns membership key as a result
+func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
+	ctx, cancel := context.WithCancel(n.Ctx)
+	defer cancel()
+	mutex := &sync.Mutex{}
+	np := len(n.PublicKeys)
+	anticoefs := bls.CalculateAntiRogueCoefficients(n.PublicKeys)
+	receivedMembershipKeyMask := *big.NewInt((1 << np) - 1)
+	membershipKey := bls.ZeroSignature()
+	msgChan := make(chan *[]byte, ChanLen)
+
+	for ctx.Err() == nil {
+		rcvdMsg := n.P2PPubSub.Receive(ctx)
+		if rcvdMsg == nil {
+			continue
+		}
+		msgChan <- rcvdMsg
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			msgBytes := <-msgChan
+			var msg MessageBlsSetup
+			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
+				logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, n.Id)
+				return
+			}
+
+			switch msg.MsgType {
+			case BlsSetupPhase:
+				membershipKeyParts := make([]bls.Signature, len(n.PublicKeys))
+				for i, _ := range membershipKeyParts {
+					membershipKeyParts[i] = n.PrivKey.GenerateMembershipKeyPart(byte(i), n.EpochPublicKey, anticoefs[n.Id])
+				}
+				outmsg := MessageBlsSetup{
+					Source:             n.Id,
+					MsgType:            BlsSetupParts,
+					MembershipKeyParts: membershipKeyParts,
+				}
+				msgBytes, _ := json.Marshal(outmsg)
+				n.P2PPubSub.Broadcast(msgBytes)
+
+			case BlsSetupParts:
+				logrus.Infof("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
+				part := msg.MembershipKeyParts[n.Id]
+				if !part.VerifyMembershipKeyPart(n.EpochPublicKey, n.PublicKeys[msg.Source], anticoefs[msg.Source], byte(n.Id)) {
+					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, n.Id)
+				}
+				mutex.Lock()
+				membershipKey = membershipKey.Aggregate(part)
+				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
+				if receivedMembershipKeyMask.Sign() == 0 {
+					cancel()
+				}
+				mutex.Unlock()
+			}
+		}()
+	}
+	return membershipKey
+}
+
+func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvous string) error {
+	nodeFromContract, err := client.NodeRegistry.GetNode(nodeIdAddress)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("Node address: %x nodeAddress from contract: %x", nodeIdAddress, nodeFromContract.NodeIdAddress)
+	if nodeFromContract.NodeIdAddress != nodeIdAddress {
+		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, nodeIdAddress)
+	}
+
+	publicKeys, err := GetPubKeysFromContract(client)
+	if err != nil {
+		return err
+	}
+	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
+	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
+
+	n.Id = int(nodeFromContract.NodeId.Int64())
+	n.PublicKeys = publicKeys
+	n.EpochPublicKey = aggregatedPublicKey
+
+	// for n.P2PPubSub.TopicObj() == nil || len(n.P2PPubSub.TopicObj().ListPeers()) < len(publicKeys)-1 {
+	// 	if n.P2PPubSub.TopicObj() == nil {
+	// 		logrus.Info("Waiting to join the initial topic")
+	// 	} else {
+	// 		logrus.Info("Waiting for all members to come, sendTopic.ListPeers(): ", n.P2PPubSub.TopicObj().ListPeers())
+	// 	}
+	// 	time.Sleep(300 * time.Millisecond)
+	// }
+
+	if n.Id == 0 {
+		logrus.Info("Preparing to start BLS setup phase...")
+		go func() {
+			// TODO: wait until every participant is online
+			time.Sleep(9000 * time.Millisecond)
+
+			// Fire the setip phase
+			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
+			msgBytes, _ := json.Marshal(msg)
+			n.P2PPubSub.Broadcast(msgBytes)
+		}()
+	}
+	wg := &sync.WaitGroup{}
+	n.MembershipKey = n.BlsSetup(wg)
+	return nil
 }

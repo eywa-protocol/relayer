@@ -5,10 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
-	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
-	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -16,6 +12,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
+	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
+	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -178,17 +179,7 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		logrus.Fatal(fmt.Errorf("failed to check node existent on error: %w", err))
 		return err
 	} else if res {
-		nodeFromContract, err := c1.NodeRegistry.GetNode(nodeIdAddress)
-		if err != nil {
-			return err
-		}
 		logrus.Infof("PORT %d", portFromFile)
-
-		logrus.Infof("Node address: %x nodeAddress from contract: %x", common.BytesToAddress([]byte(n.Host.ID())), nodeFromContract.NodeIdAddress)
-
-		if nodeFromContract.NodeIdAddress != common.BytesToAddress([]byte(n.Host.ID())) {
-			logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, common.BytesToAddress([]byte(n.Host.ID())))
-		}
 
 		//
 		// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
@@ -203,6 +194,11 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		go n.DiscoverByRendezvous(wg, rendezvous)
 
 		n.PrivKey, err = n.KeysFromFilesByConfigName(name)
+		if err != nil {
+			return err
+		}
+
+		err := n.StartEpoch(c1, nodeIdAddress, rendezvous)
 		if err != nil {
 			return err
 		}

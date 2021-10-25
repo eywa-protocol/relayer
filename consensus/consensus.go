@@ -78,52 +78,17 @@ func (c *Protocol) Send(msgBytes []byte, id int) {
 }
 
 // Receive gets message from PubSub in a blocking way
-func (c *Protocol) Receive() *[]byte {
-	// Check buffer for existing messages
-	if !c.victim {
-		select {
-		case msgFromBuffer := <-c.buffer:
-			return &msgFromBuffer
-		default:
-			break
-		}
-	}
+func (c *Protocol) Receive(ctx context.Context) *[]byte {
 
 	// Blocking function for consuming newly received messages
 	// We can access message here
-	msg, err := c.subscription.Next(context.Background())
+	msg, err := c.subscription.Next(ctx)
 	// handling canceled subscriptions
 	if err != nil {
 		return nil
 	}
 
 	msgBytes := msg.Data
-
-	// TODO: Find a way to implement threeGroups scenario
-	/*
-		var pbMessage messagepb.PbMessage
-		err = proto.Unmarshal(msgBytes, &pbMessage)
-		if err != nil {
-			fmt.Printf("Error : %v\n", err)
-			return nil
-		}
-
-		modelMsg := messagepb.ConvertPbMessage(&pbMessage)
-		if c.victim {
-			fmt.Println("VICTIM !!!!")
-			var connected bool
-			for _, n := range c.group {
-				if n == modelMsg.Source {
-					connected = true
-					break
-				}
-			}
-			if !connected {
-				c.buffer <- modelMsg
-				return nil
-			}
-		}
-	*/
 
 	return &msgBytes
 }

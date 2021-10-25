@@ -2,15 +2,11 @@ module gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge
 
 go 1.16
 
-//replace github.com/eywa-protocol/bls-crypto => ../bls-crypto/
-
 replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contracts/wrappers/
 
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain => ./external/eywa-overhead-chain/
-
-//replace github.com/eywa-protocol/bls-crypto => /home/syi/src/bls-crypto
 
 require (
 	github.com/boltdb/bolt v1.3.1
@@ -19,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.11
 	github.com/evalphobia/logrus_sentry v0.8.2
-	github.com/eywa-protocol/bls-crypto v0.1.2-0.20211020150244-23d82d97468b
+	github.com/eywa-protocol/bls-crypto v0.1.2
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/ipfs/go-cid v0.0.7

@@ -10,6 +10,8 @@ replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain => ./external/eywa-overhead-chain/
 
+//replace github.com/eywa-protocol/bls-crypto => /home/syi/src/bls-crypto
+
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.22.0-beta

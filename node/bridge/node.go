@@ -672,7 +672,7 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 			switch msg.MsgType {
 			case BlsSetupPhase:
 				membershipKeyParts := make([]bls.Signature, len(n.PublicKeys))
-				for i, _ := range membershipKeyParts {
+				for i := range membershipKeyParts {
 					membershipKeyParts[i] = n.PrivKey.GenerateMembershipKeyPart(byte(i), n.EpochPublicKey, anticoefs[n.Id])
 				}
 				outmsg := MessageBlsSetup{
@@ -718,6 +718,7 @@ func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvou
 	}
 	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
 	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
+	aggregatedPublicKey.Marshal() // to avoid data race because Marshal() wants to normalize the key for the first time
 
 	n.Id = int(nodeFromContract.NodeId.Int64())
 	n.PublicKeys = publicKeys

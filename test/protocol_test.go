@@ -369,6 +369,7 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 
 	anticoefs := bls.CalculateAntiRogueCoefficients(publicKeys)
 	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
+	aggregatedPublicKey.Marshal() // to avoid data race because Marshal() wants to normalize the key for the first time
 
 	for i := range nodes {
 		// var comm modelBLS.CommunicationInterface

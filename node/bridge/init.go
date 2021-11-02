@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/eywa-protocol/bls-crypto/bls"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -203,14 +204,12 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			return err
 		}
 
-		ledger.DefLedger, err = initLedger()
+		ledger.DefLedger, err = n.initLedger()
 		if err != nil {
 			logrus.Errorf("initLedger %s", err)
 			return err
 		}
 		defer ledger.DefLedger.Close()
-
-		//ledger.DefLedger, err = ledger.NewLedger("leveldb")
 
 		eventChan := make(chan *wrappers.BridgeOracleRequest)
 
@@ -322,7 +321,7 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 	return
 }
 
-func initLedger() (*ledger.Ledger, error) {
+func (n *Node) initLedger() (*ledger.Ledger, error) {
 	// TODO init events here
 	//events.Init() //Init event hub
 
@@ -332,10 +331,7 @@ func initLedger() (*ledger.Ledger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
-	bookKeepers, err := _config.DefConfig.GetBookkeepers()
-	if err != nil {
-		return nil, fmt.Errorf("GetBookkeepers error:%s", err)
-	}
+	bookKeepers := []bls.PublicKey{n.EpochPublicKey}
 	genesisBlock, err := _genesis.BuildGenesisBlock(bookKeepers)
 	if err != nil {
 		return nil, fmt.Errorf("genesisBlock error %s", err)

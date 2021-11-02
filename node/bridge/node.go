@@ -737,7 +737,7 @@ func (n *Node) StartEpoch(client Client, nodeIdAddress common.Address, rendezvou
 		logrus.Info("Preparing to start BLS setup phase...")
 		go func() {
 			// TODO: wait until every participant is online
-			time.Sleep(9000 * time.Millisecond)
+			time.Sleep(19000 * time.Millisecond)
 
 			// Fire the setip phase
 			msg := MessageBlsSetup{MsgType: BlsSetupPhase}

@@ -336,8 +336,7 @@ func initLedger() (*ledger.Ledger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetBookkeepers error:%s", err)
 	}
-	genesisConfig := _config.DefConfig.Genesis
-	genesisBlock, err := _genesis.BuildGenesisBlock(bookKeepers, genesisConfig)
+	genesisBlock, err := _genesis.BuildGenesisBlock(bookKeepers)
 	if err != nil {
 		return nil, fmt.Errorf("genesisBlock error %s", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-
 )
 
 // PoolTransactions is a PoolTransactions slice type for basic sorting.

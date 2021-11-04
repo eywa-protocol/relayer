@@ -42,7 +42,6 @@ func initNodeWithClients() {
 
 func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testData *big.Int) {
 	initNodeWithClients()
-	logrus.Info("sending to contract ", testData)
 	clientFrom := node.Clients[chainidFrom.String()]
 	require.NoError(t, err)
 	clientTo := node.Clients[chainIdTo.String()]
@@ -60,6 +59,7 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	dexPoolToContract, err := wrappers.NewMockDexPool(dexPoolTo, clientTo.EthClient)
 	testData = qwe.SetUint64(rand.Uint64())
 	require.NotNil(t, testData)
+	logrus.Info("sending to contract ", testData)
 	tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
 		testData,
 		dexPoolTo,

@@ -15,7 +15,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"
@@ -33,6 +32,8 @@ var Delayed = true
 
 const BufferLen = 500
 
+// Deprecated: Protocol is deprecated. Use consensus_v1.go instead
+
 type Protocol struct {
 	pubsub       *pubsub.PubSub       // PubSub of each individual node
 	subscription *pubsub.Subscription // Subscription of individual node
@@ -40,10 +41,6 @@ type Protocol struct {
 	victim       bool                 // Flag for declaring a node as a victim
 	buffer       chan []byte          // A buffer for keeping received message in case the node is kept in the delayed set by adversary
 	group        []int
-}
-
-func (c *Protocol) BroadcastMsg(msg model.Message) {
-	panic("not implemented")
 }
 
 func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
@@ -461,7 +458,7 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 	return
 }
 
-func (c *Protocol) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
+func (c *Protocol) StartBLSNode(node *model.Node, stop int, fails int) {
 
 	fmt.Print("START BLS NODE\n")
 	wg := &sync.WaitGroup{}
@@ -474,7 +471,7 @@ func (c *Protocol) StartBLSNode(node *modelBLS.Node, stop int, fails int) {
 	fmt.Println("BLS Node Started")
 }
 
-func runBLSNode(node *modelBLS.Node, stop int, wg *sync.WaitGroup) {
+func runBLSNode(node *model.Node, stop int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	err := node.WaitForMsg(stop)
 	if err != nil {

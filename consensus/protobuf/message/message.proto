@@ -1,0 +1,38 @@
+syntax = "proto2";
+package message;
+
+option go_package = "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/message;message";
+
+enum Msg_type {
+    Announce = 0;
+    Prepare = 1;
+    Prepared = 2;
+    Commit = 3;
+    Commited = 4;
+}
+
+message Message{
+    oneof request {
+        ConsensusRequest consensus = 5 ;
+        DrandRequest drand = 6 ;
+        UptimeRequest uptime = 7;
+    }
+}
+
+message ConsensusRequest {
+    required Msg_type Msg_type = 1;
+    required int64 source = 2;
+    required int64 step = 3;
+    repeated ConsensusRequest history = 4;
+    optional bytes signature = 5;
+    optional bytes mask = 6;
+    optional bytes public_key = 7;
+    optional string bridgeEventHash = 8;
+
+}
+message DrandRequest {
+
+}
+    message UptimeRequest {
+}
+

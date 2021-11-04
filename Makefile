@@ -29,7 +29,10 @@ custom_bls_test:
 	 go test -v ./test/ -run TestOneStepBLS
 
 test_local_bridge:
-	go test -v ./test/ -run Test_Local_SendRequestV2
+	go test -v ./test/ -run Test_Local_SendRequestV2 $(date +%s)
 
 wrappers:
 	make -C external/eth-contracts/ eth-local-migrate
+
+gen_proto:
+	protoc --proto_path=consensus/protobuf/message --go_out=plugins=grpc:consensus/protobuf/message --go_opt=paths=source_relative consensus/protobuf/message/message.proto

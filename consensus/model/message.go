@@ -1,22 +1,41 @@
 package model
 
+import (
+	"math/big"
+
+	"github.com/eywa-protocol/bls-crypto/bls"
+)
+
 type MsgType int
 
 const (
-	Raw = iota
-	Ack
-	Wit
-	Catchup
+	Announce = iota
+	Prepare
+	Prepared
+	Commit
+	Commited
 )
 
-type Message struct {
-	Source  int       // NodeID of message's source
-	Step    int       // Time step of message
-	MsgType MsgType   // Type of message
-	History []Message // History of messages. Sent to ensure causality, But in an inefficient way.
+type Body struct {
+	Step            int // Time step of message
+	BridgeEventHash string
+}
+
+type Header struct {
+	Source  int     // NodeID of message's source
+	MsgType MsgType // Type of message
+}
+
+type MessageWithSig struct {
+	Header
+	Body
+	History   []MessageWithSig
+	Signature bls.Signature // Aggregated signature
+	Mask      big.Int       // Bitmask of those who signed
+	PublicKey bls.PublicKey // Aggregated public key of those who signed
 }
 
 type MessageInterface interface {
-	MessageToBytes(Message) *[]byte
-	BytesToModelMessage([]byte) *Message
+	MessageToBytes(sig MessageWithSig) *[]byte
+	BytesToModelMessage([]byte) *MessageWithSig
 }

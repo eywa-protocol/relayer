@@ -8,21 +8,17 @@ import (
 	mrand "math/rand"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"
 	core "github.com/libp2p/go-libp2p-core"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	quic "github.com/libp2p/go-libp2p-quic-transport"
 	ws "github.com/libp2p/go-ws-transport"
+	"github.com/multiformats/go-multiaddr"
 )
 
 const delayBias = 100
@@ -456,27 +452,6 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 		return
 	}
 	return
-}
-
-func (c *Protocol) StartBLSNode(node *model.Node, stop int, fails int) {
-
-	fmt.Print("START BLS NODE\n")
-	wg := &sync.WaitGroup{}
-	defer wg.Done()
-	node.Advance(0)
-	wg.Add(1)
-	wg.Add(fails)
-	go runBLSNode(node, stop, wg)
-	wg.Wait()
-	fmt.Println("BLS Node Started")
-}
-
-func runBLSNode(node *model.Node, stop int, wg *sync.WaitGroup) {
-	defer wg.Done()
-	err := node.WaitForMsg(stop)
-	if err != nil {
-		logrus.Error(err)
-	}
 }
 
 func (c *Protocol) UnregisterTopicValidator() {

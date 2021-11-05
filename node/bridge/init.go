@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/eywa-protocol/bls-crypto/bls"
+	pubSub "github.com/libp2p/go-libp2p-pubsub"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/modelBLS"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -56,6 +58,7 @@ func InitNode(name, keysPath string) (err error) {
 	logrus.Infoln("Generated address:")
 	fmt.Println(common2.AddressFromSecp256k1PrivKey(privKey))
 	logrus.Infoln("Please transfer the collateral there and restart me with -register flag.")
+
 	return
 }
 
@@ -112,6 +115,14 @@ func RegisterNode(name, keysPath string) (err error) {
 		}
 		logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
 	}
+
+	ledger, err := n.initLedger()
+	if err != nil {
+		logrus.Errorf("initLedger %s", err)
+		return err
+	}
+	n.DefLedger = ledger
+	defer n.DefLedger.Close()
 
 	return
 }
@@ -203,31 +214,60 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		if err != nil {
 			return err
 		}
-
-		ledger.DefLedger, err = n.initLedger()
-		if err != nil {
-			logrus.Errorf("initLedger %s", err)
-			return err
+		topicChan := make(chan *pubSub.Topic)
+		go n.JoinPubSubTopic(fmt.Sprintf("%v-NEW_RANDEVOUZ", rendezvous), topicChan)
+		time.Sleep(10 * time.Second)
+		topic := <-topicChan
+		if topic == nil {
+			panic("TOPIC")
 		}
-		defer ledger.DefLedger.Close()
 
-		eventChan := make(chan *wrappers.BridgeOracleRequest)
+		logrus.Print("Setting node TOPIC", topic)
+		n.CurrentTopic = *topic
+		topicParticipants := n.CurrentTopic.ListPeers()
+		topicParticipants = append(topicParticipants, n.Host.ID())
+		logrus.Tracef("NODE len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
+		if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 
-		for chainIdString, client := range n.Clients {
-			err = n.ListenNodeOracleRequest(
-				eventChan,
-				wg,
-				client.ChainCfg.ChainId)
-			if errors.Is(err, ErrContextDone) {
-				logrus.Info(err)
-				return nil
-			} else if err != nil {
-				return fmt.Errorf("stop listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
+			nodeBLSSession := make(chan *modelBLS.Node)
+			go func(blsSessionChan chan *modelBLS.Node) {
+				nodeBls, err := n.NewBLSSession(topic)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						field.ConsensusRendezvous: rendezvous,
+					}).Error(fmt.Errorf("create bls node error: %w ", err))
+					return
+				}
+				blsSessionChan <- nodeBls
+
+			}(nodeBLSSession)
+
+			qwe := <-nodeBLSSession
+			n.CurrentBlSSession = qwe
+			if n.CurrentBlSSession == nil {
+				panic("n.CurrentBlSSession NIL")
 			}
-		}
+			logrus.Print("CurrentBlSSession", n.CurrentBlSSession)
 
-		wg.Add(1)
-		go n.UptimeSchedule(wg)
+			eventChan := make(chan *wrappers.BridgeOracleRequest)
+
+			for chainIdString, client := range n.Clients {
+				err = n.ListenNodeOracleRequest(
+					eventChan,
+					wg,
+					client.ChainCfg.ChainId)
+				if errors.Is(err, ErrContextDone) {
+					logrus.Info(err)
+					return nil
+				} else if err != nil {
+					return fmt.Errorf("stop listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
+				}
+			}
+		} else {
+			panic("NOT ENAUGH PARTISIPANTS")
+		}
+		//wg.Add(1)
+		//go n.NewPubSubTopicToStartNodesSchedule(wg)
 
 		logrus.Info("bridge started")
 		runa.Host(n.Host, cancel, wg)
@@ -322,8 +362,6 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 }
 
 func (n *Node) initLedger() (*ledger.Ledger, error) {
-	// TODO init events here
-	//events.Init() //Init event hub
 
 	var err error
 	dbDir := utils.GetStoreDirPath("leveldb", _config.DefConfig.P2PNode.NetworkName)
@@ -344,4 +382,14 @@ func (n *Node) initLedger() (*ledger.Ledger, error) {
 
 	logrus.Infof("Ledger init success")
 	return ledger.DefLedger, nil
+}
+
+func (n *Node) JoinPubSubTopic(currentTopic string, ptc chan *pubSub.Topic) {
+	nodesTopic, err := n.P2PPubSub.JoinTopic(currentTopic)
+	if err != nil {
+		logrus.Errorf("JoinPubSubTopic %v", err)
+	} else {
+		_, _ = nodesTopic.Subscribe()
+	}
+	ptc <- nodesTopic
 }

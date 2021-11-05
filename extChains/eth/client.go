@@ -61,6 +61,14 @@ type client struct {
 	urls               []string
 }
 
+func (c *client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	panic("implement me")
+}
+
+func (c *client) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
+	panic("implement me")
+}
+
 func NewClient(ctx context.Context, cfg *Config) (*client, error) {
 	if len(cfg.Urls) <= 0 {
 		return nil, ErrClientUrlsEmpty

@@ -63,20 +63,15 @@ type Node struct {
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup, nodeBls *modelBLS.Node) {
+	wg.Add(2)
 	defer wg.Done()
-	// TODO AdvanceWithTopic switched off for now - to restore after epoch and setup phase intagrated
-	/*consensusChannel := make(chan bool)*/
-	logrus.Tracef("сurrentRendezvous %v LEADER %v", nodeBls.CurrentRendezvous, nodeBls.Leader)
-	wg.Add(1)
+	consensusChannel := make(chan bool)
 	go nodeBls.AdvanceWithTopic(0, nodeBls.CurrentRendezvous, wg)
 	time.Sleep(time.Second)
-	/*	wg.Add(1)
-		go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
-		consensus := <-consensusChannel*/
-	consensus := true
-
-	if consensus == true {
-		logrus.Tracef("Starting Leader election !!!")
+	go nodeBls.WaitForProtocolMsg(consensusChannel, wg)
+	select {
+	case <-consensusChannel:
+		logrus.Print("Starting Leader election !!!")
 		leaderPeerId, err := libp2p.RelayerLeaderNode(nodeBls.CurrentRendezvous, nodeBls.Participants)
 		if err != nil {
 			panic(err)
@@ -90,7 +85,10 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 				logrus.Error(fmt.Errorf("%w", err))
 			}
 		}
+	case <-time.After(5000 * time.Millisecond):
+		logrus.Println("WaitGroup timed out..")
 	}
+
 	logrus.Println("The END of Protocol")
 }
 

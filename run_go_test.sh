@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TPATH="./test/networks"
+TPATH="./test"
 
 if [[ "${1}" == "local" ]];then
     COMMAND="Test_Local_SendRequestV2"

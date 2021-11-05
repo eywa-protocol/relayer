@@ -303,7 +303,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 		rcvdMsg := node.Comm.Receive(ctx)
 		logrus.Trace("rcvdMsg:", rcvdMsg)
 		if rcvdMsg == nil {
-			node.DisconnectPubSub()
+			logrus.Warn("rcvdMsg:", rcvdMsg)
 			break
 		}
 		msgChan <- rcvdMsg

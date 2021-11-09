@@ -21,22 +21,6 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 )
 
-type FailureModel int
-
-const (
-	NoFailure = iota
-	MinorFailure
-	MajorFailure
-	RejoiningMinorityFailure
-	RejoiningMajorityFailure
-	LeaveRejoin
-	ThreeGroups
-)
-
-const FailureDelay = 3
-const RejoinDelay = 15
-const LeaveDelay = 10
-
 // setupNetworkTopology sets up a simple network topology for test.
 func setupNetworkTopology(hosts []*core.Host) (err error) {
 
@@ -80,34 +64,10 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 	return err
 }
 
-func TestBLS(t *testing.T) {
-	logFile, _ := os.OpenFile("../../../logBLS.log", os.O_RDWR|os.O_CREATE, 0666)
-	model.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	// Delayed = false
-	simpleTestBLS(t, 5, 9900, 2)
-}
-
 func TestOneStepBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../logs/oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
 	model.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
-	simpleTestOneStepBLS(t, 77, 9900)
-}
-
-func simpleTestBLS(t *testing.T, n int, initialPort int, stop int) {
-	nodes, hosts := setupHostsBLS(n, initialPort)
-
-	defer func() {
-		logrus.Info("Closing hosts")
-		for _, h := range hosts {
-			_ = (*h).Close()
-		}
-	}()
-
-	err := setupNetworkTopology(hosts)
-	require.Nil(t, err)
-	// PubSub is ready and we can start our algorithm
-	sessions := StartTestBLS(nodes, stop, stop/3)
-	LogOutputBLS(t, sessions)
+	simpleTestOneStepBLS(t, 7, 9900)
 }
 
 func simpleTestOneStepBLS(t *testing.T, n int, initialPort int) {
@@ -216,31 +176,6 @@ func StartBlsSetup(nodes []*bridge.Node) {
 }
 
 // StartTest is used for starting tlc nodes
-func StartTestBLS(nodes []*bridge.Node, stop int, fails int) (sessions []*model.Node) {
-	logrus.Info("START")
-	n := len(nodes)
-
-	StartBlsSetup(nodes)
-
-	wg := &sync.WaitGroup{}
-	sessions = make([]*model.Node, n)
-	for i, node := range nodes {
-		sessions[i] = makeSession(n, node)
-	}
-	sessions[0].Advance(0)
-
-	for _, session := range sessions {
-		wg.Add(1)
-		go runNodeBLS(session, stop, wg)
-	}
-
-	wg.Add(-fails)
-	wg.Wait()
-	fmt.Println("The END")
-	return
-}
-
-// StartTest is used for starting tlc nodes
 func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*model.Node) {
 	logrus.Info("START")
 	n := len(nodes)
@@ -251,9 +186,9 @@ func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*
 	for i, node := range nodes {
 		sessions[i] = makeSession(n, node)
 	}
-	sessions[0].Advance(0)
-
 	wg := &sync.WaitGroup{}
+	sessions[0].AdvanceStep(0)
+
 	var consensusesChan []chan bool
 	for _, session := range sessions {
 		wg.Add(1)
@@ -275,15 +210,6 @@ func LogOutputBLS(t *testing.T, nodes []*model.Node) {
 		t.Logf("LogOut nodes: %d , TimeStep : %d", i, nodes[i].TimeStep)
 		model.Logger1.Printf("%d,%d\n", i, nodes[i].TimeStep)
 	}
-}
-
-func runNodeBLS(node *model.Node, stop int, wg *sync.WaitGroup) {
-	defer wg.Done()
-	err := node.WaitForMsg(stop)
-	if err != nil {
-		fmt.Println(err)
-	}
-
 }
 
 func runNodeBLSSetup(node *bridge.Node, wg *sync.WaitGroup) {

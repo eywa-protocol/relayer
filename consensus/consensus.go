@@ -91,6 +91,11 @@ func (c *Protocol) Disconnect() {
 	c.pubsub.UnregisterTopicValidator(c.topic)
 }
 
+func (c *Protocol) DisconnectTopic(topic string) {
+	c.pubsub.UnregisterTopicValidator(topic)
+
+}
+
 func (c *Protocol) Reconnect(topic string) {
 	var err error
 	if topic != "" {

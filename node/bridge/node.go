@@ -74,9 +74,8 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	wg.Add(1)
 
 	go n.session.WaitForProtocolMsg(consensusChannel, wg)
-	consensus := <-consensusChannel
-
-	if consensus == true {
+	select {
+	case <-consensusChannel:
 		logrus.Infof("Starting Leader election !!!")
 
 		leaderPeerId, err := libp2p.RelayerLeaderNode(n.session.Topic.String(), n.session.Participants)
@@ -91,8 +90,9 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 			if err != nil {
 				logrus.Error(fmt.Errorf("%w", err))
 			}
-
 		}
+	case <-time.After(5000 * time.Millisecond):
+		logrus.Println("WaitGroup timed out..")
 
 	}
 	if err := n.session.Topic.Close(); err != nil {

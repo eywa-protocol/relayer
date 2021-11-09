@@ -122,7 +122,6 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 
 		// creating pubsubs
 		comm.InitializePubSub(*host)
-		comm.InitializeVictim(false)
 
 		nodes[i] = &bridge.Node{
 			Node: base.Node{

@@ -31,6 +31,8 @@ func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
 	return c.pubsub.ListPeers(topic)
 }
 
+//use pubsub.Join() and topic.Publish() instead
+
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Protocol) Broadcast(msgBytes []byte) {
 	// Broadcasting to a topic in PubSub

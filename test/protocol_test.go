@@ -114,14 +114,13 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 		// var comm modelBLS.CommunicationInterface
 		var comm *consensus.Protocol
 		comm = new(consensus.Protocol)
-		comm.SetTopic("TLC")
 
 		// creating libp2p hosts
 		host := comm.CreatePeer(i, initialPort+i)
 		hosts[i] = host
 
 		// creating pubsubs
-		comm.InitializePubSub(*host)
+		comm.InitializePubSubWithTopic(*host, "TEST")
 
 		nodes[i] = &bridge.Node{
 			Node: base.Node{

@@ -155,6 +155,12 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		logrus.Fatal(err)
 	}
 
+	blsNodeId := n.getNodeBlsId()
+	if blsNodeId == -1 {
+		logrus.Fatal(errors.New("node id -1"))
+	}
+	n.BlsNodeId = blsNodeId
+
 	n.Dht, err = n.InitDHT(config.Bridge.BootstrapAddrs)
 	if err != nil {
 		return err
@@ -226,8 +232,8 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			}
 		}
 
-		wg.Add(1)
-		go n.UptimeSchedule(wg)
+		//wg.Add(1)
+		//go n.UptimeSchedule(wg)
 
 		logrus.Info("bridge started")
 		runa.Host(n.Host, cancel, wg)

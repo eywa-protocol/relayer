@@ -112,7 +112,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				mutex.Unlock()
 
 				if nodeTimeStep == stop {
-					logrus.Infof(" Consensus achieved by node %v", node.Id)
+					logrus.Tracef(" Consensus achieved by node %v", node.Id)
 					mutex.Lock()
 					if ctx.Err() == nil {
 						consensusAgreed <- true

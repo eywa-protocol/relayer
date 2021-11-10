@@ -24,14 +24,12 @@ import (
 type Protocol struct {
 	pubsub       *pubsub.PubSub       // PubSub of each individual node
 	subscription *pubsub.Subscription // Subscription of individual node
-	topic        string               // PubSub topic
+	topic        *pubsub.Topic        // PubSub topic
 }
 
 func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
 	return c.pubsub.ListPeers(topic)
 }
-
-//use pubsub.Join() and topic.Publish() instead
 
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Protocol) Broadcast(msgBytes []byte) {
@@ -44,7 +42,7 @@ func (c *Protocol) Broadcast(msgBytes []byte) {
 			return
 		}
 
-	}(msgBytes, c.topic, c.pubsub)
+	}(msgBytes, c.topic.String(), c.pubsub)
 }
 
 func (c *Protocol) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
@@ -75,7 +73,7 @@ func (c *Protocol) Receive(ctx context.Context) *[]byte {
 
 func (c *Protocol) Disconnect() {
 	c.subscription.Cancel()
-	c.pubsub.UnregisterTopicValidator(c.topic)
+	c.pubsub.UnregisterTopicValidator(c.topic.String())
 }
 
 func (c *Protocol) DisconnectTopic(topic string) {
@@ -85,11 +83,11 @@ func (c *Protocol) DisconnectTopic(topic string) {
 
 func (c *Protocol) Reconnect(topic string) {
 	var err error
-	if topic != "" {
-		c.topic = topic
-	}
+	//if topic != "" {
+	//	c.topic = topic
+	//}
 
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		panic(err)
 	}
@@ -104,7 +102,7 @@ func (c *Protocol) Cancel(cancelTime int, reconnectTime int) {
 		c.subscription.Cancel()
 		time.Sleep(time.Duration(reconnectTime) * time.Millisecond)
 		fmt.Println("	RESUBBING	")
-		c.subscription, _ = c.pubsub.Subscribe(c.topic)
+		c.subscription, _ = c.pubsub.Subscribe(c.topic.String())
 	}()
 }
 
@@ -135,27 +133,6 @@ func (c *Protocol) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host 
 }
 
 // initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Protocol) InitializePubSub(h core.Host) {
-	var err error
-	// Creating pubsub
-	// every peer has its own PubSub
-	c.pubsub, err = applyPubSub(h)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-	c.topic = "TLC"
-	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-}
-
-// initializePubSub creates a PubSub for the peer and also subscribes to a topic
 func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 	var err error
 	// Creating pubsub
@@ -166,15 +143,14 @@ func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 		return
 	}
 
-	if topic != "" {
-		c.topic = topic
-	} else {
-		c.InitializePubSub(h)
+	c.topic, err = c.pubsub.Join(topic)
+	if err != nil {
+		fmt.Printf("Error : %v\n", err)
 		return
 	}
 
 	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
 		return
@@ -193,15 +169,10 @@ func (c *Protocol) InitializePubSubWithTopicAndPeers(h core.Host, topic string, 
 		return
 	}
 
-	if topic != "" {
-		c.topic = topic
-	} else {
-		c.InitializePubSub(h)
-		return
-	}
+	c.InitializePubSubWithTopic(h, topic)
 
 	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
 		return
@@ -209,10 +180,10 @@ func (c *Protocol) InitializePubSubWithTopicAndPeers(h core.Host, topic string, 
 
 }
 
-func (c *Protocol) SetTopic(topic string) {
+/*func (c *Protocol) SetTopic(topic string) {
 	c.topic = topic
 }
-
+*/
 // createHost creates a host with some default options and a signing identity
 func createHost(port int) (core.Host, error) {
 	// Producing private key
@@ -389,5 +360,5 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 }
 
 func (c *Protocol) UnregisterTopicValidator() {
-	c.pubsub.UnregisterTopicValidator(c.topic)
+	c.pubsub.UnregisterTopicValidator(c.topic.String())
 }

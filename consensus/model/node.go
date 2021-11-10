@@ -29,7 +29,6 @@ type Node struct {
 	PrivateKey     bls.PrivateKey   // Private key of the node
 	EpochPublicKey bls.PublicKey    // Arrtegated public key of all participants of the current epoch
 	MembershipKey  bls.Signature    // Membership key of this node
-	Participants   []peer.ID
 	Leader         peer.ID
 	Topic          *pubsub.Topic
 }

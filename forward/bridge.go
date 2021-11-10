@@ -15,7 +15,7 @@ import (
 )
 
 // BridgeRequestV2 receiveRequestV2(bytes32 reqId, bytes b, address receiveSide, address bridgeFrom)
-func BridgeRequestV2(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, contractAddress common.Address, reqId [32]byte, b []byte, receiveSide, bridgeFrom common.Address) (txHash common.Hash, err error) {
+func BridgeRequestV2(gsnCaller GsnCaller, chainId *big.Int, signer *ecdsa.PrivateKey, contractAddress common.Address, reqId [32]byte, b []byte, receiveSide common.Address, bridgeFrom [32]byte) (txHash common.Hash, err error) {
 	contractABI, err := abi.JSON(strings.NewReader(wrappers.BridgeABI))
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("could not parse ABI: %w", err)

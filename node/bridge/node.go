@@ -392,7 +392,6 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 
 	var txHash *common.Hash
 
-	receiveSide := event.ReceiveSide.Hash()
 	bridgeFrom := client.ChainCfg.BridgeAddress.Hash()
 
 	if client.ChainCfg.UseGsn && n.gsnClient != nil {

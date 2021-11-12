@@ -5,11 +5,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/eywa-protocol/bls-crypto/bls"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
-	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
-	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
@@ -293,8 +288,9 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 			return err
 		}
 
-		err := n.StartEpoch(nodeIdAddress, rendezvous)
+		err := n.StartEpoch()
 		if err != nil {
+			logrus.Errorf("StartEpoch %v", err)
 			return err
 		}
 
@@ -321,47 +317,6 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 		return nil
 	}
 }
-
-// func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
-//     n.cMx.Lock()
-//     clientRecreated := false
-//     client, ok := n.Clients[chainId.String()]
-//     if !ok {
-//         n.cMx.Unlock()
-//         return Client{}, false, errors.New("eth client for chain ID not found")
-//     }
-//     n.cMx.Unlock()
-//
-//     netChainId, err := client.EthClient.ChainID(n.Ctx)
-//     if err != nil {
-//         logrus.WithFields(logrus.Fields{
-//             field.CainId: chainId,
-//         }).Error(fmt.Errorf("recreate network client on error: %w", err))
-//
-//         client, err = NewClient(client.ChainCfg, client.currentUrl, n.signerKey)
-//         if err != nil {
-//             err = fmt.Errorf("can not create client on error:%w", err)
-//             return Client{}, false, err
-//         } else {
-//             // replace network client in clients map
-//             clientRecreated = true
-//             n.cMx.Lock()
-//             n.Clients[chainId.String()] = client
-//             n.cMx.Unlock()
-//         }
-//     }
-//
-//     if netChainId != nil && netChainId.Cmp(chainId) != 0 {
-//         err = errors.New("chain id not match to network")
-//         logrus.WithFields(logrus.Fields{
-//             field.CainId:         chainId,
-//             field.NetworkChainId: netChainId,
-//         }).Error(err)
-//         return Client{}, false, err
-//     }
-//
-//     return client, clientRecreated, nil
-// }
 
 func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *Node, err error, clientsClose func()) {
 	n = &Node{
@@ -417,7 +372,7 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 	}
 }
 
-func (n *Node) initLedger() (*ledger.Ledger, error) {
+/*func (n *Node) initLedger() (*ledger.Ledger, error) {
 	// TODO init events here
 	// events.Init() //Init event hub
 
@@ -440,4 +395,4 @@ func (n *Node) initLedger() (*ledger.Ledger, error) {
 
 	logrus.Infof("Ledger init success")
 	return ledger.DefLedger, nil
-}
+}*/

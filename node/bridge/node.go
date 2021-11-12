@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
+	libp2p2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/contracts"
 	"math/big"
 	"sync"
@@ -551,15 +552,7 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	return membershipKey
 }
 
-func (n *Node) StartEpoch(nodeIdAddress common.Address, rendezvous string) error {
-	nodeFromContract, err := n.NodeRegistry().GetNode(&bind.CallOpts{}, nodeIdAddress)
-	if err != nil {
-		return err
-	}
-	logrus.Infof("Node address: %x nodeAddress from contract: %x", nodeIdAddress, nodeFromContract.NodeIdAddress)
-	if nodeFromContract.NodeIdAddress != nodeIdAddress {
-		logrus.Fatalf("Peer addresses mismatch. Contract: %s Local file: %s", nodeFromContract.NodeIdAddress, nodeIdAddress)
-	}
+func (n *Node) StartEpoch() error {
 
 	publicKeys, err := n.NodeRegistryPublicKeys()
 	if err != nil {
@@ -569,7 +562,7 @@ func (n *Node) StartEpoch(nodeIdAddress common.Address, rendezvous string) error
 	aggregatedPublicKey := bls.AggregatePublicKeys(publicKeys, anticoefs)
 	aggregatedPublicKey.Marshal() // to avoid data race because Marshal() wants to normalize the key for the first time
 
-	n.Id = int(nodeFromContract.NodeId.Int64())
+	n.Id = n.BlsNodeId
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
@@ -581,21 +574,25 @@ func (n *Node) StartEpoch(nodeIdAddress common.Address, rendezvous string) error
 	// 	}
 	// 	time.Sleep(300 * time.Millisecond)
 	// }
-
+	wg := &sync.WaitGroup{}
+	defer wg.Done()
 	if n.Id == 0 {
+		wg.Add(1)
 		logrus.Info("Preparing to start BLS setup phase...")
-		go func() {
+		go func(group *sync.WaitGroup) {
+
 			// TODO: wait until every participant is online
-			time.Sleep(9000 * time.Millisecond)
+			time.Sleep(19000 * time.Millisecond)
 
 			// Fire the setip phase
 			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
 			msgBytes, _ := json.Marshal(msg)
 			n.P2PPubSub.Broadcast(msgBytes)
-		}()
+		}(wg)
 	}
-	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	n.MembershipKey = n.BlsSetup(wg)
+
 	return nil
 }
 
@@ -638,7 +635,9 @@ func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *
 			}).Error(fmt.Errorf("create bls node error: %w ", err))
 			return
 		}
+
 		if n.session != nil {
+			n.session.Leader, _ = libp2p2.RelayerLeaderNode(n.session.Comm.Topic().String(), n.session.Comm.Topic().ListPeers())
 			wg := new(sync.WaitGroup)
 			wg.Add(1)
 			go n.StartProtocolByOracleRequest(e, wg)

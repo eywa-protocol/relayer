@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	libp2p2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/contracts"
-	"math/big"
-	"sync"
-	"time"
 
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/libp2p/go-flow-metrics"
@@ -568,23 +569,20 @@ func (n *Node) StartEpoch() error {
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
-	// for n.P2PPubSub.TopicObj() == nil || len(n.P2PPubSub.TopicObj().ListPeers()) < len(publicKeys)-1 {
-	// 	if n.P2PPubSub.TopicObj() == nil {
-	// 		logrus.Info("Waiting to join the initial topic")
-	// 	} else {
-	// 		logrus.Info("Waiting for all members to come, sendTopic.ListPeers(): ", n.P2PPubSub.TopicObj().ListPeers())
-	// 	}
-	// 	time.Sleep(300 * time.Millisecond)
-	// }
+	for n.P2PPubSub.Topic() == nil || len(n.P2PPubSub.Topic().ListPeers()) < len(publicKeys)-1 { // TODO: configure how many peers to wait for
+		if n.P2PPubSub.Topic() == nil {
+			logrus.Info("Waiting to join the initial topic")
+		} else {
+			logrus.Info("Waiting for all members to come, topic.ListPeers(): ", n.P2PPubSub.Topic().ListPeers())
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
 	wg := &sync.WaitGroup{}
-	defer wg.Done()
-	if n.Id == 0 {
+	if n.Id == 0 { // TODO: all nodes must be able to send the first message
 		wg.Add(1)
 		logrus.Info("Preparing to start BLS setup phase...")
 		go func(group *sync.WaitGroup) {
-
-			// TODO: wait until every participant is online
-			time.Sleep(19000 * time.Millisecond)
 
 			// Fire the setip phase
 			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
@@ -595,6 +593,8 @@ func (n *Node) StartEpoch() error {
 	wg.Add(1)
 	n.MembershipKey = n.BlsSetup(wg)
 
+	logrus.Info("BLS setup done")
+	wg.Wait()
 	return nil
 }
 

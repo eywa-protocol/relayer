@@ -70,7 +70,7 @@ func SendRequestV2FromChainToChain(t *testing.T, chainidFrom, chainIdTo, testDat
 	status, recaipt := helpers.WaitForBlockCompletation(clientFrom.EthClient, tx.Hash().String())
 	logrus.Print(recaipt.Logs)
 	logrus.Print(status)
-	time.Sleep(20 * time.Second)
+	time.Sleep(3 * time.Second)
 	res, err := dexPoolToContract.TestData(&bind.CallOpts{})
 	require.NoError(t, err)
 	require.Equal(t, testData, res)

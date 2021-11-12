@@ -27,7 +27,7 @@ message ConsensusRequest {
     optional bytes signature = 5;
     optional bytes mask = 6;
     optional bytes public_key = 7;
-    optional string bridgeEventHash = 8;
+    required string bridgeEventHash = 8;
 
 }
 message DrandRequest {

@@ -26,16 +26,17 @@ func convertModelMessage(msg model.MessageWithSig) (message *ConsensusRequest) {
 		history = append(history, convertModelMessage(hist))
 	}
 	message = &ConsensusRequest{
-		state:         protoimpl.MessageState{},
-		sizeCache:     0,
-		unknownFields: nil,
-		MsgType:       &msgType,
-		Source:        &source,
-		Step:          &step,
-		History:       history,
-		Signature:     msg.Signature.Marshal(),
-		Mask:          msg.Mask.Bytes(),
-		PublicKey:     msg.PublicKey.Marshal(),
+		state:           protoimpl.MessageState{},
+		sizeCache:       0,
+		unknownFields:   nil,
+		MsgType:         &msgType,
+		Source:          &source,
+		Step:            &step,
+		History:         history,
+		Signature:       msg.Signature.Marshal(),
+		Mask:            msg.Mask.Bytes(),
+		PublicKey:       msg.PublicKey.Marshal(),
+		BridgeEventHash: &msg.BridgeEventHash,
 	}
 	return
 }

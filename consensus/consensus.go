@@ -21,22 +21,10 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const delayBias = 100
-const delayRange = 1000
-
-var Delayed = true
-
-const BufferLen = 500
-
-// Deprecated: Protocol is deprecated. Use consensus_v1.go instead
-
 type Protocol struct {
 	pubsub       *pubsub.PubSub       // PubSub of each individual node
 	subscription *pubsub.Subscription // Subscription of individual node
-	topic        string               // PubSub topic
-	victim       bool                 // Flag for declaring a node as a victim
-	buffer       chan []byte          // A buffer for keeping received message in case the node is kept in the delayed set by adversary
-	group        []int
+	topic        *pubsub.Topic        // PubSub topic
 }
 
 func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
@@ -47,17 +35,14 @@ func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
 func (c *Protocol) Broadcast(msgBytes []byte) {
 	// Broadcasting to a topic in PubSub
 	go func(msgBytes []byte, topic string, pubsub *pubsub.PubSub) {
-		// Send the message with a delay in order to prevent message loss in libp2p
-		if Delayed {
-			time.Sleep(time.Duration(delayBias+mrand.Intn(delayRange)) * time.Millisecond)
-		}
 
 		err := pubsub.Publish(topic, msgBytes)
 		if err != nil {
-			fmt.Printf("Error(((( : %v\n", err)
+			fmt.Printf("Publish Error: %v\n", err)
 			return
 		}
-	}(msgBytes, c.topic, c.pubsub)
+
+	}(msgBytes, c.topic.String(), c.pubsub)
 }
 
 func (c *Protocol) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
@@ -88,16 +73,21 @@ func (c *Protocol) Receive(ctx context.Context) *[]byte {
 
 func (c *Protocol) Disconnect() {
 	c.subscription.Cancel()
-	c.pubsub.UnregisterTopicValidator(c.topic)
+	c.pubsub.UnregisterTopicValidator(c.topic.String())
+}
+
+func (c *Protocol) DisconnectTopic(topic string) {
+	c.pubsub.UnregisterTopicValidator(topic)
+
 }
 
 func (c *Protocol) Reconnect(topic string) {
 	var err error
-	if topic != "" {
-		c.topic = topic
-	}
+	//if topic != "" {
+	//	c.topic = topic
+	//}
 
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		panic(err)
 	}
@@ -112,7 +102,7 @@ func (c *Protocol) Cancel(cancelTime int, reconnectTime int) {
 		c.subscription.Cancel()
 		time.Sleep(time.Duration(reconnectTime) * time.Millisecond)
 		fmt.Println("	RESUBBING	")
-		c.subscription, _ = c.pubsub.Subscribe(c.topic)
+		c.subscription, _ = c.pubsub.Subscribe(c.topic.String())
 	}()
 }
 
@@ -143,27 +133,6 @@ func (c *Protocol) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host 
 }
 
 // initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Protocol) InitializePubSub(h core.Host) {
-	var err error
-	// Creating pubsub
-	// every peer has its own PubSub
-	c.pubsub, err = applyPubSub(h)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-	c.topic = "TLC"
-	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-}
-
-// initializePubSub creates a PubSub for the peer and also subscribes to a topic
 func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 	var err error
 	// Creating pubsub
@@ -174,15 +143,14 @@ func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 		return
 	}
 
-	if topic != "" {
-		c.topic = topic
-	} else {
-		c.InitializePubSub(h)
+	c.topic, err = c.pubsub.Join(topic)
+	if err != nil {
+		fmt.Printf("Error : %v\n", err)
 		return
 	}
 
 	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
 		return
@@ -190,9 +158,8 @@ func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
 
 }
 
-/*
 // InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
-func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
+func (c *Protocol) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
 	var err error
 	// Creating pubsub
 	// every peer has its own PubSub
@@ -202,83 +169,21 @@ func (c *Libp2pPubSub) InitializePubSubWithTopicAndPeers(h core.Host, topic stri
 		return
 	}
 
-	if topic != "" {
-		c.topic = topic
-	} else {
-		c.InitializePubSub(h)
-		return
-	}
+	c.InitializePubSubWithTopic(h, topic)
 
 	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic)
+	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
 		return
 	}
 
 }
-*/
-// InitializeVictim initializes buffer for keeping messages when a node is attacked by adversary.
-func (c *Protocol) InitializeVictim(makeBuffer bool) {
-	// victim is always false in initialization
-	c.victim = false
-	if makeBuffer {
-		c.buffer = make(chan []byte, BufferLen)
-	} else {
-		c.buffer = make(chan []byte, 0)
-	}
-}
 
-// AttackVictim adds a node to the set of indefinite-delayed nodes.
-func (c *Protocol) AttackVictim() {
-	c.victim = true
-	c.makeVictimNotGossip()
-}
-
-// ReleaseVictim removes the node from set of delayed nodes.
-func (c *Protocol) ReleaseVictim() {
-	c.Disconnect()
-	c.victim = false
-	c.Reconnect("")
-	err := c.pubsub.UnregisterTopicValidator(c.topic)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("REJOINING FROM DELAYED SET")
-}
-
-// JoinGroup adds nodes within the same groups to the node's group variable.
-func (c *Protocol) JoinGroup(group []int) {
-	c.group = group
-}
-
-func (c *Protocol) SetTopic(topic string) {
+/*func (c *Protocol) SetTopic(topic string) {
 	c.topic = topic
 }
-
-// makeVictimNotGossip prevents victim from participating in gossip protocol
-func (c *Protocol) makeVictimNotGossip() {
-	// Registering a message validator function. This function will process every received message by pubsub and based
-	// on return value will forward it to other nodes. Returning false will prevent the peer from forwarding the message
-	err := c.pubsub.RegisterTopicValidator(c.topic, func(ctx context.Context, pid peer.ID, msg *pubsub.Message) bool {
-		// Process message in a go routine to prevent blocking this function
-		go func(data []byte) {
-			msgBytes := data
-			c.buffer <- msgBytes
-		}(msg.Data)
-
-		//if the return value is true, the message will hit other peers
-		//if the return value is false, this peer prevented message broadcasting
-		//note that this topic validator will be called also for messages sent by self
-		return false
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
+*/
 // createHost creates a host with some default options and a signing identity
 func createHost(port int) (core.Host, error) {
 	// Producing private key
@@ -455,5 +360,9 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 }
 
 func (c *Protocol) UnregisterTopicValidator() {
-	c.pubsub.UnregisterTopicValidator(c.topic)
+	c.pubsub.UnregisterTopicValidator(c.topic.String())
+}
+
+func (c *Protocol) Topic() *pubsub.Topic {
+	return c.topic
 }

@@ -20,7 +20,7 @@ type ContractWatcher interface {
 	Query() [][]interface{}
 	NewEventPointer() interface{}
 	SetEventRaw(eventPointer interface{}, log types.Log)
-	OnEvent(eventPointer interface{})
+	OnEvent(eventPointer interface{}, srcChainId *big.Int)
 }
 
 type ClientWatcher interface {
@@ -87,7 +87,7 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 						w.client.wg.Add(1)
 						go func() {
 							defer w.client.wg.Done()
-							w.contract.OnEvent(eventPointer)
+							w.contract.OnEvent(eventPointer, w.client.chainId)
 						}()
 						select {
 

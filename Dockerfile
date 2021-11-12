@@ -1,4 +1,4 @@
-FROM golang:alpine as build
+FROM golang:1.16-alpine as build
 
 RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 
@@ -11,7 +11,8 @@ ADD     ./external/eywa-overhead-chain ./external/eywa-overhead-chain
 RUN go mod download
 
 COPY    ./cmd ./cmd
-COPY    chain ./blockchain
+COPY    chain ./chain
+COPY    extChains ./extChains
 COPY    consensus ./consensus
 COPY    ./common ./common
 COPY    ./config ./config

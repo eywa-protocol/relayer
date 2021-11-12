@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 	"math/big"
-	"reflect"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
@@ -18,14 +18,14 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/runa"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 type Node struct {
 	base.Node
 	cMx     *sync.Mutex
-	Clients map[string]Client
+	clients *extChains.Clients
+	chains  map[uint64]config.GsnChain
 }
 
 func RunNode(name, keysPath, listen string, port uint) (err error) {
@@ -42,40 +42,53 @@ func RunNode(name, keysPath, listen string, port uint) (err error) {
 		panic(err)
 	}
 
-	h, err := libp2p.NewHostFromKey(nodeKey, multiAddr)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	h, err := libp2p.NewHost(ctx, nodeKey, multiAddr)
 	if err != nil {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		if err != nil {
-			cancel()
-		}
-	}()
 	n := &Node{
-		Node:    base.Node{Ctx: ctx, Host: h},
-		cMx:     new(sync.Mutex),
-		Clients: make(map[string]Client, len(config.Gsn.Chains)),
+		Node:   base.Node{Ctx: ctx, Host: h},
+		cMx:    new(sync.Mutex),
+		chains: make(map[uint64]config.GsnChain, len(config.Gsn.Chains)),
 	}
 
 	logrus.Print(len(config.Gsn.Chains), " chains Length")
+
+	clientConfigs := make(extChains.ClientConfigs, 0, len(config.Gsn.Chains))
+
 	for _, chain := range config.Gsn.Chains {
 		logrus.Print("CHAIN ", chain, "chain")
 
-		client, err := NewClient(chain, "")
-		if err != nil {
-			return fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
+		ethClientConfig := &eth.Config{
+			Id:   chain.Id,
+			Urls: chain.RpcUrls[:],
+		}
+		ethClientConfig.SetDefault()
+		if chain.CallTimeout > 0 {
+			ethClientConfig.CallTimeout = chain.CallTimeout
+		}
+		if chain.DialTimeout > 0 {
+			ethClientConfig.DialTimeout = chain.DialTimeout
+		}
+		if chain.BlockTimeout > 0 {
+			ethClientConfig.BlockTimeout = chain.BlockTimeout
 		}
 
-		if reflect.DeepEqual(client, ethclient.Client{}) {
-			return fmt.Errorf("init chain [%d] client failed", chain.Id)
-		}
-		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
-			return fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
-		}
-		n.Clients[client.ChainCfg.ChainId.String()] = client
+		clientConfigs = append(clientConfigs, ethClientConfig)
+		n.chains[chain.Id] = *chain
 	}
+
+	n.clients, err = extChains.NewClients(ctx, clientConfigs)
+	if err != nil {
+		err = fmt.Errorf("init eth clients error: %w", err)
+		logrus.Error(err)
+		return err
+	}
+	defer n.clients.Close()
 
 	n.Dht, err = n.InitDHT(config.Gsn.BootstrapAddrs)
 	if err != nil {
@@ -91,75 +104,25 @@ func RunNode(name, keysPath, listen string, port uint) (err error) {
 	return
 }
 
-func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
-	n.cMx.Lock()
-	clientRecreated := false
-	client, ok := n.Clients[chainId.String()]
-	if !ok {
-		n.cMx.Unlock()
-		return Client{}, false, errors.New("eth client for chain ID not found")
-	}
-	n.cMx.Unlock()
-
-	netChainId, err := client.EthClient.ChainID(n.Ctx)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			field.CainId: chainId,
-		}).Error(fmt.Errorf("recreate network client on error: %w", err))
-
-		client, err = NewClient(client.ChainCfg, client.currentUrl)
-		if err != nil {
-			err = fmt.Errorf("can not create client on error:%w", err)
-			return Client{}, false, err
-		} else {
-			// replace network client in clients map
-			clientRecreated = true
-			n.cMx.Lock()
-			n.Clients[chainId.String()] = client
-			n.cMx.Unlock()
-		}
-	}
-
-	if netChainId != nil && netChainId.Cmp(chainId) != 0 {
-		err = errors.New("chain id not match to network")
-		logrus.WithFields(logrus.Fields{
-			field.CainId:         chainId,
-			field.NetworkChainId: netChainId,
-		}).Error(err)
-		return Client{}, false, err
-	}
-
-	return client, clientRecreated, nil
-}
-
-func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
-	n.cMx.Lock()
-	defer n.cMx.Unlock()
-
-	client, ok := n.Clients[chainId.String()]
-	if !ok {
-		return Client{}, errors.New("eth client for chain ID not found")
-	}
-
-	return client, nil
-}
-
 func (n *Node) GetOwner(chainId *big.Int) (*bind.TransactOpts, error) {
-	if client, err := n.GetNodeClient(chainId); err != nil {
+	if chain, ok := n.chains[chainId.Uint64()]; !ok {
 
-		return nil, fmt.Errorf("get forwarder owner for chain[%s] error: %w", chainId.String(), err)
+		return nil, fmt.Errorf("chain[%s] error: %w", chainId.String(), errors.New("unsupported now"))
 	} else {
 
-		return client.owner, nil
+		return bind.NewKeyedTransactorWithChainID(chain.EcdsaKey, chainId)
 	}
 }
 
 func (n *Node) GetForwarder(chainId *big.Int) (*wrappers.Forwarder, error) {
-	if client, _, err := n.GetNodeClientOrRecreate(chainId); err != nil {
+	if chain, ok := n.chains[chainId.Uint64()]; !ok {
 
-		return nil, fmt.Errorf("get forwarder owner for chain[%s] error: %w", chainId.String(), err)
+		return nil, fmt.Errorf("chain[%s] error: %w", chainId.String(), errors.New("unsupported now"))
+	} else if client, err := n.clients.GetEthClient(chainId); err != nil {
+
+		return nil, err
 	} else {
 
-		return client.forwarder, nil
+		return wrappers.NewForwarder(chain.ForwarderAddress, client)
 	}
 }

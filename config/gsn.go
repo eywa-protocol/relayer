@@ -10,9 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gopkg.in/yaml.v3"
 	_ "gopkg.in/yaml.v3"
 )
@@ -27,10 +24,14 @@ type GsnConfig struct {
 }
 
 type GsnChain struct {
-	Id               uint `yaml:"id"`
-	ChainId          *big.Int
-	RpcUrls          []string `yaml:"rpc_urls"`
-	EcdsaKeyString   string   `yaml:"ecdsa_key"`
+	CallTimeout  time.Duration `yaml:"call_timeout"`
+	DialTimeout  time.Duration `yaml:"dial_timeout"`
+	BlockTimeout time.Duration `yaml:"block_timeout"`
+	Id           uint64        `yaml:"id"`
+	ChainId      *big.Int
+	RpcUrls      []string `yaml:"rpc_urls"`
+
+	EcdsaKeyString   string `yaml:"ecdsa_key"`
 	EcdsaKey         *ecdsa.PrivateKey
 	EcdsaAddress     common.Address
 	ForwarderAddress common.Address `yaml:"forwarder_address"`
@@ -61,20 +62,20 @@ func LoadGsnConfig(path string) error {
 	return nil
 }
 
-func (c *GsnChain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
-	for _, url := range c.RpcUrls {
-		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
-			continue
-		} else if client, err = ethclient.Dial(url); err != nil {
-			logrus.WithFields(logrus.Fields{
-				field.CainId: c.Id,
-				field.EthUrl: url,
-			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
-		} else {
-
-			return client, url, nil
-		}
-	}
-
-	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
-}
+// func (c *GsnChain) GetEthClient(skipUrl string) (client *ethclient.Client, url string, err error) {
+// 	for _, url := range c.RpcUrls {
+// 		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
+// 			continue
+// 		} else if client, err = ethclient.Dial(url); err != nil {
+// 			logrus.WithFields(logrus.Fields{
+// 				field.CainId: c.Id,
+// 				field.EthUrl: url,
+// 			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
+// 		} else {
+//
+// 			return client, url, nil
+// 		}
+// 	}
+//
+// 	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
+// }

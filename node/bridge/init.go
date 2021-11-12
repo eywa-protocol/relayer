@@ -3,24 +3,25 @@ package bridge
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/eywa-protocol/bls-crypto/bls"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
+	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
+	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/contracts"
 	"io/ioutil"
 	"math/big"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
-	_config "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/common/config"
-	_genesis "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
-
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/libp2p/go-flow-metrics"
 	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
@@ -69,20 +70,18 @@ func RegisterNode(name, keysPath string) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	n, err := NewNodeWithClients(ctx, signerKey)
+	n, err, clientsClose := NewNodeWithClients(ctx, signerKey)
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
 	}
-
-	// Secp256k1 node key
-	// nodeKey, err := common2.GetOrGenAndSaveSecp256k1Key(keysPath, name+"-signer")
+	defer clientsClose()
 
 	pub, err := common2.LoadBlsPublicKey(keysPath, name)
 	if err != nil {
 		return
 	}
 
-	n.Host, err = libp2p.NewHostFromKeyFila(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
+	n.Host, err = libp2p.NewHostFromKeyFile(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
 	if err != nil {
 		panic(err)
 	}
@@ -95,43 +94,137 @@ func RegisterNode(name, keysPath string) (err error) {
 			return fmt.Errorf("can not init DHT on error: %w ", err)
 		}
 
-		n.gsnClient, err = gsn.NewClient(ctx, n.Host, n, 10*time.Second)
+		n.gsnClient, err = gsn.NewClient(ctx, n.Host, n, config.Bridge.GsnDiscoveryInterval)
 		if err != nil {
 			return fmt.Errorf("can not init gsn client on error: %w ", err)
 		}
-		err = n.gsnClient.WaitForDiscoveryGsn(60 * time.Second)
+		err = n.gsnClient.WaitForDiscoveryGsn(config.Bridge.GsnWaitDuration)
 		if err != nil {
 			return fmt.Errorf("can not discover gsn node on error: %w ", err)
 		}
 	}
+	regChainId := n.RegChainId()
+	regClient, err := n.clients.GetEthClient(regChainId)
+	if err != nil {
 
-	for _, client := range n.Clients {
-		id, relayerPool, err := client.RegisterNode(n.gsnClient, signerKey, n.Host.ID(), string(pub))
-		if err != nil {
-			return fmt.Errorf("register node on chain [%d] error: %w ", client.ChainCfg.Id, err)
-		}
-		logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
+		return err
 	}
 
-	return
-}
+	//
 
-func NewNode(name, keysPath, rendezvous string) (err error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logrus.Infof("Adding Node %s it's NodeidAddress %x", n.Host.ID(), common.BytesToAddress([]byte(n.Host.ID().String())))
+	fromAddress := common2.AddressFromSecp256k1PrivKey(signerKey)
+	nodeIdAsAddress := common.BytesToAddress([]byte(n.Host.ID()))
+
+	nodeRegistry := n.NodeRegistry()
+	res, err := nodeRegistry.NodeExists(&bind.CallOpts{}, nodeIdAsAddress)
+	if err != nil {
+		err = fmt.Errorf("node not exists nodeIdAddress: %s, client.Id: %s, error: %w",
+			nodeIdAsAddress.String(), regChainId.String(), err)
+	}
+	if res == true {
+		logrus.Infof("Node %x allready exists", n.Host.ID())
+		return
+	}
+
+	eywaAddress, _ := nodeRegistry.EYWA(&bind.CallOpts{})
+	eywa, err := wrappers.NewERC20Permit(eywaAddress, regClient)
+	if err != nil {
+		return fmt.Errorf("EYWA contract error: %w", err)
+	}
+	fromNonce, _ := eywa.Nonces(&bind.CallOpts{}, fromAddress)
+	value, _ := eywa.BalanceOf(&bind.CallOpts{}, fromAddress)
+
+	deadline := big.NewInt(time.Now().Unix() + 100)
+	const EywaPermitName = "EYWA"
+	const EywaPermitVersion = "1"
+	v, r, s := common2.SignErc20Permit(signerKey, EywaPermitName, EywaPermitVersion, regChainId,
+		eywaAddress, fromAddress, n.NodeRegistryAddress(), value, fromNonce, deadline)
+
+	node := wrappers.NodeRegistryNode{
+		Owner:         fromAddress,
+		Pool:          common.Address{},
+		NodeIdAddress: nodeIdAsAddress,
+		BlsPubKey:     string(pub),
+		NodeId:        big.NewInt(0),
+	}
+
+	var txHash common.Hash
+	if n.CanUseGsn(regChainId) && n.gsnClient != nil {
+		if txHash, err = forward.NodeRegistryCreateNode(n.gsnClient, regChainId, signerKey, n.NodeRegistryAddress(), node, deadline, v, r, s); err != nil {
+			err = fmt.Errorf("CreateRelayer over gsn chainId %d ERROR: %v", regChainId, err)
+			logrus.Error(err)
+			return err
+		}
+	} else {
+		if nodeRegistrySession, err := n.NodeRegistrySession(signerKey); err != nil {
+			return fmt.Errorf("get node registry session error: %w", err)
+		} else if tx, err := nodeRegistrySession.CreateRelayer(node, deadline, v, r, s); err != nil {
+			err = fmt.Errorf("CreateRelayer chainId %d ERROR: %v", regChainId, err)
+			logrus.Error(err)
+			return err
+		} else {
+			txHash = tx.Hash()
+		}
+	}
+
+	receipt, err := regClient.WaitTransaction(txHash)
+	if err != nil {
+
+		return fmt.Errorf("WaitTransaction error: %w", err)
+	}
+	logrus.Infof("recept.Status %d", receipt.Status)
+
+	blockNum := receipt.BlockNumber.Uint64()
+
+	it, err := n.NodeRegistryFilterer().FilterCreatedRelayer(&bind.FilterOpts{Start: blockNum, End: &blockNum},
+		[]common.Address{node.NodeIdAddress}, []*big.Int{}, []common.Address{})
+	if err != nil {
+
+		return err
+	}
 	defer func() {
-		if err != nil {
-			cancel()
+		if err := it.Close(); err != nil {
+
+			logrus.Error(fmt.Errorf("close registry created rellayer iterator error: %w", err))
 		}
 	}()
+
+	var (
+		id          *big.Int
+		relayerPool *common.Address
+	)
+	for it.Next() {
+		logrus.Info("CreatedRelayer Event", it.Event.NodeIdAddress)
+		id = it.Event.NodeId
+		relayerPool = &it.Event.RelayerPool
+		break
+	}
+
+	logrus.Infof("New RelayerPool created with #%d at %s.", id, relayerPool)
+
+	return nil
+}
+
+func RunNode(name, keysPath, rendezvous string) (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
 	if err != nil {
 
 		return err
 	}
 
-	n, err := NewNodeWithClients(ctx, signerKey)
+	n, err, clientsClose := NewNodeWithClients(ctx, signerKey)
 	if err != nil {
 		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
+	}
+	defer clientsClose()
+
+	if n.Bridge, err = contracts.NewBridge(n.clients); err != nil {
+
+		logrus.Fatal(fmt.Errorf("init bridge contracts error: %w", err))
 	}
 
 	keyFile := keysPath + "/" + name + "-ecdsa.key"
@@ -150,14 +243,14 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 
 	ipFromFile := words[2]
 	logrus.Info("IP ADDRESS", ipFromFile)
-	n.Host, err = libp2p.NewHostFromKeyFila(n.Ctx, keyFile, portFromFile, ipFromFile)
+	n.Host, err = libp2p.NewHostFromKeyFile(n.Ctx, keyFile, portFromFile, ipFromFile)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	blsNodeId := n.getNodeBlsId()
-	if blsNodeId == -1 {
-		logrus.Fatal(errors.New("node id -1"))
+	blsNodeId, err := n.getNodeBlsId()
+	if err != nil {
+		return err
 	}
 	n.BlsNodeId = blsNodeId
 
@@ -177,12 +270,7 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 		field.NodeRendezvous: config.Bridge.Rendezvous,
 	})
 
-	c1, ok := n.Clients[config.Bridge.Chains[0].ChainId.String()]
-	if !ok {
-		return fmt.Errorf("node  client 0 not initialized")
-	}
-
-	if res, err := c1.NodeRegistry.NodeExists(nodeIdAddress); err != nil {
+	if res, err := n.NodeRegistry().NodeExists(&bind.CallOpts{}, nodeIdAddress); err != nil {
 		logrus.Fatal(fmt.Errorf("failed to check node existent on error: %w", err))
 		return err
 	} else if res {
@@ -205,35 +293,25 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 			return err
 		}
 
-		err := n.StartEpoch(c1, nodeIdAddress, rendezvous)
+		err := n.StartEpoch(nodeIdAddress, rendezvous)
 		if err != nil {
 			return err
 		}
 
-		ledger.DefLedger, err = n.initLedger()
-		if err != nil {
-			logrus.Errorf("initLedger %s", err)
-			return err
-		}
-		defer ledger.DefLedger.Close()
+		// initialize watchers
+		for _, chain := range config.Bridge.Chains {
+			if watcher, err := eth.NewOracleRequestWatcher(chain.BridgeAddress, n.HandleOracleRequest); err != nil {
+				err = fmt.Errorf("chain [%d] init watcher error: %w", chain.Id, err)
 
-		eventChan := make(chan *wrappers.BridgeOracleRequest)
+				return err
+			} else {
 
-		for chainIdString, client := range n.Clients {
-			err = n.ListenNodeOracleRequest(
-				eventChan,
-				wg,
-				client.ChainCfg.ChainId)
-			if errors.Is(err, ErrContextDone) {
-				logrus.Info(err)
-				return nil
-			} else if err != nil {
-				return fmt.Errorf("stop listen for node oracle request chainId [%s] on error: %w", chainIdString, err)
+				n.clients.AddWatcher(new(big.Int).SetUint64(chain.Id), watcher)
 			}
 		}
 
-		//wg.Add(1)
-		//go n.UptimeSchedule(wg)
+		/*		wg.Add(1)
+				go n.UptimeSchedule(wg)*/
 
 		logrus.Info("bridge started")
 		runa.Host(n.Host, cancel, wg)
@@ -244,92 +322,104 @@ func NewNode(name, keysPath, rendezvous string) (err error) {
 	}
 }
 
-func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
-	n.cMx.Lock()
-	clientRecreated := false
-	client, ok := n.Clients[chainId.String()]
-	if !ok {
-		n.cMx.Unlock()
-		return Client{}, false, errors.New("eth client for chain ID not found")
-	}
-	n.cMx.Unlock()
+// func (n *Node) GetNodeClientOrRecreate(chainId *big.Int) (Client, bool, error) {
+//     n.cMx.Lock()
+//     clientRecreated := false
+//     client, ok := n.Clients[chainId.String()]
+//     if !ok {
+//         n.cMx.Unlock()
+//         return Client{}, false, errors.New("eth client for chain ID not found")
+//     }
+//     n.cMx.Unlock()
+//
+//     netChainId, err := client.EthClient.ChainID(n.Ctx)
+//     if err != nil {
+//         logrus.WithFields(logrus.Fields{
+//             field.CainId: chainId,
+//         }).Error(fmt.Errorf("recreate network client on error: %w", err))
+//
+//         client, err = NewClient(client.ChainCfg, client.currentUrl, n.signerKey)
+//         if err != nil {
+//             err = fmt.Errorf("can not create client on error:%w", err)
+//             return Client{}, false, err
+//         } else {
+//             // replace network client in clients map
+//             clientRecreated = true
+//             n.cMx.Lock()
+//             n.Clients[chainId.String()] = client
+//             n.cMx.Unlock()
+//         }
+//     }
+//
+//     if netChainId != nil && netChainId.Cmp(chainId) != 0 {
+//         err = errors.New("chain id not match to network")
+//         logrus.WithFields(logrus.Fields{
+//             field.CainId:         chainId,
+//             field.NetworkChainId: netChainId,
+//         }).Error(err)
+//         return Client{}, false, err
+//     }
+//
+//     return client, clientRecreated, nil
+// }
 
-	netChainId, err := client.EthClient.ChainID(n.Ctx)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			field.CainId: chainId,
-		}).Error(fmt.Errorf("recreate network client on error: %w", err))
-
-		client, err = NewClient(client.ChainCfg, client.currentUrl, n.signerKey)
-		if err != nil {
-			err = fmt.Errorf("can not create client on error:%w", err)
-			return Client{}, false, err
-		} else {
-			// replace network client in clients map
-			clientRecreated = true
-			n.cMx.Lock()
-			n.Clients[chainId.String()] = client
-			n.cMx.Unlock()
-		}
-	}
-
-	if netChainId != nil && netChainId.Cmp(chainId) != 0 {
-		err = errors.New("chain id not match to network")
-		logrus.WithFields(logrus.Fields{
-			field.CainId:         chainId,
-			field.NetworkChainId: netChainId,
-		}).Error(err)
-		return Client{}, false, err
-	}
-
-	return client, clientRecreated, nil
-}
-
-func (n Node) GetNodeClient(chainId *big.Int) (Client, error) {
-	n.cMx.Lock()
-	defer n.cMx.Unlock()
-
-	client, ok := n.Clients[chainId.String()]
-	if !ok {
-		return Client{}, errors.New("eth client for chain ID not found")
-	}
-
-	return client, nil
-}
-
-func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *Node, err error) {
+func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *Node, err error, clientsClose func()) {
 	n = &Node{
 		Node: base.Node{
 			Ctx: ctx,
 		},
 		nonceMx:        new(sync.Mutex),
-		cMx:            new(sync.Mutex),
-		Clients:        make(map[string]Client, len(config.Bridge.Chains)),
 		signerKey:      signerKey,
 		uptimeRegistry: new(flow.MeterRegistry),
 	}
-
+	chains := make(map[uint64]*config.BridgeChain, len(config.Bridge.Chains))
+	clientConfigs := make(extChains.ClientConfigs, 0, len(config.Bridge.Chains))
 	logrus.Print(len(config.Bridge.Chains), " chains Length")
 	for _, chain := range config.Bridge.Chains {
-		logrus.Print("CHAIN ", chain, "chain")
-		client, err := NewClient(chain, "", signerKey)
-		if err != nil {
-			return nil, fmt.Errorf("init chain[%d] node client error: %w", chain.Id, err)
+		ethClientConfig := &eth.Config{
+			Id:   chain.Id,
+			Urls: chain.RpcUrls[:],
 		}
-		if reflect.DeepEqual(client, ethclient.Client{}) {
-			return nil, fmt.Errorf("init chain [%d] client failed", chain.Id)
+		ethClientConfig.SetDefault()
+		if chain.CallTimeout > 0 {
+			ethClientConfig.CallTimeout = chain.CallTimeout
 		}
-		if _, ok := n.Clients[client.ChainCfg.ChainId.String()]; ok {
-			return nil, fmt.Errorf("init duplicate  chain[%d] node client chainId:[%s] error %w", chain.Id, client.ChainCfg.ChainId, err)
+		if chain.DialTimeout > 0 {
+			ethClientConfig.DialTimeout = chain.DialTimeout
 		}
-		n.Clients[client.ChainCfg.ChainId.String()] = client
+		if chain.BlockTimeout > 0 {
+			ethClientConfig.BlockTimeout = chain.BlockTimeout
+		}
+
+		clientConfigs = append(clientConfigs, ethClientConfig)
+		chains[chain.Id] = chain
+		logrus.Debug("CHAIN ", chain, "chain")
 	}
-	return
+
+	if n.clients, err = extChains.NewClients(n.Ctx, clientConfigs); err != nil {
+
+		return nil, fmt.Errorf("init notde clients error: %w", err), nil
+	} else if regChain, ok := chains[config.Bridge.RegChainId]; !ok {
+
+		return nil, fmt.Errorf("invalid reg chain [%d]", config.Bridge.RegChainId), nil
+	} else if regClient, err := n.clients.GetEthClient(new(big.Int).SetUint64(config.Bridge.RegChainId)); err != nil {
+
+		return nil, fmt.Errorf("get reg chain client error: %w", err), nil
+	} else if n.Registry, err = contracts.NewRegistry(regChain.NodeRegistryAddress, regClient); err != nil {
+
+		return nil, fmt.Errorf("init node registry error: %w", err), nil
+	} else if n.Forwarder, err = contracts.NewForwarder(n.clients); err != nil {
+
+		return nil, fmt.Errorf("init node forwarder error: %w", err), nil
+	} else {
+
+		return n, nil, n.clients.Close
+	}
 }
 
 func (n *Node) initLedger() (*ledger.Ledger, error) {
 	// TODO init events here
-	//events.Init() //Init event hub
+	// events.Init() //Init event hub
 
 	var err error
 	dbDir := utils.GetStoreDirPath("leveldb", _config.DefConfig.P2PNode.NetworkName)

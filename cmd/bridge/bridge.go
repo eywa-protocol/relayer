@@ -108,7 +108,7 @@ func main() {
 	} else {
 
 		//blockchain.CreateBlockchain()
-		err := bridge.NewNode(name, keysPath, config.Bridge.Rendezvous)
+		err := bridge.RunNode(name, keysPath, config.Bridge.Rendezvous)
 		if err != nil {
 			logrus.Fatalf("node stoped on error: %v", err)
 		}

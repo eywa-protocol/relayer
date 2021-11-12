@@ -51,7 +51,10 @@ func NodeInit(keysPath, name, listen string, port uint) (err error) {
 		panic(err)
 	}
 
-	h, err := libp2p.NewHostFromKey(prvKey, multiAddr)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	h, err := libp2p.NewHost(ctx, prvKey, multiAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -65,11 +68,7 @@ func NodeInit(keysPath, name, listen string, port uint) (err error) {
 
 func NewNode(keysPath, name, listen string, port uint) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		if err != nil {
-			cancel()
-		}
-	}()
+	defer cancel()
 
 	keyFile := keysPath + "/" + name + "-rsa.key"
 
@@ -88,7 +87,7 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 		logrus.Fatalf("create multiaddr error: %v", err)
 	}
 
-	h, err := libp2p.NewHostFromKey(pk, multiAddr)
+	h, err := libp2p.NewHost(ctx, pk, multiAddr)
 	if err != nil {
 		logrus.Fatal(fmt.Errorf("new bootstrap host error: %w", err))
 	}

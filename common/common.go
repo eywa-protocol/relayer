@@ -1,25 +1,19 @@
 package common
 
 import (
-	"context"
 	"crypto/ecdsa"
-	"errors"
-	"fmt"
 	"log"
 	"math/big"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
 func Connect(string2 string) (*ethclient.Client, error) {
@@ -28,19 +22,6 @@ func Connect(string2 string) (*ethclient.Client, error) {
 
 func AddressIsZero(address common.Address) bool {
 	return address.String() == common.Address{}.String()
-}
-
-
-func GetChainIdByurl(rpcUrl string) (chainId *big.Int, err error) {
-	client, err := Connect(rpcUrl)
-	if err != nil {
-		return
-	}
-	chainId, err = client.ChainID(context.Background())
-	if err != nil {
-		return
-	}
-	return
 }
 
 func ToECDSAFromHex(hexString string) (pk *ecdsa.PrivateKey, err error) {
@@ -69,34 +50,35 @@ func CreateNode(duration time.Duration, creaateNode func(time.Time) bool) chan b
 	return stop
 }
 
-func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common.Hash) (*types.Receipt, error) {
-	queryTicker := time.NewTicker(time.Second)
-	defer queryTicker.Stop()
-	for {
-
-		logrus.Info("WaitTransaction ", "txHash", txHash)
-
-		receipt, err := c.TransactionReceipt(ctx, txHash)
-		if receipt != nil {
-			return receipt, nil
-		}
-		if err != nil {
-			logrus.Error("Receipt retrieval failed", "err", err)
-		} else {
-			logrus.Trace("Transaction not yet mined")
-		}
-		// Wait for the next round.
-		select {
-
-		case <-ctx.Done():
-
-			return nil, ctx.Err()
-
-		case <-queryTicker.C:
-
-		}
-	}
-}
+// todo remove commented
+// func CreateNodeWithTicker(ctx context.Context, c ethclient.Client, txHash common.Hash) (*types.Receipt, error) {
+// 	queryTicker := time.NewTicker(time.Second)
+// 	defer queryTicker.Stop()
+// 	for {
+//
+// 		logrus.Info("WaitTransaction ", "txHash", txHash)
+//
+// 		receipt, err := c.TransactionReceipt(ctx, txHash)
+// 		if receipt != nil {
+// 			return receipt, nil
+// 		}
+// 		if err != nil {
+// 			logrus.Error("Receipt retrieval failed", "err", err)
+// 		} else {
+// 			logrus.Trace("Transaction not yet mined")
+// 		}
+// 		// Wait for the next round.
+// 		select {
+//
+// 		case <-ctx.Done():
+//
+// 			return nil, ctx.Err()
+//
+// 		case <-queryTicker.C:
+//
+// 		}
+// 	}
+// }
 
 func SignErc20Permit(pk *ecdsa.PrivateKey, name, version string, chainId *big.Int, verifyingContract, owner, spender common.Address, value, nonce, deadline *big.Int) (v uint8, r [32]byte, s [32]byte) {
 	data := core.TypedData{
@@ -147,55 +129,55 @@ func SignErc20Permit(pk *ecdsa.PrivateKey, name, version string, chainId *big.In
 	return v, r, s
 }
 
-func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeRegistryNode, err error) {
-	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
-	if err != nil {
-		return
-	}
+// todo remove commented
+// func GetNodesFromContract(client *ethclient.Client, nodeListContractAddress common.Address) (nodes []wrappers.NodeRegistryNode, err error) {
+// 	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	nodes, err = nodeList.GetNodes(&bind.CallOpts{})
+//
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	return
+// }
 
-	nodes, err = nodeList.GetNodes(&bind.CallOpts{})
+// func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address) {
+// 	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	nodes, err := nodeList.GetNodes(&bind.CallOpts{})
+// 	if err != nil {
+// 		logrus.Fatal(err)
+// 	}
+//
+// 	for _, node1 := range nodes {
+// 		logrus.Tracef("node ID %d node.NodeIdAddress %v", node1.NodeId, node1.NodeIdAddress)
+// 	}
+//
+// }
 
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func PrintNodes(client *ethclient.Client, nodeListContractAddress common.Address) {
-	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
-	if err != nil {
-		return
-	}
-
-	nodes, err := nodeList.GetNodes(&bind.CallOpts{})
-	if err != nil {
-		logrus.Fatal(err)
-	}
-
-	for _, node1 := range nodes {
-		logrus.Tracef("node ID %d node.NodeIdAddress %v", node1.NodeId, node1.NodeIdAddress)
-	}
-
-}
-
-func GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeRegistryNode, err error) {
-	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
-	if err != nil {
-		return
-	}
-
-	if exist, _ := nodeList.NodeExists(&bind.CallOpts{}, nodeBLSAddr); !exist {
-		err = errors.New(fmt.Sprintf("NODE DOES NOT EXIST %v", nodeBLSAddr))
-		return
-	}
-	node, err = nodeList.GetNode(&bind.CallOpts{}, nodeBLSAddr)
-	if err != nil {
-		return
-	}
-	return
-}
-
+// func  	GetNode(client *ethclient.Client, nodeListContractAddress common.Address, nodeBLSAddr common.Address) (node wrappers.NodeRegistryNode, err error) {
+// 	nodeList, err := wrappers.NewNodeRegistry(nodeListContractAddress, client)
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	if exist, _ := nodeList.NodeExists(&bind.CallOpts{}, nodeBLSAddr); !exist {
+// 		err = errors.New(fmt.Sprintf("NODE DOES NOT EXIST %v", nodeBLSAddr))
+// 		return
+// 	}
+// 	node, err = nodeList.GetNode(&bind.CallOpts{}, nodeBLSAddr)
+// 	if err != nil {
+// 		return
+// 	}
+// 	return
+// }
 
 func FileExists(filename string) bool {
 	info, err := os.Stat(filename)

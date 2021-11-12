@@ -4,7 +4,7 @@ go 1.16
 
 replace gitlab.digiu.ai/blockchainlaboratory/wrappers => ./external/eth-contracts/wrappers/
 
-replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
+//replace gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge => ./
 
 replace gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain => ./external/eywa-overhead-chain/
 
@@ -40,7 +40,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain v0.0.0-20211018150134-95faf4c0fee4
 	gitlab.digiu.ai/blockchainlaboratory/wrappers v0.0.0-20210610095807-6b6bd5e43077
-	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sys v0.0.0-20211020174200-9d6173849985 // indirect
 	google.golang.org/protobuf v1.26.0

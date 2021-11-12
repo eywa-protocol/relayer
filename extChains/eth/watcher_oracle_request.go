@@ -6,19 +6,23 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
+	"math/big"
 	"strings"
 )
 
 type oracleRequestWatcher struct {
 	contractAbi     abi.ABI
 	contractAddress common.Address
-	eventTrap       EventHandler
+	eventHandler    OracleRequestHandler
 }
 
-type EventHandler func(eventPointer interface{})
+type OracleRequestHandler func(event *wrappers.BridgeOracleRequest, srcChainId *big.Int)
 
-func NewOracleRequestWatcher(address common.Address, eventTrap EventHandler) (*oracleRequestWatcher, error) {
-	if contractAbi, err := abi.JSON(strings.NewReader(wrappers.BridgeABI)); err != nil {
+func NewOracleRequestWatcher(address common.Address, eventHandler OracleRequestHandler) (*oracleRequestWatcher, error) {
+	if eventHandler == nil {
+
+		return nil, ErrHandlerUndefined
+	} else if contractAbi, err := abi.JSON(strings.NewReader(wrappers.BridgeABI)); err != nil {
 
 		return nil, err
 	} else {
@@ -26,7 +30,7 @@ func NewOracleRequestWatcher(address common.Address, eventTrap EventHandler) (*o
 		return &oracleRequestWatcher{
 			contractAbi:     contractAbi,
 			contractAddress: address,
-			eventTrap:       eventTrap,
+			eventHandler:    eventHandler,
 		}, nil
 	}
 
@@ -57,14 +61,11 @@ func (o oracleRequestWatcher) SetEventRaw(eventPointer interface{}, log types.Lo
 	eventPointer.(*wrappers.BridgeOracleRequest).Raw = log
 }
 
-func (o oracleRequestWatcher) OnEvent(eventPointer interface{}) {
-	if o.eventTrap != nil {
-		o.eventTrap(eventPointer)
+func (o oracleRequestWatcher) OnEvent(eventPointer interface{}, srcChainId *big.Int) {
+	if req, ok := eventPointer.(*wrappers.BridgeOracleRequest); !ok {
+		logrus.Error(ErrUnsupportedEvent)
 	} else {
-		if req, ok := eventPointer.(*wrappers.BridgeOracleRequest); !ok {
-			logrus.Error(ErrUnsupportedEvent)
-		} else {
-			logrus.Infof("bridge oracle request received tx: %s", req.Raw.TxHash.Hex())
-		}
+		logrus.Infof("bridge oracle request received tx: %s", req.Raw.TxHash.Hex())
+		o.eventHandler(req, srcChainId)
 	}
 }

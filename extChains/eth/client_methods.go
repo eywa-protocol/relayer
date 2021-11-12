@@ -3,6 +3,8 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
+	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -50,7 +52,7 @@ func (c *client) CodeAt(ctx context.Context, contract common.Address, blockNumbe
 	}
 }
 
-func (c client) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+func (c *client) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -60,7 +62,17 @@ func (c client) CallContract(ctx context.Context, call ethereum.CallMsg, blockNu
 	}
 }
 
-func (c client) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+func (c *client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
+	defer cancel()
+	if client, err := c.getClient(); err != nil {
+		return nil, err
+	} else {
+		return client.HeaderByNumber(callCtx, number)
+	}
+}
+
+func (c *client) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -70,7 +82,7 @@ func (c client) PendingCodeAt(ctx context.Context, account common.Address) ([]by
 	}
 }
 
-func (c client) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+func (c *client) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -80,7 +92,7 @@ func (c client) PendingNonceAt(ctx context.Context, account common.Address) (uin
 	}
 }
 
-func (c client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+func (c *client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -90,7 +102,17 @@ func (c client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	}
 }
 
-func (c client) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
+func (c *client) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
+	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
+	defer cancel()
+	if client, err := c.getClient(); err != nil {
+		return nil, err
+	} else {
+		return client.SuggestGasTipCap(callCtx)
+	}
+}
+
+func (c *client) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -100,7 +122,7 @@ func (c client) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uin
 	}
 }
 
-func (c client) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+func (c *client) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	callCtx, cancel := context.WithTimeout(ctx, c.callTimeout)
 	defer cancel()
 	if client, err := c.getClient(); err != nil {
@@ -172,14 +194,13 @@ func (c *client) CallOpt(privateKey *ecdsa.PrivateKey) (*bind.TransactOpts, erro
 }
 
 func (c *client) WaitForBlockCompletion(txHash common.Hash) (int, *types.Receipt) {
-	ctx, chancel := context.WithTimeout(context.Background(), time.Second*60)
+	ctx, chancel := context.WithTimeout(context.Background(), c.blockTimeout)
 	defer chancel()
 	transaction := make(chan *types.Receipt)
 	go func(context context.Context, client *client) {
 		for {
 			statusCode := -1
 			tx, err := client.TransactionReceipt(ctx, txHash)
-			// tx.BlockNumber.String()
 			if err == nil {
 				statusCode = int(tx.Status)
 				transaction <- tx
@@ -213,5 +234,36 @@ func (c *client) WaitForBlockCompletion(txHash common.Hash) (int, *types.Receipt
 			return int(tx.Status), tx
 		}
 		return -1, nil
+	}
+}
+
+func (c *client) WaitTransaction(txHash common.Hash) (*types.Receipt, error) {
+	var receipt *types.Receipt
+	var err error
+	ctx, cancel := context.WithTimeout(context.Background(), c.blockTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+
+			return nil, fmt.Errorf("wait for transaction %s timed out", txHash.Hex())
+		default:
+
+			if receipt, err = c.TransactionReceipt(context.Background(), txHash); receipt == nil ||
+				errors.Is(err, ethereum.NotFound) {
+
+				time.Sleep(time.Millisecond * 500)
+				continue
+			} else if err != nil {
+
+				return nil, fmt.Errorf("transaction %s failed: %v", txHash.Hex(), err)
+			} else if receipt.Status != 1 {
+
+				return nil, fmt.Errorf("failed transaction: %s", txHash.Hex())
+			} else {
+
+				return receipt, nil
+			}
+		}
 	}
 }

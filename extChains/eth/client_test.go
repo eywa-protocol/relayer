@@ -40,15 +40,12 @@ func TestClient(t *testing.T) {
 
 	txs := make([]string, 0, len(config.Bridge.Chains))
 	mx := new(sync.Mutex)
-	eventTrap := func(event interface{}) {
-		if req, ok := event.(*wrappers.BridgeOracleRequest); !ok {
-			fmt.Printf("unsupported event, %v\n", event)
-		} else {
-			mx.Lock()
-			fmt.Printf("bridge oracle request received tx: %s\n", req.Raw.TxHash.Hex())
-			txs = append(txs, req.Raw.TxHash.Hex())
-			mx.Unlock()
-		}
+	eventHandler := func(event *wrappers.BridgeOracleRequest, srcChainId *big.Int) {
+		mx.Lock()
+		fmt.Printf("bridge oracle request received from %s to %s  tx: %s\n",
+			srcChainId.String(), event.Chainid, event.Raw.TxHash.Hex())
+		txs = append(txs, event.Raw.TxHash.Hex())
+		mx.Unlock()
 	}
 	for _, chain := range config.Bridge.Chains {
 		cfg := &Config{
@@ -61,7 +58,7 @@ func TestClient(t *testing.T) {
 
 			fmt.Printf("create client error: %v\n", err)
 			break
-		} else if contractWatcher, err := NewOracleRequestWatcher(chain.BridgeAddress, eventTrap); err != nil {
+		} else if contractWatcher, err := NewOracleRequestWatcher(chain.BridgeAddress, eventHandler); err != nil {
 
 			fmt.Printf("create watcher error: %v\n", err)
 			break
@@ -128,7 +125,7 @@ func TestClient(t *testing.T) {
 			return
 		}
 		fmt.Printf("tx send: %s\n", tx.Hash().Hex())
-		_, _ = fromClient.WaitForBlockCompletion(tx.Hash())
+		_, _ = fromClient.WaitTransaction(tx.Hash())
 		sendTxs = append(sendTxs, tx.Hash().Hex())
 	}
 	mx.Lock()

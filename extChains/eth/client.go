@@ -18,15 +18,23 @@ import (
 )
 
 const (
-	defaultDialTimeout = 5 * time.Second
-	defaultCallTimeout = 3 * time.Second
+	defaultDialTimeout  = 5 * time.Second
+	defaultCallTimeout  = 10 * time.Second
+	defaultBlockTimeout = 120 * time.Second
 )
 
 type Config struct {
-	CallTimeout time.Duration
-	DialTimeout time.Duration
-	Id          uint
-	Urls        []string
+	CallTimeout  time.Duration
+	DialTimeout  time.Duration
+	BlockTimeout time.Duration
+	Id           uint64
+	Urls         []string
+}
+
+func (c *Config) SetDefault() {
+	c.CallTimeout = defaultCallTimeout
+	c.DialTimeout = defaultDialTimeout
+	c.BlockTimeout = defaultBlockTimeout
 }
 
 type Client interface {
@@ -36,6 +44,7 @@ type Client interface {
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error)
 	WaitForBlockCompletion(txHash common.Hash) (int, *types.Receipt)
+	WaitTransaction(txHash common.Hash) (*types.Receipt, error)
 	CallOpt(privateKey *ecdsa.PrivateKey) (*bind.TransactOpts, error)
 	AddWatcher(contract ContractWatcher)
 	RemoveWatcher(contract ContractWatcher)
@@ -50,6 +59,7 @@ type client struct {
 	chainId            *big.Int
 	callTimeout        time.Duration
 	dialTimeout        time.Duration
+	blockTimeout       time.Duration
 	mx                 *sync.Mutex
 	wg                 *sync.WaitGroup
 	connected          bool
@@ -61,28 +71,23 @@ type client struct {
 	urls               []string
 }
 
-func (c *client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	panic("implement me")
-}
 
-func (c *client) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-	panic("implement me")
-}
 
 func NewClient(ctx context.Context, cfg *Config) (*client, error) {
 	if len(cfg.Urls) <= 0 {
 		return nil, ErrClientUrlsEmpty
 	}
 	c := &client{
-		watchers:    make(map[string]ClientWatcher),
-		chainId:     big.NewInt(int64(cfg.Id)),
-		callTimeout: defaultCallTimeout,
-		dialTimeout: defaultDialTimeout,
-		mx:          new(sync.Mutex),
-		wg:          new(sync.WaitGroup),
-		subLoopMx:   new(sync.Mutex),
-		currentUrl:  "",
-		urls:        cfg.Urls,
+		watchers:     make(map[string]ClientWatcher),
+		chainId:      new(big.Int).SetUint64(cfg.Id),
+		callTimeout:  defaultCallTimeout,
+		dialTimeout:  defaultDialTimeout,
+		blockTimeout: defaultBlockTimeout,
+		mx:           new(sync.Mutex),
+		wg:           new(sync.WaitGroup),
+		subLoopMx:    new(sync.Mutex),
+		currentUrl:   "",
+		urls:         cfg.Urls,
 	}
 
 	if cfg.CallTimeout > 0 {
@@ -91,6 +96,10 @@ func NewClient(ctx context.Context, cfg *Config) (*client, error) {
 
 	if cfg.DialTimeout > 0 {
 		c.dialTimeout = cfg.DialTimeout
+	}
+
+	if cfg.BlockTimeout > 0 {
+		c.blockTimeout = cfg.BlockTimeout
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 

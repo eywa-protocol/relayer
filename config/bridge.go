@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
@@ -12,10 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/sirupsen/logrus"
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
 	"gopkg.in/yaml.v3"
 	_ "gopkg.in/yaml.v3"
 )
@@ -25,22 +21,22 @@ var Bridge Configuration
 
 type Configuration struct {
 	TickerInterval       time.Duration `yaml:"ticker_interval"`
+	GsnDiscoveryInterval time.Duration `yaml:"gsn_discovery_interval"`
+	GsnWaitDuration      time.Duration `yaml:"gsn_wait_duration"`
 	UptimeReportInterval time.Duration
 	UseGsn               bool
 	Rendezvous           string         `yaml:"rendezvous"`
+	RegChainId           uint64         `yaml:"reg_chain_id"`
 	Chains               []*BridgeChain `yaml:"chains"`
 	BootstrapAddrs       []string       `yaml:"bootstrap-addrs"`
 	PromListenPort       *string        `yaml:"prom_listen_port"`
 }
 
-type BridgeKeys struct {
-}
-
-type BridgeContract struct {
-}
-
 type BridgeChain struct {
-	Id                  uint `yaml:"id"`
+	CallTimeout         time.Duration `yaml:"call_timeout"`
+	DialTimeout         time.Duration `yaml:"dial_timeout"`
+	BlockTimeout        time.Duration `yaml:"block_timeout"`
+	Id                  uint64        `yaml:"id"`
 	ChainId             *big.Int
 	RpcUrls             []string `yaml:"rpc_urls"`
 	EcdsaKeyString      string   `yaml:"ecdsa_key"`
@@ -61,6 +57,20 @@ func LoadBridgeConfig(path string, useGsn bool) error {
 	}
 	if err := yaml.Unmarshal(data, &Bridge); err != nil {
 		return fmt.Errorf("unmarshal config error: %w", err)
+	}
+
+	if Bridge.GsnWaitDuration <= 0 {
+
+		Bridge.GsnWaitDuration = 60 * time.Second
+	}
+
+	if Bridge.GsnDiscoveryInterval <= 0 {
+
+		Bridge.GsnDiscoveryInterval = 10 * time.Second
+	}
+
+	if Bridge.RegChainId <= 0 {
+		Bridge.RegChainId = Bridge.Chains[0].Id
 	}
 
 	// todo: change to 24 hours
@@ -95,34 +105,34 @@ func LoadBridgeConfig(path string, useGsn bool) error {
 	return nil
 }
 
-func (c *BridgeChain) GetEthClient(skipUrl string, signerAddress common.Address) (client *ethclient.Client, url string, err error) {
-	for _, url := range c.RpcUrls {
-		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
-			continue
-		}
-		if client, err = ethclient.Dial(url); err != nil {
-			logrus.WithFields(logrus.Fields{
-				field.CainId: c.Id,
-				field.EthUrl: url,
-			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
-			continue
-		} else {
-			balance, err := client.BalanceAt(context.Background(), signerAddress, nil)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					field.CainId:       c.Id,
-					field.EcdsaAddress: signerAddress,
-				}).Error(fmt.Errorf("get address balance error: %w", err))
-			}
-			if balance == big.NewInt(0) {
-
-				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
-					c.Id, signerAddress.String(), balance.String())
-
-			}
-
-			return client, url, nil
-		}
-	}
-	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
-}
+// func (c *BridgeChain) GetEthClient(skipUrl string, signerAddress common.Address) (client *ethclient.Client, url string, err error) {
+// 	for _, url := range c.RpcUrls {
+// 		if skipUrl != "" && len(c.RpcUrls) > 1 && url == skipUrl {
+// 			continue
+// 		}
+// 		if client, err = ethclient.Dial(url); err != nil {
+// 			logrus.WithFields(logrus.Fields{
+// 				field.CainId: c.Id,
+// 				field.EthUrl: url,
+// 			}).Error(fmt.Errorf("can not connect to chain rpc on error: %w", err))
+// 			continue
+// 		} else {
+// 			balance, err := client.BalanceAt(context.Background(), signerAddress, nil)
+// 			if err != nil {
+// 				logrus.WithFields(logrus.Fields{
+// 					field.CainId:       c.Id,
+// 					field.EcdsaAddress: signerAddress,
+// 				}).Error(fmt.Errorf("get address balance error: %w", err))
+// 			}
+// 			if balance == big.NewInt(0) {
+//
+// 				return nil, url, fmt.Errorf("you balance on your chain [%d] wallet [%s]: %s to start node",
+// 					c.Id, signerAddress.String(), balance.String())
+//
+// 			}
+//
+// 			return client, url, nil
+// 		}
+// 	}
+// 	return nil, "", fmt.Errorf("connection to all rpc url for chain [%d]  failed", c.Id)
+// }

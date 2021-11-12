@@ -2,51 +2,16 @@ package libp2p
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"io"
-	mrand "math/rand"
-
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 )
 
-func NewHost(ctx context.Context, seed int64, keyFile string, port int) (host host.Host, err error) {
-	var r io.Reader
-	if seed == 0 {
-		r = rand.Reader
-	} else {
-		r = mrand.New(mrand.NewSource(seed))
-	}
-	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
-	if keyFile == "" {
-		priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
-		if err != nil {
-			return nil, err
-		}
-
-		host, err = libp2p.New(ctx,
-			libp2p.ListenAddrs(addr),
-			libp2p.Identity(priv),
-		)
-
-	} else {
-		id, err := IdentityFromKey(keyFile)
-		if err != nil {
-			return nil, err
-		}
-		host, err = libp2p.New(ctx,
-			libp2p.ListenAddrs(addr),
-			id,
-		)
-	}
-	return
-
-}
-
-func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address string) (host2 host.Host, err error) {
+func NewHostFromKeyFile(ctx context.Context, keyFile string, port int, address string) (host2 host.Host, err error) {
 	if address == "" {
 		address = "0.0.0.0"
 	}
@@ -55,22 +20,23 @@ func NewHostFromKeyFila(ctx context.Context, keyFile string, port int, address s
 		return
 	}
 
-	id, err := IdentityFromKey(keyFile)
+	privKey, err := common.ReadHostKey(keyFile)
 	if err != nil {
+		logrus.Errorf("ERROR GETTING CERT %v", err)
 		return
 	}
 
-	host2, err = libp2p.New(ctx,
-		libp2p.ListenAddrs(addr),
-		id)
-	return
+	return NewHost(ctx, privKey, addr)
 }
 
-func NewHostFromKey(prvKey crypto.PrivKey, multiAddr multiaddr.Multiaddr) (host2 host.Host, err error) {
+func NewHost(ctx context.Context, prvKey crypto.PrivKey, multiAddr multiaddr.Multiaddr) (host2 host.Host, err error) {
 
 	return libp2p.New(
-		context.Background(),
+		ctx,
 		libp2p.ListenAddrs(multiAddr),
 		libp2p.Identity(prvKey),
+		// libp2p.Security(tls.ID, tls.New),
+		// libp2p.EnableNATService(),
+		// libp2p.ForceReachabilityPublic(),
 	)
 }

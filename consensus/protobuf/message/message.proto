@@ -28,8 +28,8 @@ message ConsensusRequest {
     optional bytes mask = 6;
     optional bytes public_key = 7;
     required string bridgeEventHash = 8;
-
 }
+
 message DrandRequest {
 
 }

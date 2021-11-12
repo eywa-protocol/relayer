@@ -140,6 +140,10 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 }
 
 func makeSession(n int, node *bridge.Node) *model.Node {
+	//topic, err := node.P2PPubSub.JoinTopic("ProtocolTestTopic")
+	//if err != nil {
+	//	logrus.Error(err)
+	//}
 	return &model.Node{
 		Ctx:            node.Ctx,
 		Id:             node.Id,

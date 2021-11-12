@@ -33,7 +33,6 @@ func (n Node) InitDHT(bootstrapPeerAddrs []string) (dht *dht.IpfsDHT, err error)
 	if err != nil {
 		return
 	}
-
 	return
 }
 

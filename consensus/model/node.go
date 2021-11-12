@@ -30,7 +30,6 @@ type Node struct {
 	EpochPublicKey bls.PublicKey    // Arrtegated public key of all participants of the current epoch
 	MembershipKey  bls.Signature    // Membership key of this node
 	Leader         peer.ID
-	Topic          *pubsub.Topic
 }
 
 // CommunicationInterface is a interface used for communicating with transport layer.
@@ -40,4 +39,5 @@ type CommunicationInterface interface {
 	Receive(context.Context) *[]byte // Blocking receive
 	Disconnect()                     // Disconnect node
 	Reconnect(string)                // Reconnect node
+	Topic() *pubsub.Topic
 }

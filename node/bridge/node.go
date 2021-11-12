@@ -64,8 +64,6 @@ type Node struct {
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) {
-	defer n.session.DisconnectPubSub()
-	defer n.session.Topic.Close()
 	defer wg.Done()
 
 	consensusChannel := make(chan bool)
@@ -88,10 +86,6 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 		logrus.Warn("WaitGroup timed out..")
 
 	}
-	if err := n.session.Topic.Close(); err != nil {
-		logrus.Warnf("nodeBls.Topic.Close: %v", err)
-	}
-	logrus.Info("CLOSED TOPIC")
 	logrus.Info("The END of Protocol")
 }
 
@@ -170,7 +164,6 @@ func (n Node) NewBLSSession(topic *pubSub.Topic, publicKeys []bls.PublicKey, top
 		PartPublicKey:  bls.ZeroPublicKey(),
 		PartSignature:  bls.ZeroSignature(),
 		Leader:         "",
-		Topic:          topic,
 	}
 }
 
@@ -396,7 +389,6 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 									return
 								}
 								defer p2pSub.Cancel()
-								n.P2PPubSub.InitializePubSubWithTopic(n.Host, topic.String())
 								parts, enaugh := n.EnaughTopicParticipants(topic)
 
 								if enaugh {
@@ -405,7 +397,7 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 										return
 									}
 									n.session = n.NewBLSSession(topic, publicKeys, parts)
-									n.session.Leader, err = libp2p.RelayerLeaderNode(n.session.Topic.String(), parts)
+									n.session.Leader, err = libp2p.RelayerLeaderNode(n.P2PPubSub.Topic().String(), parts)
 									if err != nil {
 										logrus.Errorf("RelayerLeaderNode error: %v", err)
 										return
@@ -418,10 +410,11 @@ func (n *Node) ListenNodeOracleRequest(channel chan *wrappers.BridgeOracleReques
 									wg.Add(1)
 									go n.StartProtocolByOracleRequest(e, wg)
 									wg.Wait()
-								}
-								if ctx.Err() != nil {
+									break
+								} else if ctx.Err() != nil {
 									logrus.Warnf("Not enaugh participants %d , %v", len(parts), ctx.Err())
 									break
+
 								}
 								time.Sleep(300 * time.Millisecond)
 							}

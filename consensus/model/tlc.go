@@ -64,7 +64,7 @@ func (node *Node) AdvanceStep(step int) {
 
 	msg := MessageWithSig{
 		Header:  Header{node.Id, Announce},
-		Body:    Body{node.TimeStep, node.Topic.String()},
+		Body:    Body{node.TimeStep, node.Comm.Topic().String()},
 		History: make([]MessageWithSig, 0),
 	}
 
@@ -99,7 +99,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 		}
 
 		msg := node.ConvertMsg.BytesToModelMessage(*rcvdMsg)
-		if msg.BridgeEventHash == node.Topic.String() {
+		if msg.BridgeEventHash == node.Comm.Topic().String() {
 			msgChan <- rcvdMsg
 			wg.Add(1)
 			go func() {
@@ -237,7 +237,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				}
 			}()
 		} else {
-			logrus.Warnf("NOT MY MESSAGE !!!!!!!!!!!!!!!!!!!  %s != %s", msg.BridgeEventHash, node.Topic.String())
+			logrus.Warnf("NOT MY MESSAGE !!!!!!!!!!!!!!!!!!!  %s != %s", msg.BridgeEventHash, node.Comm.Topic().String())
 			//node.DisconnectPubSub()
 			continue
 		}

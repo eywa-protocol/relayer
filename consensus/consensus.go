@@ -362,3 +362,7 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 func (c *Protocol) UnregisterTopicValidator() {
 	c.pubsub.UnregisterTopicValidator(c.topic.String())
 }
+
+func (c *Protocol) Topic() *pubsub.Topic {
+	return c.topic
+}

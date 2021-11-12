@@ -156,6 +156,8 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
 				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
+					leader, _ := libp2p2.RelayerLeaderNode(topic.String(), topicParticipants)
+
 					blsNode = &model.Node{
 						Ctx:            n.Ctx,
 						Id:             int(node.NodeId.Int64()),
@@ -173,7 +175,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 						MembershipKey:  n.MembershipKey,
 						PartPublicKey:  bls.ZeroPublicKey(),
 						PartSignature:  bls.ZeroSignature(),
-						Leader:         "",
+						Leader:         leader,
 					}
 					break
 				}
@@ -637,7 +639,6 @@ func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *
 		}
 
 		if n.session != nil {
-			n.session.Leader, _ = libp2p2.RelayerLeaderNode(n.session.Comm.Topic().String(), n.session.Comm.Topic().ListPeers())
 			wg := new(sync.WaitGroup)
 			wg.Add(1)
 			go n.StartProtocolByOracleRequest(e, wg)

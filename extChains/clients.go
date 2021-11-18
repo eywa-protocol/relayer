@@ -3,10 +3,11 @@ package extChains
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 	"math/big"
 	"sync"
+
+	"github.com/sirupsen/logrus"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 )
 
 type Clients struct {
@@ -74,4 +75,8 @@ func (s *Clients) Close() {
 		client.Close()
 		delete(s.ethClients, id)
 	}
+}
+
+func (s *Clients) All() *map[uint64]eth.Client {
+	return &s.ethClients
 }

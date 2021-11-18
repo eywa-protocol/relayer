@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
-	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
 	"math/big"
 	"sync"
 	"time"
+
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
+	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
+
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
@@ -630,8 +633,27 @@ func (n *Node) StartEpoch() error {
 
 	logrus.Info("BLS setup done")
 	wg.Wait()
-	logrus.Info("start epoch done")
+	n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0))
 	return nil
+}
+
+func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int) {
+	for chainId, client := range *n.clients.All() {
+		instance, err := n.GetBridge(big.NewInt(int64(chainId)))
+		if err != nil {
+			logrus.Error("Unable to get Bridge for %d: %w", chainId, err)
+			continue
+		}
+		txOpts, err := client.CallOpt(n.signerKey)
+		if err != nil {
+			logrus.Error("Unable to get txOps for %d: %w", chainId, err)
+			continue
+		}
+		go func() {
+			tx, _ := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask)
+			logrus.Info("Sent UpdateEpoch() to %d as %x", chainId, tx.Hash())
+		}()
+	}
 }
 
 func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *big.Int) {

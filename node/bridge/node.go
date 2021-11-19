@@ -17,6 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	libp2p2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/contracts"
@@ -638,21 +639,34 @@ func (n *Node) StartEpoch() error {
 }
 
 func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int) {
+	// if n.Id != 0 {
+	// 	return
+	// }
 	for chainId, client := range *n.clients.All() {
-		instance, err := n.GetBridge(big.NewInt(int64(chainId)))
-		if err != nil {
-			logrus.Error("Unable to get Bridge for %d: %w", chainId, err)
-			continue
-		}
-		txOpts, err := client.CallOpt(n.signerKey)
-		if err != nil {
-			logrus.Error("Unable to get txOps for %d: %w", chainId, err)
-			continue
-		}
-		go func() {
-			tx, _ := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask)
-			logrus.Info("Sent UpdateEpoch() to %d as %x", chainId, tx.Hash())
-		}()
+		go func(chainId uint64, client eth.Client) {
+			instance, err := n.GetBridge(big.NewInt(int64(chainId)))
+			if err != nil {
+				logrus.Errorf("Unable to get Bridge for %d: %v", chainId, err)
+				return
+			}
+			txOpts, err := client.CallOpt(n.signerKey)
+			if err != nil {
+				logrus.Errorf("Unable to get txOps for %d: %v", chainId, err)
+				return
+			}
+			tx, err := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask)
+			if err != nil {
+				logrus.Errorf("Unable to invoke UpdateRequest for %d: %v", chainId, err)
+				return
+			}
+			logrus.Infof("Sent UpdateEpoch() to %d as %x", chainId, tx.Hash())
+			receipt, err := client.WaitTransaction(tx.Hash())
+			if err != nil {
+				logrus.Errorf("Unable to transact UpdateRequest for %d: %v", chainId, err)
+				return
+			}
+			logrus.Infof("Done UpdateEpoch() to %d with status %d", chainId, receipt.Status)
+		}(chainId, client)
 	}
 }
 

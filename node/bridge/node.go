@@ -634,14 +634,12 @@ func (n *Node) StartEpoch() error {
 
 	logrus.Info("BLS setup done")
 	wg.Wait()
-	n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0))
+	go n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0))
 	return nil
 }
 
 func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int) {
-	// if n.Id != 0 {
-	// 	return
-	// }
+	time.Sleep(time.Duration(n.Id) * time.Second)
 	for chainId, client := range *n.clients.All() {
 		go func(chainId uint64, client eth.Client) {
 			instance, err := n.GetBridge(big.NewInt(int64(chainId)))

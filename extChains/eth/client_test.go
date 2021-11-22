@@ -38,7 +38,7 @@ func TestClient(t *testing.T) {
 	clients := make(clientList, 0, len(config.Bridge.Chains))
 	defer clients.Close()
 
-	txs := make([]string, 0, len(config.Bridge.Chains))
+	txs := make([]string, 0, len(config.Bridge.Chains)*3)
 	mx := new(sync.Mutex)
 	eventHandler := func(event *wrappers.BridgeOracleRequest, srcChainId *big.Int) {
 		mx.Lock()
@@ -83,50 +83,53 @@ func TestClient(t *testing.T) {
 		}
 	}
 
-	sendTxs := make([]string, 0, len(config.Bridge.Chains))
-	for ixFrom, fromClient := range clients {
-		var toClient Client
-		toIx := 0
-		if ixFrom < (len(clients) - 1) {
-			toIx = ixFrom + 1
-		}
-		toClient = clients[toIx]
+	sendTxs := make([]string, 0, len(config.Bridge.Chains)*3)
+	for i := 0; i < 3; i++ {
 
-		testData := new(big.Int).SetUint64(rand.Uint64())
+		for ixFrom, fromClient := range clients {
+			var toClient Client
+			toIx := 0
+			if ixFrom < (len(clients) - 1) {
+				toIx = ixFrom + 1
+			}
+			toClient = clients[toIx]
 
-		dexPoolFrom := config.Bridge.Chains[ixFrom].DexPoolAddress
-		dexPoolTo := config.Bridge.Chains[toIx].DexPoolAddress
-		bridgeTo := config.Bridge.Chains[toIx].BridgeAddress
-		pKeyFrom := config.Bridge.Chains[ixFrom].EcdsaKey
+			testData := new(big.Int).SetUint64(rand.Uint64())
 
-		txOptsFrom, err := fromClient.CallOpt(pKeyFrom)
-		if err != nil {
-			fmt.Printf("can not get call opt on error: %v", err)
-			t.Failed()
-			return
-		}
-		dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, fromClient)
+			dexPoolFrom := config.Bridge.Chains[ixFrom].DexPoolAddress
+			dexPoolTo := config.Bridge.Chains[toIx].DexPoolAddress
+			bridgeTo := config.Bridge.Chains[toIx].BridgeAddress
+			pKeyFrom := config.Bridge.Chains[ixFrom].EcdsaKey
 
-		chainIdTo, err := toClient.ChainID(ctx)
-		if err != nil {
-			fmt.Printf("can not get chain id to on error: %v", err)
-			t.Failed()
-			return
+			txOptsFrom, err := fromClient.CallOpt(pKeyFrom)
+			if err != nil {
+				fmt.Printf("can not get call opt on error: %v", err)
+				t.Failed()
+				return
+			}
+			dexPoolFromContract, err := wrappers.NewMockDexPool(dexPoolFrom, fromClient)
+
+			chainIdTo, err := toClient.ChainID(ctx)
+			if err != nil {
+				fmt.Printf("can not get chain id to on error: %v", err)
+				t.Failed()
+				return
+			}
+			tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
+				testData,
+				dexPoolTo,
+				bridgeTo,
+				chainIdTo,
+			)
+			if err != nil {
+				fmt.Printf("can not send tx on error: %v\n", err)
+				t.Failed()
+				return
+			}
+			fmt.Printf("tx send: %s\n", tx.Hash().Hex())
+			_, _ = fromClient.WaitTransaction(tx.Hash())
+			sendTxs = append(sendTxs, tx.Hash().Hex())
 		}
-		tx, err := dexPoolFromContract.SendRequestTestV2(txOptsFrom,
-			testData,
-			dexPoolTo,
-			bridgeTo,
-			chainIdTo,
-		)
-		if err != nil {
-			fmt.Printf("can not send tx on error: %v\n", err)
-			t.Failed()
-			return
-		}
-		fmt.Printf("tx send: %s\n", tx.Hash().Hex())
-		_, _ = fromClient.WaitTransaction(tx.Hash())
-		sendTxs = append(sendTxs, tx.Hash().Hex())
 	}
 	mx.Lock()
 	assert.Equal(t, len(sendTxs), len(txs))

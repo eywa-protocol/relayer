@@ -120,7 +120,7 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 		hosts[i] = host
 
 		// creating pubsubs
-		comm.InitializePubSubWithTopic(*host, "TEST")
+		// comm.InitializePubSubWithTopic(*host, "TEST")
 
 		nodes[i] = &bridge.Node{
 			Node: base.Node{
@@ -135,6 +135,8 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 			PrivKey:   privateKeys[i],
 			P2PPubSub: comm,
 		}
+
+		nodes[i].InitializeCommonPubSub("TEST")
 	}
 	return nodes, hosts
 }

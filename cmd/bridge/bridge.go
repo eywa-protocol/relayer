@@ -36,6 +36,7 @@ func main() {
 		init             bool
 		register         bool
 		path             string
+		listen           string
 		port             uint
 		logLevel         int
 		pprofFlag        bool
@@ -48,7 +49,8 @@ func main() {
 	flag.BoolVar(&init, "init", false, "run \"./bridge -init\" to init node")
 	flag.BoolVar(&register, "register", false, "run \"./bridge -register\" to register node")
 	flag.StringVar(&path, "cnf", "bridge.yaml", "config file absolute path")
-	flag.UintVar(&port, "port", 0, "-port")
+	flag.UintVar(&port, "port", 45554, "-port")
+	flag.StringVar(&listen, "listen", "0.0.0.0", "listen ip address")
 	flag.IntVar(&logLevel, "verbosity", int(logrus.InfoLevel), "run -verbosity 6 to set Trace loglevel")
 	flag.BoolVar(&pprofFlag, "profiling", false, "run with '-profiling true' argument to use profiler on \"http://localhost:1234/debug/pprof/\"")
 	flag.StringVar(&commonRendezvous, "randevoue", "", "run \"./bridge -randevoue CUSTOMSTRING\" to setup your group of nodes")
@@ -101,14 +103,14 @@ func main() {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	} else if register {
-		err := bridge.RegisterNode(name, keysPath)
+		err := bridge.RegisterNode(name, keysPath, listen, port)
 		if err != nil {
 			logrus.Error(fmt.Errorf("node init error %w", err))
 		}
 	} else {
 
-		//blockchain.CreateBlockchain()
-		err := bridge.RunNode(name, keysPath, config.Bridge.Rendezvous)
+		// blockchain.CreateBlockchain()
+		err := bridge.RunNode(name, keysPath, config.Bridge.Rendezvous, listen, port)
 		if err != nil {
 			logrus.Fatalf("node stoped on error: %v", err)
 		}

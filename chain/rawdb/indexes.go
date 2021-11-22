@@ -50,7 +50,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*chain.Transaction, c
 	return &tx, blockHash, blockNumber, txIndex
 }
 
-// ReadTxLookupEntry retrieves the positional metadata associated with a transaction
+// ReadTxLookupBytesEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
 func ReadTxLookupBytesEntry(db DatabaseReader, hash []byte) (common.Hash, uint64, uint64) {
 	data, _ := db.Get(hash)
@@ -59,7 +59,7 @@ func ReadTxLookupBytesEntry(db DatabaseReader, hash []byte) (common.Hash, uint64
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		logrus.Printf(fmt.Sprintf("hash  Invalid transaction lookup entry ", hash))
+		logrus.Printf("hash  Invalid transaction lookup entry %x", hash)
 		return common.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
@@ -74,7 +74,7 @@ func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		logrus.Printf(fmt.Sprintf("hash  Invalid transaction lookup entry ", hash.Hex()))
+		logrus.Printf("hash  Invalid transaction lookup entry %s", hash.Hex())
 		return common.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
@@ -87,9 +87,9 @@ func ReadBodyRawByNumber(db DatabaseReader, number uint64) rlp.RawValue {
 	return data
 }
 
-//store.Get([]byte(fmt.Sprint(genesisBlock.Number)))
+// store.Get([]byte(fmt.Sprint(genesisBlock.Number)))
 
-// ReadBodyRLP retrieves the block body (transactions and uncles) in RLP encoding.
+// ReadBodyRaw retrieves the block body (transactions and uncles) in RLP encoding.
 func ReadBodyRaw(db DatabaseReader, hash []byte) rlp.RawValue {
 	data, _ := db.Get(hash)
 	return data

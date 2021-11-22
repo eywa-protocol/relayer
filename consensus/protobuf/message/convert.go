@@ -18,7 +18,7 @@ func convertModelMessage(msg model.MessageWithSig) (message *ConsensusRequest) {
 	source := int64(msg.Source)
 	step := int64(msg.Step)
 
-	msgType := MsgType(int(msg.MsgType))
+	msgType := MsgType(msg.MsgType)
 
 	history := make([]*ConsensusRequest, 0)
 
@@ -69,8 +69,8 @@ func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWit
 	}
 
 	message = model.MessageWithSig{
-		Header:    model.Header{int(msg.GetSource()), model.MsgType(msg.GetMsgType())},
-		Body:      model.Body{int(msg.GetStep()), msg.GetBridgeEventHash()},
+		Header:    model.Header{Source: int(msg.GetSource()), MsgType: model.MsgType(msg.GetMsgType())},
+		Body:      model.Body{Step: int(msg.GetStep()), BridgeEventHash: msg.GetBridgeEventHash()},
 		History:   history,
 		Signature: sig,
 		Mask:      *new(big.Int).SetBytes(msg.Mask),

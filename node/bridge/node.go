@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	"math/big"
 	"sync"
 	"time"
@@ -62,6 +63,7 @@ type Node struct {
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
 	BlsNodeId      int
+	Ledger         *ledger.Ledger
 	EpochKeys
 }
 
@@ -76,6 +78,13 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	go session.WaitForProtocolMsg(consensusChannel, wg)
 	select {
 	case <-consensusChannel:
+		err := n.Ledger.CreateBlockFromEvent(*event)
+		if err != nil {
+			logrus.Error(fmt.Errorf("CreateBlockFromEvent ERROR: %w", err))
+		}
+		blockHash := n.Ledger.GetCurrentBlockHash()
+		hash := blockHash.ToHexString()
+		logrus.Printf("BLOCK HASH: %v Currentheight: %d", hash, n.Ledger.GetCurrentBlockHeight())
 		logrus.Infof("LEADER:%s == MYMNODE:%s", session.Leader.Pretty(), n.Host.ID().Pretty())
 		if session.Leader.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")

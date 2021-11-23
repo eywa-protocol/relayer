@@ -12,6 +12,7 @@ import (
 // Node is the struct used for keeping everything related to a node in TLC.
 type Node struct {
 	Ctx            context.Context
+	Topic          *pubsub.Topic
 	Id             int                    // Id of the node
 	TimeStep       int                    // Node's local time step
 	ThresholdAck   int                    // Threshold on number of messages
@@ -34,10 +35,14 @@ type Node struct {
 
 // CommunicationInterface is a interface used for communicating with transport layer.
 type CommunicationInterface interface {
-	Send([]byte, int)                // Send a message to a specific node
-	Broadcast([]byte)                // Broadcast messages to other nodes
+	Broadcast([]byte) // Broadcast messages to other nodes
+	BroadcastTo(topic *pubsub.Topic, msgBytes []byte)
 	Receive(context.Context) *[]byte // Blocking receive
-	Disconnect()                     // Disconnect node
-	Reconnect(string)                // Reconnect node
-	Topic() *pubsub.Topic
+	ReceiveFrom(topicName string, ctx context.Context) *[]byte
+	Disconnect()            // Disconnect node
+	Subscribe(string) error // Reconnect node
+	MainTopic() *pubsub.Topic
+	Topic(topicName string) *pubsub.Topic
+	JoinTopic(topicName string) (topic *pubsub.Topic, err error)
+	LeaveTopic(topicName string) error
 }

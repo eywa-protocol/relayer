@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	badger "github.com/ipfs/go-ds-badger"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"io/ioutil"
 	"math/rand"
 	"sync"
@@ -95,9 +97,35 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 		field.PeerId: h.ID().Pretty(),
 	})
 
-	_, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
+	peerStoreFile := keysPath + "/peer-store"
+	ds, err := badger.NewDatastore(peerStoreFile, nil)
 	if err != nil {
-		return err
+
+		logrus.Fatalf("can not open peer datastore at %s on error %v", peerStoreFile, err)
+	}
+
+	// ds:=sync2.MutexWrap(datastore.NewMapDatastore())
+	//
+	// ps,err:=pstoreds.NewPeerstore(ctx,ds)
+	// if err!=nil{
+	// 	logrus.Fatalf("can not create peer store  on error %v",  err)
+	// }
+
+	var bootstrapPeers []peer.AddrInfo
+	dhtOpts := []dht.Option{
+		dht.Mode(dht.ModeServer),
+		dht.Datastore(ds),
+		dht.BootstrapPeers(bootstrapPeers...),
+	}
+	dhtDisc, err := dht.New(ctx, h, dhtOpts...)
+	if err != nil {
+
+		return fmt.Errorf("can not create DHT on error: %w", err)
+	}
+
+	if err = dhtDisc.Bootstrap(ctx); err != nil {
+
+		return fmt.Errorf("can not bootstrap DHT on error: %w", err)
 	}
 
 	runa.Host(h, cancel, &sync.WaitGroup{})

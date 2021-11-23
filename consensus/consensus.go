@@ -4,14 +4,20 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p"
+	discovery "github.com/libp2p/go-libp2p-discovery"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/sirupsen/logrus"
 	mrand "math/rand"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/libp2p/go-libp2p"
 	core "github.com/libp2p/go-libp2p-core"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -22,91 +28,187 @@ import (
 )
 
 type Protocol struct {
-	pubsub       *pubsub.PubSub       // PubSub of each individual node
-	subscription *pubsub.Subscription // Subscription of individual node
-	topic        *pubsub.Topic        // PubSub topic
+	pubsub        *pubsub.PubSub // PubSub of each individual node
+	mainTopic     string
+	topics        map[string]*pubsub.Topic        // PubSub topics
+	subscriptions map[string]*pubsub.Subscription // Subscription of individual node
+	mx            *sync.Mutex
 }
 
-func (c *Protocol) ListPeersByTopic(topic string) []peer.ID {
-	return c.pubsub.ListPeers(topic)
+func (c *Protocol) ListPeersByTopic(topicName string) []peer.ID {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if topic, ok := c.topics[topicName]; ok {
+
+		return topic.ListPeers()
+	}
+
+	return []peer.ID{}
 }
 
 // Broadcast Uses PubSub publish to broadcast messages to other peers
 func (c *Protocol) Broadcast(msgBytes []byte) {
 	// Broadcasting to a topic in PubSub
-	go func(msgBytes []byte, topic string, pubsub *pubsub.PubSub) {
-
-		err := pubsub.Publish(topic, msgBytes)
+	go func(msgBytes []byte, topic *pubsub.Topic) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := topic.Publish(ctx, msgBytes)
 		if err != nil {
-			fmt.Printf("Publish Error: %v\n", err)
+			err = fmt.Errorf("publish to main topic error: %w", err)
+			if errors.Is(err, pubsub.ErrTopicClosed) {
+				logrus.Warn(err)
+			} else {
+				logrus.Error(err)
+			}
 			return
 		}
 
-	}(msgBytes, c.topic.String(), c.pubsub)
+	}(msgBytes, c.getTopic(c.mainTopic))
 }
 
-func (c *Protocol) JoinTopic(topicMsg string) (topic *pubsub.Topic, err error) {
-	return c.pubsub.Join(topicMsg)
+func (c *Protocol) BroadcastTo(topic *pubsub.Topic, msgBytes []byte) {
+	// Broadcasting to a topic in PubSub
+	go func(msgBytes []byte, topic *pubsub.Topic) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		err := topic.Publish(ctx, msgBytes)
+		if err != nil {
+			err = fmt.Errorf("broadcast to topic %s error: %w", topic.String(), err)
+			if errors.Is(err, pubsub.ErrTopicClosed) {
+				logrus.Warn(err)
+			} else {
+				logrus.Error(err)
+			}
+			return
+		}
+
+	}(msgBytes, topic)
 }
 
-// Send uses Broadcast for sending messages
-func (c *Protocol) Send(msgBytes []byte, id int) {
-	// In libp2p implementation, we also broadcast instead of sending directly. So Acks will be broadcast in this case.
-	c.Broadcast(msgBytes)
+func (c *Protocol) getTopic(topicName string) *pubsub.Topic {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	return c.topics[topicName]
 }
 
-// Receive gets message from PubSub in a blocking way
+func (c *Protocol) JoinTopic(topicName string) (topic *pubsub.Topic, err error) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if topic, ok := c.topics[topicName]; ok {
+
+		return topic, nil
+	} else if topic, err := c.pubsub.Join(topicName); err != nil {
+
+		return nil, err
+	} else {
+		c.topics[topicName] = topic
+
+		return topic, nil
+	}
+}
+
+func (c *Protocol) LeaveTopic(topicName string) error {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if topic, ok := c.topics[topicName]; ok && topicName != c.mainTopic {
+		if subscription, ok := c.subscriptions[topicName]; ok {
+			subscription.Cancel()
+			delete(c.subscriptions, topicName)
+		}
+		delete(c.topics, topicName)
+		return topic.Close()
+	}
+	return nil
+}
+
+// Receive gets message from main topic PubSub in a blocking way
 func (c *Protocol) Receive(ctx context.Context) *[]byte {
 
-	// Blocking function for consuming newly received messages
-	// We can access message here
-	msg, err := c.subscription.Next(ctx)
-	// handling canceled subscriptions
-	if err != nil {
+	c.mx.Lock()
+	if subscription, ok := c.subscriptions[c.mainTopic]; ok {
+		c.mx.Unlock()
+		// Blocking function for consuming newly received messages
+		// We can access message here
+		msg, err := subscription.Next(ctx)
+		// handling canceled subscriptions
+		if err != nil {
+			return nil
+		}
+
+		msgBytes := msg.Data
+
+		return &msgBytes
+	} else {
+		c.mx.Unlock()
 		return nil
 	}
+}
 
-	msgBytes := msg.Data
+// ReceiveFrom gets message from PubSub in a blocking way for topic
+func (c *Protocol) ReceiveFrom(topicName string, ctx context.Context) *[]byte {
+	c.mx.Lock()
+	if subscription, ok := c.subscriptions[topicName]; ok {
+		c.mx.Unlock()
+		// Blocking function for consuming newly received messages
+		// We can access message here
+		msg, err := subscription.Next(ctx)
+		// handling canceled subscriptions
+		if err != nil {
+			return nil
+		}
 
-	return &msgBytes
+		msgBytes := msg.Data
+
+		return &msgBytes
+	} else {
+		c.mx.Unlock()
+		logrus.Warnf("subscription for topic %s not found", topicName)
+		return nil
+	}
 }
 
 func (c *Protocol) Disconnect() {
-	c.subscription.Cancel()
-	c.pubsub.UnregisterTopicValidator(c.topic.String())
-}
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	for topicName, topic := range c.topics {
+		if subscription, ok := c.subscriptions[topicName]; ok {
+			subscription.Cancel()
+			delete(c.subscriptions, topicName)
+		}
+		if err := c.pubsub.UnregisterTopicValidator(topicName); err != nil {
 
-func (c *Protocol) DisconnectTopic(topic string) {
-	c.pubsub.UnregisterTopicValidator(topic)
+			logrus.Error(err)
+		}
+		if err := topic.Close(); err != nil {
 
-}
-
-func (c *Protocol) Reconnect(topic string) {
-	var err error
-	//if topic != "" {
-	//	c.topic = topic
-	//}
-
-	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
-	if err != nil {
-		panic(err)
+			logrus.Error(err)
+		}
+		delete(c.topics, topicName)
 	}
-	fmt.Println("RECONNECT to topic ", c.topic)
 }
 
-// Cancel unsubscribes a node from pubsub
-func (c *Protocol) Cancel(cancelTime int, reconnectTime int) {
-	go func() {
-		time.Sleep(time.Duration(cancelTime) * time.Millisecond)
-		fmt.Println("	CANCELING	")
-		c.subscription.Cancel()
-		time.Sleep(time.Duration(reconnectTime) * time.Millisecond)
-		fmt.Println("	RESUBBING	")
-		c.subscription, _ = c.pubsub.Subscribe(c.topic.String())
-	}()
+func (c *Protocol) Subscribe(topicName string) error {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if topic, ok := c.topics[topicName]; ok {
+		if _, subscribed := c.subscriptions[topicName]; subscribed {
+
+			return nil
+		} else if subscription, err := topic.Subscribe(); err != nil {
+
+			return fmt.Errorf("topic %s subscribe error %w", topicName, err)
+		} else {
+			c.subscriptions[topicName] = subscription
+
+			return nil
+		}
+	} else {
+
+		return fmt.Errorf("topic %s not joined", topicName)
+	}
 }
 
-// createPeer creates a peer on localhost and configures it to use libp2p.
+// CreatePeer creates a peer on localhost and configures it to use libp2p.
 func (c *Protocol) CreatePeer(nodeId int, port int) *core.Host {
 	// Creating a node
 	h, err := createHost(port)
@@ -132,53 +234,67 @@ func (c *Protocol) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host 
 	return &h
 }
 
-// initializePubSub creates a PubSub for the peer and also subscribes to a topic
-func (c *Protocol) InitializePubSubWithTopic(h core.Host, topic string) {
-	var err error
+// NewPubSubWithTopic creates a PubSub for the peer and also subscribes to a main topic
+func NewPubSubWithTopic(h core.Host, dht *dht.IpfsDHT, mainTopicName string) (*Protocol, error) {
+
 	// Creating pubsub
 	// every peer has its own PubSub
-	c.pubsub, err = applyPubSub(h)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
+	disc := discovery.NewRoutingDiscovery(dht)
+	optsPS := []pubsub.Option{
+		// pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
+		pubsub.WithPeerOutboundQueueSize(512),
+		pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
+		pubsub.WithDiscovery(disc),
 	}
 
-	c.topic, err = c.pubsub.Join(topic)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
+	if pubSub, err := pubsub.NewGossipSub(context.Background(), h, optsPS...); err != nil {
+		logrus.Error(fmt.Errorf("init gosip error: %w", err))
 
-	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
+		return nil, err
+	} else if topic, err := pubSub.Join(mainTopicName); err != nil {
+		logrus.Error(fmt.Errorf("init gosip error: %w", err))
 
+		return nil, err
+	} else if subscription, err := topic.Subscribe(); err != nil {
+
+		return nil, err
+	} else {
+		c := &Protocol{
+			pubsub:        pubSub,
+			mainTopic:     mainTopicName,
+			topics:        make(map[string]*pubsub.Topic, 20),
+			subscriptions: make(map[string]*pubsub.Subscription, 20),
+			mx:            new(sync.Mutex),
+		}
+
+		c.subscriptions[mainTopicName] = subscription
+		c.topics[mainTopicName] = topic
+
+		return c, nil
+	}
 }
 
-// InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
-func (c *Protocol) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
-	var err error
-	// Creating pubsub
-	// every peer has its own PubSub
-	c.pubsub, err = applyPubSubDeatiled(h, peerAddrs)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-	c.InitializePubSubWithTopic(h, topic)
-
-	// Creating a subscription and subscribing to the topic
-	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-}
+// // InitializePubSubWithTopicAndPeers creates a PubSub for the peer with some extra parameters
+// func (c *Protocol) InitializePubSubWithTopicAndPeers(h core.Host, topic string, peerAddrs []peer.AddrInfo) {
+// 	var err error
+// 	// Creating pubsub
+// 	// every peer has its own PubSub
+// 	c.pubsub, err = applyPubSubDeatiled(h, peerAddrs)
+// 	if err != nil {
+// 		fmt.Printf("Error : %v\n", err)
+// 		return
+// 	}
+//
+// 	c.InitializePubSubWithTopic(h, topic)
+//
+// 	// Creating a subscription and subscribing to the topic
+// 	c.subscription, err = c.pubsub.Subscribe(c.topic.String())
+// 	if err != nil {
+// 		fmt.Printf("Error : %v\n", err)
+// 		return
+// 	}
+//
+// }
 
 /*func (c *Protocol) SetTopic(topic string) {
 	c.topic = topic
@@ -293,7 +409,7 @@ func GetLocalhostAddress(h core.Host) string {
 // applyPubSub creates a new GossipSub with message signing
 func applyPubSub(h core.Host) (*pubsub.PubSub, error) {
 	optsPS := []pubsub.Option{
-		pubsub.WithMessageSigning(true),
+		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
 	}
 
 	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
@@ -302,12 +418,12 @@ func applyPubSub(h core.Host) (*pubsub.PubSub, error) {
 // applyPubSubDetailed creates a new GossipSub with message signing
 func applyPubSubDeatiled(h core.Host, addrInfos []peer.AddrInfo) (*pubsub.PubSub, error) {
 	optsPS := []pubsub.Option{
-		pubsub.WithMessageSigning(true),
+		// pubsub.WithMessageSigning(true),
 		pubsub.WithPeerExchange(true),
-		//pubsub.WithMessageIdFn(func(pmsg *pubsubpb.Message) string {
+		// pubsub.WithMessageIdFn(func(pmsg *pubsubpb.Message) string {
 		//	hash := blake2b.Sum256(pmsg.Data)
 		//	return string(hash[:])
-		//}),
+		// }),
 		pubsub.WithDirectPeers(addrInfos),
 		pubsub.WithFloodPublish(true),
 		pubsub.WithDirectConnectTicks(7),
@@ -359,10 +475,12 @@ func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error
 	return
 }
 
-func (c *Protocol) UnregisterTopicValidator() {
-	c.pubsub.UnregisterTopicValidator(c.topic.String())
+func (c *Protocol) MainTopic() *pubsub.Topic {
+
+	return c.getTopic(c.mainTopic)
 }
 
-func (c *Protocol) Topic() *pubsub.Topic {
-	return c.topic
+func (c *Protocol) Topic(topicName string) *pubsub.Topic {
+
+	return c.getTopic(topicName)
 }

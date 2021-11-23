@@ -53,6 +53,7 @@ type Node struct {
 	contracts.Registry
 	contracts.Forwarder
 	contracts.Bridge
+	rendezvous     string
 	clients        *extChains.Clients
 	nonceMx        *sync.Mutex
 	P2PPubSub      *bls_consensus.Protocol
@@ -60,33 +61,33 @@ type Node struct {
 	PrivKey        bls.PrivateKey
 	uptimeRegistry *flow.MeterRegistry
 	gsnClient      *gsn.Client
-	session        *model.Node
 	BlsNodeId      int
 	EpochKeys
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, wg *sync.WaitGroup) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Node, wg *sync.WaitGroup) {
 	defer wg.Done()
-
 	consensusChannel := make(chan bool)
-	n.session.AdvanceStep(0)
+	session.AdvanceStep(0)
 	time.Sleep(time.Second)
+	ctx, cancel := context.WithTimeout(session.Ctx, 30*time.Second)
+	defer cancel()
 	wg.Add(1)
-
-	go n.session.WaitForProtocolMsg(consensusChannel, wg)
+	go session.WaitForProtocolMsg(consensusChannel, wg)
 	select {
 	case <-consensusChannel:
-		logrus.Infof("LEADER:%s == MYMNODE:%s", n.session.Leader.Pretty(), n.Host.ID().Pretty())
-		if n.session.Leader.Pretty() == n.Host.ID().Pretty() {
+		logrus.Infof("LEADER:%s == MYMNODE:%s", session.Leader.Pretty(), n.Host.ID().Pretty())
+		if session.Leader.Pretty() == n.Host.ID().Pretty() {
 			logrus.Info("LEADER going to Call external chain contract method")
 			_, err := n.ReceiveRequestV2(event)
 			if err != nil {
 				logrus.Error(fmt.Errorf("%w", err))
 			}
 		}
-	case <-time.After(5000 * time.Millisecond):
-		logrus.Warn("WaitGroup timed out..")
-
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			logrus.Warn("WaitGroup timed out..")
+		}
 	}
 	logrus.Info("The END of Protocol")
 }
@@ -149,18 +150,19 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 		}
 
 		blsNode = func() *model.Node {
-			ctx, cancel := context.WithDeadline(n.Ctx, time.Now().Add(10*time.Second))
+			ctx, cancel := context.WithTimeout(n.Ctx, 30*time.Second)
 			defer cancel()
 			for {
 				topicParticipants := topic.ListPeers()
 				topicParticipants = append(topicParticipants, n.Host.ID())
 				// logrus.Tracef("len(topicParticipants) = [ %d ] len(n.DiscoveryPeers)/2+1 = [ %v ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants) /*, len(n.DiscoveryPeers)/2+1*/, len(n.Dht.RoutingTable().ListPeers()))
-				logrus.Tracef("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
+				logrus.Infof("len(topicParticipants) = [ %d ] len(n.Dht.RoutingTable().ListPeers()) = [ %d ]", len(topicParticipants), len(n.Dht.RoutingTable().ListPeers()))
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					leader, _ := libp2p2.RelayerLeaderNode(topic.String(), topicParticipants)
 
 					blsNode = &model.Node{
 						Ctx:            n.Ctx,
+						Topic:          topic,
 						Id:             int(node.NodeId.Int64()),
 						TimeStep:       0,
 						ThresholdWit:   len(topicParticipants)/2 + 1,
@@ -180,12 +182,11 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 					}
 					break
 				}
-				if ctx.Err() != nil {
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					logrus.Warnf("Not enaugh participants %d , %v", len(topicParticipants), ctx.Err())
-					_ = topic.Close()
 					break
 				}
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(1000 * time.Millisecond)
 			}
 
 			return blsNode
@@ -218,7 +219,7 @@ func (n *Node) ListenReceiveRequest(clientNetwork *ethclient.Client, proxyNetwor
 				logrus.Infof("ReceiveRequest: %v %v", e.ReqId, e.ReceiveSide)
 				// TODO disconnect from topic
 				/** TODO:
-				Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)
+				  Is transaction true, otherwise repeat to invoke tx, err := instance.ReceiveRequestV2(auth)
 				*/
 
 			}
@@ -303,8 +304,16 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	return
 }
 
-func (n Node) InitializeCommonPubSub() (p2pPubSub *bls_consensus.Protocol) {
-	return new(bls_consensus.Protocol)
+func (n *Node) InitializeCommonPubSub(rendezvous string) error {
+	if pubsub, err := bls_consensus.NewPubSubWithTopic(n.Host, n.GetDht(), rendezvous); err != nil {
+		return err
+	} else {
+		n.rendezvous = rendezvous
+		n.P2PPubSub = pubsub
+
+		return nil
+	}
+
 }
 
 // DiscoverByRendezvous	Announce your presence in network using a rendezvous point
@@ -313,64 +322,66 @@ func (n Node) InitializeCommonPubSub() (p2pPubSub *bls_consensus.Protocol) {
 // It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
 // routingDiscovery.Advertise makes this node announce that it can provide a value for the given key.
 // Where a key in this case is rendezvousString. Other peers will hit the same key to find other peers.
-func (n Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
+func (n *Node) DiscoverByRendezvous(wg *sync.WaitGroup, rendezvous string) {
 
-	defer wg.Done()
 	//	The Advertise function starts a go-routine that keeps on advertising until the context gets cancelled.
 	//	It announces its presence every 3 hours. This can be shortened by providing a TTL (time to live) option as a fourth parameter.
 
 	// TODO: When TTL elapsed should check presence in network
 	// QUEST: What's happening with presence in network when node goes down (in DHT table, in while other nodes is trying to connect)
 	logrus.Printf("Announcing ourselves with rendezvous [%s] ...", rendezvous)
-	var routingDiscovery = discovery.NewRoutingDiscovery(n.Dht)
+	routingDiscovery := discovery.NewRoutingDiscovery(n.Dht)
 	discovery.Advertise(n.Ctx, routingDiscovery, rendezvous)
 	logrus.Printf("Successfully announced! n.Host.ID():%s ", n.Host.ID().Pretty())
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(config.Bridge.TickerInterval)
+		defer ticker.Stop()
 
-	ticker := time.NewTicker(config.Bridge.TickerInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			logrus.Tracef("Looking advertised peers by rendezvous %s....", rendezvous)
-			// TODO: enhance, because synchronous
-			peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
-			if err != nil {
-				logrus.Fatal("FindPeers ", err)
-			}
-			ctn := 0
-			for _, p := range peers {
-				if p.ID == n.Host.ID() {
-					continue
+		for {
+			select {
+			case <-ticker.C:
+				logrus.Tracef("Looking advertised peers by rendezvous %s....", rendezvous)
+				// TODO: enhance, because synchronous
+				peers, err := discovery.FindPeers(n.Ctx, routingDiscovery, rendezvous)
+				if err != nil {
+					logrus.Fatal("FindPeers ", err)
 				}
-				logrus.Tracef("Discovery: FoundedPee %v, isConnected: %t", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
-				// TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
-
-				if n.Host.Network().Connectedness(p.ID) != network.Connected {
-					_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
-					if err != nil {
-						logrus.WithField(field.PeerId, p.ID.Pretty()).
-							Error(errors.New("connect to peer was unsuccessful on discovery"))
-
-					} else {
-						logrus.Tracef("Discovery: connected to peer %s", p.ID.Pretty())
+				ctn := 0
+				for _, p := range peers {
+					if p.ID.Pretty() == n.Host.ID().Pretty() {
+						continue
 					}
-				} else {
-					// store peer uptime
-					n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.Bridge.TickerInterval.Milliseconds() / 1000))
-				}
+					logrus.Tracef("Discovery: FoundedPee %v, isConnected: %t", p, n.Host.Network().Connectedness(p.ID) == network.Connected)
+					// TODO: add into if: "&&  n.n.DiscoveryPeers.contains(p.ID)"
 
-				if n.Host.Network().Connectedness(p.ID) == network.Connected {
-					ctn++
-				}
+					if n.Host.Network().Connectedness(p.ID) != network.Connected {
+						_, err = n.Host.Network().DialPeer(n.Ctx, p.ID)
+						if err != nil {
+							logrus.WithField(field.PeerId, p.ID.Pretty()).
+								Error(errors.New("connect to peer was unsuccessful on discovery"))
 
+						} else {
+							logrus.Tracef("Discovery: connected to peer %s", p.ID.Pretty())
+						}
+					} else {
+						// store peer uptime
+						n.uptimeRegistry.Get(p.ID.Pretty()).Mark(uint64(config.Bridge.TickerInterval.Milliseconds() / 1000))
+					}
+
+					if n.Host.Network().Connectedness(p.ID) == network.Connected {
+						ctn++
+					}
+
+				}
+				logrus.Tracef("Total amout discovered and connected peers: %d", ctn)
+
+			case <-n.Ctx.Done():
+				return
 			}
-			logrus.Tracef("Total amout discovered and connected peers: %d", ctn)
-
-		case <-n.Ctx.Done():
-			return
 		}
-	}
+	}()
 }
 
 /*func (n *Node) UptimeSchedule(wg *sync.WaitGroup) {
@@ -504,53 +515,57 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	anticoefs := bls.CalculateAntiRogueCoefficients(n.PublicKeys)
 	receivedMembershipKeyMask := *big.NewInt((1 << np) - 1)
 	membershipKey := bls.ZeroSignature()
-	msgChan := make(chan *[]byte, ChanLen)
 
-	for ctx.Err() == nil {
+	for {
 		rcvdMsg := n.P2PPubSub.Receive(ctx)
 		if rcvdMsg == nil {
-			continue
+			logrus.Info("receive return nil")
+			break
 		}
-		msgChan <- rcvdMsg
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			msgBytes := <-msgChan
-			var msg MessageBlsSetup
-			if err := json.Unmarshal(*msgBytes, &msg); err != nil {
-				logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, n.Id)
-				return
-			}
 
-			switch msg.MsgType {
-			case BlsSetupPhase:
-				membershipKeyParts := make([]bls.Signature, len(n.PublicKeys))
-				for i := range membershipKeyParts {
-					membershipKeyParts[i] = n.PrivKey.GenerateMembershipKeyPart(byte(i), n.EpochPublicKey, anticoefs[n.Id])
+		select {
+		case <-ctx.Done():
+			break
+		default:
+			wg.Add(1)
+			go func(msgBytes *[]byte) {
+				defer wg.Done()
+				var msg MessageBlsSetup
+				if err := json.Unmarshal(*msgBytes, &msg); err != nil {
+					logrus.Errorf("Unable to decode received message, skipped: %v %d", *msgBytes, n.Id)
+					return
 				}
-				outmsg := MessageBlsSetup{
-					Source:             n.Id,
-					MsgType:            BlsSetupParts,
-					MembershipKeyParts: membershipKeyParts,
-				}
-				msgBytes, _ := json.Marshal(outmsg)
-				n.P2PPubSub.Broadcast(msgBytes)
 
-			case BlsSetupParts:
-				logrus.Infof("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
-				part := msg.MembershipKeyParts[n.Id]
-				if !part.VerifyMembershipKeyPart(n.EpochPublicKey, n.PublicKeys[msg.Source], anticoefs[msg.Source], byte(n.Id)) {
-					logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, n.Id)
+				switch msg.MsgType {
+				case BlsSetupPhase:
+					membershipKeyParts := make([]bls.Signature, len(n.PublicKeys))
+					for i := range membershipKeyParts {
+						membershipKeyParts[i] = n.PrivKey.GenerateMembershipKeyPart(byte(i), n.EpochPublicKey, anticoefs[n.Id])
+					}
+					outmsg := MessageBlsSetup{
+						Source:             n.Id,
+						MsgType:            BlsSetupParts,
+						MembershipKeyParts: membershipKeyParts,
+					}
+					msgBytes, _ := json.Marshal(outmsg)
+					n.P2PPubSub.Broadcast(msgBytes)
+
+				case BlsSetupParts:
+					logrus.Infof("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
+					part := msg.MembershipKeyParts[n.Id]
+					if !part.VerifyMembershipKeyPart(n.EpochPublicKey, n.PublicKeys[msg.Source], anticoefs[msg.Source], byte(n.Id)) {
+						logrus.Errorf("Failed to verify membership key from node %d on node %d", msg.Source, n.Id)
+					}
+					mutex.Lock()
+					membershipKey = membershipKey.Aggregate(part)
+					receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
+					if receivedMembershipKeyMask.Sign() == 0 {
+						cancel()
+					}
+					mutex.Unlock()
 				}
-				mutex.Lock()
-				membershipKey = membershipKey.Aggregate(part)
-				receivedMembershipKeyMask.SetBit(&receivedMembershipKeyMask, msg.Source, 0)
-				if receivedMembershipKeyMask.Sign() == 0 {
-					cancel()
-				}
-				mutex.Unlock()
-			}
-		}()
+			}(rcvdMsg)
+		}
 	}
 	return membershipKey
 }
@@ -569,79 +584,76 @@ func (n *Node) StartEpoch() error {
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
-	for n.P2PPubSub.Topic() == nil || len(n.P2PPubSub.Topic().ListPeers()) < len(publicKeys)-1 { // TODO: configure how many peers to wait for
-		if n.P2PPubSub.Topic() == nil {
+	for n.P2PPubSub.MainTopic() == nil || len(n.P2PPubSub.MainTopic().ListPeers()) < len(publicKeys)-1 { // TODO: configure how many peers to wait for
+		if n.P2PPubSub.MainTopic() == nil {
 			logrus.Info("Waiting to join the initial topic")
 		} else {
-			logrus.Info("Waiting for all members to come, topic.ListPeers(): ", n.P2PPubSub.Topic().ListPeers())
+			logrus.Info("Waiting for all members to come, topic.ListPeers(): ", n.P2PPubSub.MainTopic().ListPeers())
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(3 * time.Second)
 	}
 
 	wg := &sync.WaitGroup{}
 	if n.Id == 0 { // TODO: all nodes must be able to send the first message
-		wg.Add(1)
 		logrus.Info("Preparing to start BLS setup phase...")
-		go func(group *sync.WaitGroup) {
-
-			// Fire the setip phase
-			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
-			msgBytes, _ := json.Marshal(msg)
-			n.P2PPubSub.Broadcast(msgBytes)
-		}(wg)
+		// Fire the setip phase
+		msg := MessageBlsSetup{MsgType: BlsSetupPhase}
+		msgBytes, _ := json.Marshal(msg)
+		n.P2PPubSub.Broadcast(msgBytes)
 	}
-	wg.Add(1)
+
+	logrus.Info("Start BLS setup done")
 	n.MembershipKey = n.BlsSetup(wg)
 
 	logrus.Info("BLS setup done")
-	wg.Done()
+	wg.Wait()
+	logrus.Info("start epoch done")
 	return nil
 }
 
 func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *big.Int) {
-	logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", e.Chainid.String())
-	currentTopic := common2.ToHex(e.Raw.TxHash)
-	logrus.Debugf("currentTopic %s", currentTopic)
-	if topic, err := n.P2PPubSub.JoinTopic(currentTopic); err != nil {
+	logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", srcChainId.String())
+	topicName := common2.ToHex(e.Raw.TxHash)
+	logrus.Debugf("currentTopic %s", topicName)
+	if topic, err := n.P2PPubSub.JoinTopic(topicName); err != nil {
 		logrus.WithFields(logrus.Fields{
-			field.CainId:              e.Chainid,
-			field.ConsensusRendezvous: currentTopic,
+			field.CainId:              srcChainId,
+			field.ConsensusRendezvous: topicName,
 		}).Error(fmt.Errorf("join topic error: %w", err))
 	} else {
 		defer func() {
-			if err := topic.Close(); err != nil {
+			if err := n.P2PPubSub.LeaveTopic(topicName); err != nil {
 				logrus.WithFields(logrus.Fields{
 					field.CainId:              e.Chainid,
-					field.ConsensusRendezvous: currentTopic,
+					field.ConsensusRendezvous: topicName,
 				}).Error(fmt.Errorf("close topic error: %w", err))
 			}
 			logrus.Tracef("chainId %s topic %s closed", e.Chainid.String(), topic.String())
 		}()
-		p2pSub, err := topic.Subscribe()
+		err := n.P2PPubSub.Subscribe(topicName)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				field.CainId:              e.Chainid,
-				field.ConsensusRendezvous: currentTopic,
-			}).Error(fmt.Errorf("subscribe error: %w", err))
+				field.ConsensusRendezvous: topicName,
+			}).Error(fmt.Errorf("subscribe to topic error: %w", err))
 			return
 		}
-		defer p2pSub.Cancel()
-		logrus.Println("p2pSub.Topic: ", p2pSub.Topic())
-		logrus.Println("sendTopic.ListPeers(): ", topic.ListPeers())
+		logrus.Infof("request chain[%s] subscribe to topic: %s", srcChainId.String(), topicName)
+		logrus.Infof("request chain[%s] topic peers: %v", srcChainId.String(), topic.ListPeers())
 
-		n.session, err = n.NewBLSNode(topic)
+		session, err := n.NewBLSNode(topic)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				field.CainId:              e.Chainid,
-				field.ConsensusRendezvous: currentTopic,
+				field.ConsensusRendezvous: topicName,
 			}).Error(fmt.Errorf("create bls node error: %w ", err))
 			return
 		}
 
-		if n.session != nil {
+		if session != nil {
 			wg := new(sync.WaitGroup)
 			wg.Add(1)
-			go n.StartProtocolByOracleRequest(e, wg)
+			go n.StartProtocolByOracleRequest(e, session, wg)
 			wg.Wait()
 		}
 	}

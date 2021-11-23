@@ -11,7 +11,7 @@ import (
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 )
 
-func NewHostFromKeyFile(ctx context.Context, keyFile string, port int, address string) (host2 host.Host, err error) {
+func NewHostFromKeyFile(ctx context.Context, keyFile string, port uint, address string) (host2 host.Host, err error) {
 	if address == "" {
 		address = "0.0.0.0"
 	}
@@ -31,12 +31,19 @@ func NewHostFromKeyFile(ctx context.Context, keyFile string, port int, address s
 
 func NewHost(ctx context.Context, prvKey crypto.PrivKey, multiAddr multiaddr.Multiaddr) (host2 host.Host, err error) {
 
-	return libp2p.New(
-		ctx,
+	// if psk, err := common.ToBytes32("EYWA Network"); err != nil {
+	//
+	// 	return nil, fmt.Errorf("can not create PSK on error; %w", err)
+	// } else {
+
+	return libp2p.New(ctx,
 		libp2p.ListenAddrs(multiAddr),
 		libp2p.Identity(prvKey),
+		// libp2p.PrivateNetwork(psk[:]),
 		// libp2p.Security(tls.ID, tls.New),
 		// libp2p.EnableNATService(),
 		// libp2p.ForceReachabilityPublic(),
 	)
+	// }
+
 }

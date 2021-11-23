@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"math/big"
 	"sync"
-	"time"
 )
 
 type ContractWatcher interface {
@@ -25,16 +25,18 @@ type ContractWatcher interface {
 
 type ClientWatcher interface {
 	Subscribe() error
-	Resubscribe()
+	Resubscribe() error
+	IsSubscribed() bool
 	Close()
 }
 
 func NewClientWatcher(ctx context.Context, client *client, contract ContractWatcher) *clientWatcher {
 	w := &clientWatcher{
-		client:   client,
-		cache:    NewLogCache(),
-		contract: contract,
-		mx:       new(sync.Mutex),
+		client:       client,
+		cache:        NewLogCache(),
+		contract:     contract,
+		subscribedMx: new(sync.Mutex),
+		mx:           new(sync.Mutex),
 	}
 
 	w.ctx, w.cancel = context.WithCancel(ctx)
@@ -42,13 +44,15 @@ func NewClientWatcher(ctx context.Context, client *client, contract ContractWatc
 }
 
 type clientWatcher struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	client   *client
-	cache    *LogCache
-	contract ContractWatcher
-	sub      event.Subscription
-	mx       *sync.Mutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	client       *client
+	cache        *LogCache
+	contract     ContractWatcher
+	sub          event.Subscription
+	subscribed   bool
+	subscribedMx *sync.Mutex
+	mx           *sync.Mutex
 }
 
 func (w *clientWatcher) unpackLog(out interface{}, log types.Log) error {
@@ -90,21 +94,40 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 							w.contract.OnEvent(eventPointer, w.client.chainId)
 						}()
 						select {
-
 						case err := <-sub.Err():
-
+							logrus.Infof("chain[%s] subscription error: %v", w.client.chainId.String(), err)
+							if err != nil {
+								logrus.Debugf("subscription error: %v", err)
+								w.setSubscribed(false)
+								w.client.SendResubscribeSignal()
+							}
+							// if err != nil {
+							// 	_, _ = w.client.getClient()
+							// }
 							return err
 						case <-quit:
 
 							return nil
+						default:
 						}
+					} else {
+						logrus.Debugf("skip already processed log: %s\n", log.TxHash.Hex())
 					}
 				case err := <-sub.Err():
-
+					logrus.Infof("chain[%s] subscription error: %v", w.client.chainId.String(), err)
+					if err != nil {
+						logrus.Debugf("subscription error: %v", err)
+						w.setSubscribed(false)
+						w.client.SendResubscribeSignal()
+					}
+					// if err != nil {
+					// 	_, _ = w.client.getClient()
+					// }
 					return err
 				case <-quit:
 
 					return nil
+				default:
 				}
 			}
 		}), nil
@@ -143,35 +166,62 @@ func (w *clientWatcher) watchLogs() (chan types.Log, event.Subscription, error) 
 	}
 }
 
+func (w *clientWatcher) IsSubscribed() bool {
+	w.subscribedMx.Lock()
+	defer w.subscribedMx.Unlock()
+	return w.subscribed
+}
+
+func (w *clientWatcher) setSubscribed(subscribed bool) {
+	w.subscribedMx.Lock()
+	defer w.subscribedMx.Unlock()
+	w.subscribed = subscribed
+
+}
+
 func (w *clientWatcher) Subscribe() error {
 	w.mx.Lock()
 	defer w.mx.Unlock()
 	var err error
 	if w.sub, err = w.watchEvents(); err != nil {
+		w.setSubscribed(false)
 		logrus.Warnf("subscribe error: %v", err)
-
 		return err
 	} else {
+		w.setSubscribed(true)
 		logrus.Infof("subscribed to %s", w.contract.Name())
-
 		return nil
 	}
 }
 
-func (w *clientWatcher) Resubscribe() {
+func (w *clientWatcher) Resubscribe() error {
 	w.mx.Lock()
 	defer w.mx.Unlock()
-	w.sub = event.Resubscribe(3*time.Second, func(ctx context.Context) (event.Subscription, error) {
-		if sub, err := w.watchEvents(); err != nil {
-			logrus.Warnf("resubscribe error: %v", err)
+	var err error
+	if w.sub, err = w.watchEvents(); err != nil {
+		w.setSubscribed(false)
+		err = fmt.Errorf("can not resubscribe to %s on chain %s on error: %v",
+			w.contract.Name(), w.client.chainId.String(), err)
+		logrus.Warn(err)
+		return err
+	} else {
+		w.setSubscribed(true)
+		logrus.Infof("resubscribed to %s on chain %s", w.contract.Name(), w.client.chainId.String())
+		return nil
+	}
 
-			return nil, err
-		} else {
-			logrus.Infof("resubscribed to %s", w.contract.Name())
-
-			return sub, err
-		}
-	})
+	// w.sub = event.Resubscribe(5*time.Second, func(ctx context.Context) (event.Subscription, error) {
+	// 	if sub, err := w.watchEvents(); err != nil {
+	// 		logrus.Warnf("can not resubscribe to %s on chain %s on error: %v",
+	// 			w.contract.Name(),w.client.chainId.String(), err)
+	//
+	// 		return nil, err
+	// 	} else {
+	// 		logrus.Infof("resubscribed to %s on chain %s", w.contract.Name(),w.client.chainId.String())
+	//
+	// 		return sub, err
+	// 	}
+	// })
 }
 
 func (w *clientWatcher) Close() {

@@ -30,14 +30,14 @@ func Popcount(z *big.Int) int {
 // verifyThresholdWitnesses verifies that it's really witnessed by majority of nodes by checking the signature and number of them
 func (node *Node) verifyThresholdWitnesses(msg MessageWithSig) (err error) {
 	if pop := Popcount(&msg.Mask); pop < node.ThresholdAck {
-		err = fmt.Errorf("Not enough sigantures: %d(%s) < %d", pop, msg.Mask.Text(16), node.ThresholdAck)
+		err = fmt.Errorf("not enough sigantures: %d(%s) < %d", pop, msg.Mask.Text(16), node.ThresholdAck)
 		return
 	}
 
 	// Verify message signature
 	body, _ := json.Marshal(msg.Body)
 	if !msg.Signature.VerifyMultisig(node.EpochPublicKey, msg.PublicKey, body, &msg.Mask) {
-		return fmt.Errorf("Threshold signature mismatch for '%s'", body)
+		return fmt.Errorf("threshold signature mismatch for '%s'", body)
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 	return
@@ -64,7 +64,7 @@ func (node *Node) AdvanceStep(step int) {
 
 	msg := MessageWithSig{
 		Header:  Header{node.Id, Announce},
-		Body:    Body{node.TimeStep, node.Comm.Topic().String()},
+		Body:    Body{node.TimeStep, node.Topic.String()},
 		History: make([]MessageWithSig, 0),
 	}
 
@@ -74,7 +74,7 @@ func (node *Node) AdvanceStep(step int) {
 	node.SigMask = bls.EmptyMultisigMask()
 
 	msgBytes := node.ConvertMsg.MessageToBytes(msg)
-	node.Comm.Broadcast(*msgBytes)
+	node.Comm.BroadcastTo(node.Topic, *msgBytes)
 }
 
 func (node *Node) DisconnectPubSub() {
@@ -92,14 +92,14 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 	stop := 1
 	for ctx.Err() == nil {
 		// For now we assume that the underlying receive function is blocking
-		rcvdMsg := node.Comm.Receive(ctx)
+		rcvdMsg := node.Comm.ReceiveFrom(node.Topic.String(), ctx)
 		if rcvdMsg == nil {
 			logrus.Warn("rcvdMsg:", rcvdMsg)
 			break
 		}
 
 		msg := node.ConvertMsg.BytesToModelMessage(*rcvdMsg)
-		if msg.BridgeEventHash == node.Comm.Topic().String() {
+		if msg.BridgeEventHash == node.Topic.String() {
 			msgChan <- rcvdMsg
 			wg.Add(1)
 			go func() {
@@ -129,7 +129,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 						msg.Step = nodeTimeStep
 						msg.History = node.History
 						msgBytes := node.ConvertMsg.MessageToBytes(*msg)
-						node.Comm.Broadcast(*msgBytes)
+						node.Comm.BroadcastTo(node.Topic, *msgBytes)
 
 					}
 					return
@@ -193,7 +193,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 						}
 
 						msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
-						node.Comm.Broadcast(*msgBytes)
+						node.Comm.BroadcastTo(node.Topic, *msgBytes)
 					}
 
 					mutex.Unlock()
@@ -222,7 +222,7 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 						Signature: signature,
 					}
 					msgBytes = node.ConvertMsg.MessageToBytes(outmsg)
-					node.Comm.Broadcast(*msgBytes)
+					node.Comm.BroadcastTo(node.Topic, *msgBytes)
 
 				case Commit:
 					mutex.Lock()
@@ -237,8 +237,8 @@ func (node *Node) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGro
 				}
 			}()
 		} else {
-			logrus.Warnf("NOT MY MESSAGE !!!!!!!!!!!!!!!!!!!  %s != %s", msg.BridgeEventHash, node.Comm.Topic().String())
-			//node.DisconnectPubSub()
+			logrus.Warnf("NOT MY MESSAGE !!!!!!!!!!!!!!!!!!!  %s != %s", msg.BridgeEventHash, node.Topic.String())
+			// node.DisconnectPubSub()
 			continue
 		}
 	}

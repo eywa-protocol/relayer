@@ -4,10 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -56,7 +53,7 @@ func InitNode(name, keysPath string) (err error) {
 	return
 }
 
-func RegisterNode(name, keysPath string) (err error) {
+func RegisterNode(name, keysPath string, listen string, port uint) (err error) {
 
 	signerKey, err := common2.LoadSecp256k1Key(keysPath, name)
 	if err != nil {
@@ -68,7 +65,7 @@ func RegisterNode(name, keysPath string) (err error) {
 
 	n, err, clientsClose := NewNodeWithClients(ctx, signerKey)
 	if err != nil {
-		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
+		logrus.Fatalf("init node with clients error: %v", err)
 	}
 	defer clientsClose()
 
@@ -77,7 +74,7 @@ func RegisterNode(name, keysPath string) (err error) {
 		return
 	}
 
-	n.Host, err = libp2p.NewHostFromKeyFile(context.Background(), keysPath+"/"+name+"-ecdsa.key", 0, "")
+	n.Host, err = libp2p.NewHostFromKeyFile(ctx, keysPath+"/"+name+"-ecdsa.key", port, listen)
 	if err != nil {
 		panic(err)
 	}
@@ -202,7 +199,7 @@ func RegisterNode(name, keysPath string) (err error) {
 	return nil
 }
 
-func RunNode(name, keysPath, rendezvous string) (err error) {
+func RunNode(name, keysPath, rendezvous string, listen string, port uint) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -225,24 +222,26 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 
 	keyFile := keysPath + "/" + name + "-ecdsa.key"
 
-	peerStringFromFile, err := ioutil.ReadFile(keysPath + "/" + name + "-peer.env")
-	if err != nil {
-		logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
-	}
-
-	words := strings.Split(string(peerStringFromFile), "/")
-
-	portFromFile, err := strconv.Atoi(words[4])
-	if err != nil {
-		logrus.Fatalf("Can't obtain port on error: %v", err)
-	}
-
-	ipFromFile := words[2]
-	logrus.Info("IP ADDRESS", ipFromFile)
-	n.Host, err = libp2p.NewHostFromKeyFile(n.Ctx, keyFile, portFromFile, ipFromFile)
+	// peerStringFromFile, err := ioutil.ReadFile(keysPath + "/" + name + "-peer.env")
+	// if err != nil {
+	// 	logrus.Fatalf("File %s reading error: %v", keysPath+"/"+name+"-peer.env", err)
+	// }
+	//
+	// words := strings.Split(string(peerStringFromFile), "/")
+	//
+	// portFromFile, err := strconv.Atoi(words[4])
+	// if err != nil {
+	// 	logrus.Fatalf("Can't obtain port on error: %v", err)
+	// }
+	//
+	// ipFromFile := words[2]
+	// logrus.Info("IP ADDRESS", ipFromFile)
+	n.Host, err = libp2p.NewHostFromKeyFile(n.Ctx, keyFile, port, listen)
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
+	_ = libp2p.WriteHostAddrToConfig(n.Host, keysPath+"/"+name+"-peer.env")
 
 	blsNodeId, err := n.getNodeBlsId()
 	if err != nil {
@@ -254,6 +253,9 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	wg := &sync.WaitGroup{}
+	n.DiscoverByRendezvous(wg, rendezvous)
 
 	if n.gsnClient, err = gsn.NewClient(n.Ctx, n.Host, n, config.Bridge.TickerInterval); err != nil {
 		logrus.Fatal(err)
@@ -270,19 +272,20 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 		logrus.Fatal(fmt.Errorf("failed to check node existent on error: %w", err))
 		return err
 	} else if res {
-		logrus.Infof("PORT %d", portFromFile)
+		logrus.Infof("PORT %d", port)
 
 		//
 		// ======== 4. AFTER CONNECTION TO BOOSTRAP NODE WE ARE DISCOVERING OTHER ========
 		//
 
-		n.P2PPubSub = n.InitializeCommonPubSub()
-		n.P2PPubSub.InitializePubSubWithTopic(n.Host, rendezvous)
+		if err = n.InitializeCommonPubSub(rendezvous); err != nil {
 
-		wg := &sync.WaitGroup{}
+			logrus.Error("can not initialize common pubsub on error %w", err)
+			return err
+		}
+		logrus.Infof("pubsub initialized with topic %s", n.P2PPubSub.MainTopic().String())
 
-		wg.Add(1)
-		go n.DiscoverByRendezvous(wg, rendezvous)
+		defer n.P2PPubSub.Disconnect()
 
 		n.PrivKey, err = n.KeysFromFilesByConfigName(name)
 		if err != nil {
@@ -297,13 +300,22 @@ func RunNode(name, keysPath, rendezvous string) (err error) {
 
 		// initialize watchers
 		for _, chain := range config.Bridge.Chains {
+			chainId := new(big.Int).SetUint64(chain.Id)
 			if watcher, err := eth.NewOracleRequestWatcher(chain.BridgeAddress, n.HandleOracleRequest); err != nil {
 				err = fmt.Errorf("chain [%d] init watcher error: %w", chain.Id, err)
 
 				return err
-			} else {
+			} else if client, err := n.clients.GetEthClient(chainId); err != nil {
 
-				n.clients.AddWatcher(new(big.Int).SetUint64(chain.Id), watcher)
+				return err
+			} else {
+				client.AddWatcher(watcher)
+				if netChainId, err := client.ChainID(ctx); err != nil {
+					logrus.Warn(fmt.Errorf("can not get netqork chain id [%s] on error: %w", chainId.String(), err))
+				} else if chainId.Cmp(netChainId) != 0 {
+					return fmt.Errorf("client id %s %w id %s",
+						chainId.String(), extChains.ErrClientIdMismatchToNetwork, netChainId.String())
+				}
 			}
 		}
 

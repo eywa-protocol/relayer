@@ -75,18 +75,19 @@ func (c *Client) WaitForDiscoveryGsn(timeout time.Duration) error {
 	var err error
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	stopTime := time.Now().Add(timeout)
+	startTime := time.Now()
+	stopTime := startTime.Add(timeout)
 	go func() {
 		defer wg.Done()
 		for {
 			if _, err = c.getGsnPeerId(); err == nil {
-
+				logrus.Infof("gsn discover time: %s", time.Since(startTime).String())
 				return
 			} else if time.Now().After(stopTime) {
 				err = errors.New("wait for discover gsn peer timed out")
 				return
 			} else {
-				time.Sleep(time.Second)
+				time.Sleep(10 * time.Millisecond)
 			}
 		}
 	}()

@@ -2,7 +2,6 @@ package base
 
 import (
 	"context"
-
 	"github.com/libp2p/go-libp2p-core/host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multiaddr"
@@ -18,7 +17,7 @@ type Node struct {
 
 func (n Node) InitDHT(bootstrapPeerAddrs []string) (dht *dht.IpfsDHT, err error) {
 
-	bootstrapPeers := make([]multiaddr.Multiaddr, 0, len(bootstrapPeerAddrs))
+	bootstrapAddrs := make([]multiaddr.Multiaddr, 0, len(bootstrapPeerAddrs))
 
 	for _, addr := range bootstrapPeerAddrs {
 		logrus.Infof("add bootstrap peer: %s", addr)
@@ -26,13 +25,14 @@ func (n Node) InitDHT(bootstrapPeerAddrs []string) (dht *dht.IpfsDHT, err error)
 		if err != nil {
 			return nil, err
 		}
-		bootstrapPeers = append(bootstrapPeers, nAddr)
+		bootstrapAddrs = append(bootstrapAddrs, nAddr)
 	}
-	logrus.Infof("bootstrap peers count: %d", len(bootstrapPeers))
-	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapPeers[:])
+	logrus.Infof("bootstrap peers count: %d", len(bootstrapAddrs))
+	dht, err = libp2p.NewDHT(n.Ctx, n.Host, bootstrapAddrs)
 	if err != nil {
 		return
 	}
+
 	return
 }
 

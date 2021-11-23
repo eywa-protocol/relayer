@@ -45,7 +45,7 @@ services:
       static-network:
         ipv4_address: 172.20.64.13
     ports:
-      - "172.20.64.11:4001:4001"
+      - "172.20.64.13:4001:4001"
 
   #gsn nodes
   gsn1:
@@ -73,6 +73,7 @@ services:
   # protocol nodes
   node1:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
+#    command: [ "./bridge", "-cnf", "bridge.yaml", "-profiling" ]
     image: p2p-bridge_img
     depends_on:
       - ganache_net1
@@ -91,7 +92,8 @@ services:
     networks:
       static-network:
         ipv4_address: 172.20.32.11
-
+#    ports:
+#      - "127.0.0.1:1234:1234"
   node2:
     command: [ "./bridge", "-cnf", "bridge.yaml" ]
     image: p2p-bridge_img

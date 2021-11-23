@@ -4,6 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/eywa-protocol/bls-crypto/bls"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	"math/big"
 	"sync"
 	"time"
@@ -297,7 +301,11 @@ func RunNode(name, keysPath, rendezvous string, listen string, port uint) (err e
 			logrus.Errorf("StartEpoch %v", err)
 			return err
 		}
-
+		n.Ledger, err = n.initLedger()
+		if err != nil {
+			logrus.Errorf("initLedger %v", err)
+			return err
+		}
 		// initialize watchers
 		for _, chain := range config.Bridge.Chains {
 			chainId := new(big.Int).SetUint64(chain.Id)
@@ -385,27 +393,24 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 	}
 }
 
-/*func (n *Node) initLedger() (*ledger.Ledger, error) {
-	// TODO init events here
-	// events.Init() //Init event hub
+func (n *Node) initLedger() (ldg *ledger.Ledger, err error) {
 
-	var err error
-	dbDir := utils.GetStoreDirPath("leveldb", _config.DefConfig.P2PNode.NetworkName)
-	ledger.DefLedger, err = ledger.NewLedger(dbDir)
+	dbDir := utils.GetStoreDirPath("leveldb", n.rendezvous)
+	ldg, err = ledger.NewLedger(dbDir)
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
 	bookKeepers := []bls.PublicKey{n.EpochPublicKey}
-	genesisBlock, err := _genesis.BuildGenesisBlock(bookKeepers)
+	genesisBlock, err := genesis.BuildGenesisBlock(bookKeepers)
 	if err != nil {
 		return nil, fmt.Errorf("genesisBlock error %s", err)
 	}
 	logrus.Infof("Current ChainId: %d", genesisBlock.Header.ChainID)
-	err = ledger.DefLedger.Init(bookKeepers, genesisBlock)
+	err = ldg.Init(genesisBlock)
 	if err != nil {
 		return nil, fmt.Errorf("Init ledger error:%s", err)
 	}
 
 	logrus.Infof("Ledger init success")
-	return ledger.DefLedger, nil
-}*/
+	return ldg, nil
+}

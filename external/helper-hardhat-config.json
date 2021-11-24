@@ -1,0 +1,435 @@
+{
+  "avalanchetestnet": {
+    "rpcUrl": "ws://185.132.176.254:13214/ext/bc/C/ws",
+    "rpcUrl2": "https://avalanche.testnet.eywa.fi",
+    "n": "AVALANCHETESTNET",
+    "netwiker": "AVCH",
+    "env_file": [
+      "networks_env/env_connect_to_avalanchetestnet.env",
+      "networks_env/env_test_for_avalanchetestnet.env"
+    ],
+    "chainId": 43113,
+    "relayHub": "0x0000000000000000000000000000000000000000",
+    "forwarder": "0x0000000000000000000000000000000000000000",
+    "amm_pool": "0xF9F4Fc354C027FEAC4698cC5514d2276795EE172",
+    "token": [
+      {
+        "address": "0xB0F79Fc1cdee2B03B8B4618AAAb4396e5c749684",
+        "name": "EYWA",
+        "symbol": "EYWA"
+      },
+      {
+        "address": "0xBb0F8F8fC4EeD9B649162bDCaaE3483737Ae68E3",
+        "name": "USDT",
+        "symbol": "USDT"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "rinkeby",
+      "bsctestnet",
+      "mumbai",
+      "hecotestnet"
+    ],
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nodeList": "0x7F05d33Ef6708cE3af579c8F3e07D4FF4b684c32",
+    "bridge": "0xCe993F345e6dD930dB0a1f562b77DC22088a545d",
+    "mockDexPool": "0x8563713944374744293E889b936164fe518d7Efc",
+    "portal": "0xEf7247db485F57Ab69A3c013a1F9a57C3a4b0B16",
+    "synthesis": "0xf714bebe92Ed529205DE6ec9743Dc593b9d50E56",
+    "curveProxy": ""
+  },
+  "hecotestnet": {
+    "rpcUrl": "ws://185.132.176.254:8577",
+    "rpcUrl2": "https://huobi.testnet.eywa.fi",
+    "n": "HECOTESTNET",
+    "netwiker": "HECO",
+    "env_file": [
+      "networks_env/env_connect_to_hecotestnet.env",
+      "networks_env/env_test_for_hecotestnet.env"
+    ],
+    "chainId": 256,
+    "relayHub": "0x0000000000000000000000000000000000000000",
+    "forwarder": "0x0000000000000000000000000000000000000000",
+    "amm_pool": "0x2bCeC25644e56422bEFd3feA5286344369396fF1",
+    "token": [
+      {
+        "address": "0x7475FfD4170f67aC64a688d813b9b402700667c2",
+        "name": "EYWA",
+        "symbol": "EYWA"
+      },
+      {
+        "address": "0xcdec93702Fba053877988443112Cb8F7F1BebA27",
+        "name": "USDT",
+        "symbol": "USDT"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "rinkeby",
+      "bsctestnet",
+      "mumbai",
+      "avalanchetestnet"
+    ],
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nodeList": "0xA762BC5dEAE4174252C751963548C26454Da2Ec2",
+    "bridge": "0x569E20430a4AE0FA23F3171c36B805a1A8942785",
+    "mockDexPool": "0xD9387b8eb9149C8437b88407f7e3a0324624B22a",
+    "portal": "0x8F0a42F7B46D55ca0749e8968994FbCeC9E7AeDA",
+    "synthesis": "0x514c0E83C86a491320497d7657aF9B5b2E264f6f",
+    "curveProxy": ""
+  },
+  "mumbai": {
+    "rpcUrl": "ws://185.132.176.254:8578",
+    "rpcUrl2": "https://mumbai.testnet.eywa.fi",
+    "n": "MUMBAI",
+    "netwiker": "MUMBAI",
+    "env_file": [
+      "networks_env/env_connect_to_mumbai.env",
+      "networks_env/env_test_for_mumbai.env"
+    ],
+    "chainId": 80001,
+    "relayHub": "0x6C28AfC105e65782D9Ea6F2cA68df84C9e7d750d",
+    "forwarder": "0xdA78a11FD57aF7be2eDD804840eA7f4c2A38801d",
+    "amm_pool": "0xe712D9eac03B3480D204602f5aE188B718FbbC2E",
+    "token": [
+      {
+        "address": "0xDA53403DF5ff2058feb9C6729FAfb3996b84545b",
+        "name": "EYWA",
+        "symbol": "EYWA"
+      },
+      {
+        "address": "0xe07D7B44D340216723eD5eA33c724908B817EE9D",
+        "name": "USDT",
+        "symbol": "USDT"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "rinkeby",
+      "bsctestnet",
+      "hecotestnet",
+      "avalanchetestnet"
+    ],
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nodeList": "0xeAa11BB61B8F82f81c8F30e8290074933fa8e0c9",
+    "bridge": "0x97825C17B301c0556f3c744F11C0046Cbe6ba20B",
+    "mockDexPool": "0xc2F08F58eBB5e0dBa87251B9D763bA2a8a5119A6",
+    "portal": "0x6228cF7FB0b258e153466336a0E643985734460d",
+    "synthesis": "0x3aCCb3fFa6A1008a59ddF8ac5C11BFd8d17E54a9",
+    "curveProxy": ""
+  },
+  "rinkeby": {
+    "rpcUrl": "wss://rinkeby.infura.io/ws/v3/ab95bf9f6dd743e6a8526579b76fe358",
+    "rpcUrl2": "https://rinkeby.infura.io/v3/ab95bf9f6dd743e6a8526579b76fe358",
+    "n": "RINKEBY",
+    "netwiker": "ETH",
+    "env_file": [
+      "networks_env/env_connect_to_rinkeby.env",
+      "networks_env/env_test_for_rinkeby.env"
+    ],
+    "chainId": 4,
+    "relayHub": "0x6650d69225CA31049DB7Bd210aE4671c0B1ca132",
+    "forwarder": "0x83A54884bE4657706785D7309cf46B58FE5f6e8a",
+    "amm_pool": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "token": [
+      {
+        "address": "0x08Ffcb0Ca216Bb3C12855910Ee4014191D81eeba",
+        "name": "EYWA",
+        "symbol": "EYWA"
+      },
+      {
+        "address": "0xa9E233E2c06fbAFf7d1D913060d5F4e159092414",
+        "name": "USDT",
+        "symbol": "USDT"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "bsctestnet",
+      "mumbai",
+      "hecotestnet",
+      "avalanchetestnet"
+    ],
+    "paymaster": "0xeFAC0dE7B0588335010B69abb24eB01309265EA2",
+    "nodeList": "0xcE20fC5689Cd9ba4078Fa7c1cb1BCB2D90eA02a3",
+    "bridge": "0x07CB29b6461bb2CadabA2930587017206edeb2bD",
+    "mockDexPool": "0x96E692445277838684EAF662435eee4b6Db9b6aE",
+    "portal": "0x0C9d712B4b7a38e73f7713802e284af3f65a4591",
+    "synthesis": "0xD56aB64178848a966d63eabC7f45C56BaA30FF86",
+    "curveProxy": ""
+  },
+  "bsctestnet": {
+    "rpcUrl": "ws://185.132.176.254:8576",
+    "rpcUrl2": "https://bsc.testnet.eywa.fi",
+    "n": "BSCTESTNET",
+    "netwiker": "BSC",
+    "env_file": [
+      "networks_env/env_connect_to_bsctestnet.env",
+      "networks_env/env_test_for_bsctestnet.env"
+    ],
+    "chainId": 97,
+    "relayHub": "0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA",
+    "forwarder": "0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB",
+    "amm_pool": "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3",
+    "token": [
+      {
+        "address": "0xc0924cC9113588c93b6990D15723d0C80acf0dA6",
+        "name": "EYWA",
+        "symbol": "EYWA"
+      },
+      {
+        "address": "0x98e8927207C6C221A5eb4a3575925717Fa6303a8",
+        "name": "USDT",
+        "symbol": "USDT"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "rinkeby",
+      "mumbai",
+      "hecotestnet",
+      "avalanchetestnet"
+    ],
+    "paymaster": "0xF6A74A437F0633991c007A59508287a426e5c455",
+    "nodeList": "0x1Bf2845E05Fb7CfA46f76d661C0B1b89fcee3BA0",
+    "bridge": "0xb6eB27120e75B6C49305E8f3e2e8F91c6701466A",
+    "mockDexPool": "0x7D1Cc21ef24f03A8265D5ca2647AF5B9B24C8CE6",
+    "portal": "0xBC60FfC09DaA8FBfE88d2e7F802595a56A742102",
+    "synthesis": "0xE2c8ADc930A21F8e48173dc6776fcb2B09C4A3b6",
+    "curveProxy": ""
+  },
+  "ganache": {
+    "rpcUrl": "http://127.0.0.1:9999",
+    "rpcUrl2": "http://127.0.0.1:9999",
+    "n": "GANACHE",
+    "netwiker": "GACHE",
+    "env_file": [
+      "networks_env/env_connect_to_ganache.env",
+      "networks_env/env_test_for_ganache.env"
+    ],
+    "chainId": 0,
+    "relayHub": "0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA",
+    "forwarder": "0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB",
+    "amm_pool": "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3",
+    "token": [
+      {
+        "address": "0x1bBB6FC8e87A3622Fbd5300f13bf21A3e66cdB7d",
+        "name": "Pandora",
+        "symbol": "PAR"
+      },
+      {
+        "address": "0x74142B3bE036AF872deF48A00482c5BeC90386bF",
+        "name": "Tsakheila",
+        "symbol": "TSL"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "rinkeby"
+    ],
+    "paymaster": "0xF6A74A437F0633991c007A59508287a426e5c455",
+    "nodeRegistry": "0x4c5c441Ea5d34c186C18ff70BF6e06f083BECb55",
+    "eywa": "0x4dc43f45DC8BF89185145A9eA7505751799412ee",
+    "bridge": "0x205C740e8572ffb364EcE8a9D0CC01bcA27cdD0C",
+    "mockDexPool": "0xF8A748b4B8430FD76E7f9ED8A5f9a5cf400Df7fc",
+    "portal": "0x6FeACfFF44afAfA65ce2395E8E8612Eb9c7b73E1",
+    "synthesis": "0x33C6B21459070B242EC918238CC29c98AC09a031",
+    "curveProxy": ""
+  },
+  "network1": {
+    "rpcUrl": "ws://172.20.128.11:7545",
+    "rpcUrl2": "http://172.20.128.11:7545",
+    "n": "NETWORK1",
+    "netwiker": "NET1",
+    "env_file": [
+      "networks_env/env_connect_to_network1.env",
+      "networks_env/env_test_for_network1.env"
+    ],
+    "chainId": 1111,
+    "relayHub": "0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA",
+    "forwarder": "0x4bb819FA7AfC1b3F65fc47198bF3e9A4c959CbEc",
+    "amm_pool": "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3",
+    "token": [
+      {
+        "address": "0x1bBB6FC8e87A3622Fbd5300f13bf21A3e66cdB7d",
+        "name": "Pandora",
+        "symbol": "PAR"
+      },
+      {
+        "address": "0x74142B3bE036AF872deF48A00482c5BeC90386bF",
+        "name": "Tsakheila",
+        "symbol": "TSL"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "network2",
+      "network3"
+    ],
+    "paymaster": "0xF6A74A437F0633991c007A59508287a426e5c455",
+    "nodeRegistry": "0xDDF1108f02C97B6594455e556aE0174381C217Bc",
+    "eywa": "0x48a031c6ad7F74923Dd4450d4b70d9D21c52215b",
+    "bridge": "0x53C0A09e4954dD2D0edc6bF44F2C53B9c1fED667",
+    "mockDexPool": "0xD846DE1386bac441fdA49D05563bFD874F52CAb4",
+    "portal": "0x204F815995eb66B8a13b2308d56CB98d7566F48a",
+    "synthesis": "0xD110733A983A255C692c9547c66266EDE8EAb9d3",
+    "curveProxy": ""
+  },
+  "network2": {
+    "rpcUrl": "ws://172.20.128.12:8545",
+    "rpcUrl2": "http://172.20.128.12:8545",
+    "n": "NETWORK2",
+    "netwiker": "NET2",
+    "env_file": [
+      "networks_env/env_connect_to_network2.env",
+      "networks_env/env_test_for_network2.env"
+    ],
+    "chainId": 1112,
+    "relayHub": "0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA",
+    "forwarder": "0x756b147e4Fac1E185B07bFdBb95c42eF5eCEAa4c",
+    "amm_pool": "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3",
+    "token": [
+      {
+        "address": "0x1bBB6FC8e87A3622Fbd5300f13bf21A3e66cdB7d",
+        "name": "Pandora",
+        "symbol": "PAR"
+      },
+      {
+        "address": "0x74142B3bE036AF872deF48A00482c5BeC90386bF",
+        "name": "Tsakheila",
+        "symbol": "TSL"
+      }
+    ],
+    "localToken": [],
+    "localPool": "",
+    "localPoolLp": "",
+    "localPoolCoins": [],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "network1",
+      "network3"
+    ],
+    "paymaster": "0xF6A74A437F0633991c007A59508287a426e5c455",
+    "nodeRegistry": "0x59da540FeACf4DAa3c9D00DEd796EBb53Fd5342e",
+    "eywa": "0x4Bf79f2cb58F2003615E4fD62101199EAC73DA3E",
+    "bridge": "0x0c760E9A85d2E957Dd1E189516b6658CfEcD3985",
+    "mockDexPool": "0x329DCb6edc4D6b9110d366BCc4f52624F619176A",
+    "portal": "0xBE8a929Ac944333f054D2936ba7CdcD9A457323f",
+    "synthesis": "0xdd85dDc3A272000d9d0942eD6e44A2c8c487858e",
+    "curveProxy": ""
+  },
+  "network3": {
+    "rpcUrl": "ws://172.20.128.13:9545",
+    "rpcUrl2": "http://172.20.128.13:9545",
+    "n": "NETWORK3",
+    "netwiker": "NET3",
+    "env_file": [
+      "networks_env/env_connect_to_network3.env",
+      "networks_env/env_test_for_network3.env"
+    ],
+    "chainId": 1113,
+    "relayHub": "0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA",
+    "forwarder": "0xE9F2CA40d4be0B21c7E5C970805f194BAfAA7C27",
+    "amm_pool": "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3",
+    "token": [
+      {
+        "address": "0x1bBB6FC8e87A3622Fbd5300f13bf21A3e66cdB7d",
+        "name": "Pandora",
+        "symbol": "PAR"
+      },
+      {
+        "address": "0x74142B3bE036AF872deF48A00482c5BeC90386bF",
+        "name": "Tsakheila",
+        "symbol": "TSL"
+      }
+    ],
+    "localToken": [
+      {
+        "address": "0x1B40342a9e103Be4620EDA320a6bC6b9Ac077f18",
+        "name": "network3Token0",
+        "symbol": "TK0"
+      },
+      {
+        "address": "0x69F65eD97A16020a247fdd48E467fCaB851cFa8e",
+        "name": "network3Token1",
+        "symbol": "TK1"
+      },
+      {
+        "address": "0x24681A64AA93d0aFEa81bd541A7843BE72d5f34c",
+        "name": "network3Token2",
+        "symbol": "TK2"
+      }
+    ],
+    "localPool": "0x7cD9D9A9Eb4c83f73F7462B031d615cCb6A06E14",
+    "localPoolLp": {
+      "address": "0x883678869DA7f1f9aE56D44994644f3EB503566B",
+      "name": "network3LpLocal",
+      "symbol": "LP"
+    },
+    "localPoolCoins": [
+      "0x1B40342a9e103Be4620EDA320a6bC6b9Ac077f18",
+      "0x69F65eD97A16020a247fdd48E467fCaB851cFa8e",
+      "0x24681A64AA93d0aFEa81bd541A7843BE72d5f34c"
+    ],
+    "crosschainPool": "",
+    "crosschainPoolLp": "",
+    "crosschainPoolCoins": [],
+    "sourceForRepresentation": [
+      "network1",
+      "network2"
+    ],
+    "paymaster": "0xF6A74A437F0633991c007A59508287a426e5c455",
+    "nodeRegistry": "0x4b43BAb7694d2d3c5c355A6568244101724639c3",
+    "eywa": "0x1AA57a168eBa12F6D270c80F9B8cEcEeFAE41d0f",
+    "bridge": "0x99A0cc91fb7fbD7b5514D68E9280AFd72576A267",
+    "mockDexPool": "0x222D25c3D561FE8DaDeF22Ba9010C4454FA6e02B",
+    "portal": "0xF5d39537E69D48bfB63A9ecB3fb9D2Ce833cE305",
+    "synthesis": "0x30c487604FD3c7e8c102EF92EDD3053e24f999E1",
+    "curveProxy": "0xB61ecE822aE132F4a3F8b4eD464acAe1f4202847"
+  }
+}

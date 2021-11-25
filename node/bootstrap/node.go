@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"io/ioutil"
 	"math/rand"
+	"runtime"
 	"sync"
 	"time"
 
@@ -115,6 +116,7 @@ func NewNode(keysPath, name, listen string, port uint) (err error) {
 	dhtOpts := []dht.Option{
 		dht.Mode(dht.ModeServer),
 		dht.Datastore(ds),
+		dht.Concurrency(runtime.NumCPU() * 2),
 		dht.BootstrapPeers(bootstrapPeers...),
 	}
 	dhtDisc, err := dht.New(ctx, h, dhtOpts...)

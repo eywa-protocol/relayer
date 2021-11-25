@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"sync"
 	"time"
 
@@ -33,8 +34,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapAddrs []multiaddr.Mult
 	}
 
 	options := []dht.Option{
-		dht.Mode(dht.ModeClient),
-		dht.Mode(dht.ModeClient),
+		dht.Concurrency(runtime.NumCPU() * 2),
 		dht.BootstrapPeers(bootstrapPeers...),
 	}
 
@@ -120,11 +120,11 @@ func WriteHostAddrToConfig(host2 host.Host, filename string) (nodeURL string) {
 	return
 }
 
-func GetAddrsFromHost(host2 host.Host) (nodeAddrs []string) {
-	for _, addr := range host2.Addrs() {
-		nodeURL := fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
-		logrus.Tracef("Node Address: %s\n", nodeURL)
-		nodeAddrs = append(nodeAddrs, nodeURL)
-	}
-	return
-}
+// func GetAddrsFromHost(host2 host.Host) (nodeAddrs []string) {
+// 	for _, addr := range host2.Addrs() {
+// 		nodeURL := fmt.Sprintf("%s/p2p/%s", addr, host2.ID().Pretty())
+// 		logrus.Tracef("Node Address: %s\n", nodeURL)
+// 		nodeAddrs = append(nodeAddrs, nodeURL)
+// 	}
+// 	return
+// }

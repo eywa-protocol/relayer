@@ -7,9 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/libp2p/go-libp2p"
-	discCore "github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/host"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/sirupsen/logrus"
 	mrand "math/rand"
@@ -191,7 +188,7 @@ func (c *Protocol) Subscribe(topicName string) error {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 	if topic, ok := c.topics[topicName]; ok {
-		if _, subscribed := c.subscriptions[topicName]; subscribed {
+		if sub, subscribed := c.subscriptions[topicName]; subscribed && sub != nil {
 
 			return nil
 		} else if subscription, err := topic.Subscribe(); err != nil {
@@ -237,23 +234,11 @@ func (c *Protocol) CreatePeerWithIp(nodeId int, ip string, port int) *core.Host 
 // NewPubSubWithTopic creates a PubSub for the peer and also subscribes to a main topic
 func NewPubSubWithTopic(h core.Host, dht *dht.IpfsDHT, mainTopicName string) (*Protocol, error) {
 
-	// Creating pubsub
-	// every peer has its own PubSub
-	disc := discovery.NewRoutingDiscovery(dht)
-
-	rngSrc := mrand.NewSource(mrand.Int63())
-
 	optsPS := []pubsub.Option{
-		// pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
+		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign | 1),
 		pubsub.WithPeerOutboundQueueSize(512),
 		pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
-
-		pubsub.WithDiscovery(disc,
-			pubsub.WithDiscoveryOpts(discCore.TTL(2*time.Minute)),
-			pubsub.WithDiscoverConnector(func(h host.Host) (*discovery.BackoffConnector, error) {
-				backoff := discovery.NewExponentialBackoff(5*time.Second, 30*time.Second, discovery.FullJitter, time.Second, 5.0, 0, mrand.New(rngSrc))
-				return discovery.NewBackoffConnector(h, 1024, 10*time.Second, backoff)
-			})),
+		// pubsub.WithEventTracer(NewTracer()),
 	}
 
 	if pubSub, err := pubsub.NewGossipSub(context.Background(), h, optsPS...); err != nil {
@@ -261,13 +246,15 @@ func NewPubSubWithTopic(h core.Host, dht *dht.IpfsDHT, mainTopicName string) (*P
 
 		return nil, err
 	} else if topic, err := pubSub.Join(mainTopicName); err != nil {
-		logrus.Error(fmt.Errorf("init gosip error: %w", err))
+		logrus.Error(fmt.Errorf("join main topic %s error: %w", mainTopicName, err))
 
 		return nil, err
 	} else if subscription, err := topic.Subscribe(); err != nil {
+		logrus.Error(fmt.Errorf("subscribe to main topic: %s error: %w", mainTopicName, err))
 
 		return nil, err
 	} else {
+
 		c := &Protocol{
 			pubsub:        pubSub,
 			mainTopic:     mainTopicName,
@@ -276,8 +263,19 @@ func NewPubSubWithTopic(h core.Host, dht *dht.IpfsDHT, mainTopicName string) (*P
 			mx:            new(sync.Mutex),
 		}
 
+		// if topic, err := pubSub.Join(mainTopicName); err != nil {
+		//     logrus.Error(fmt.Errorf("join main topic %s error: %w", mainTopicName, err))
+		//
+		//     return nil, err
+		// } else if subscription, err := pubSub.Subscribe(mainTopicName); err != nil {
+		//     logrus.Error(fmt.Errorf("subscribe to main topic: %s error: %w", mainTopicName, err))
+		//
+		//     return nil, err
+		// } else {
 		c.subscriptions[mainTopicName] = subscription
 		c.topics[mainTopicName] = topic
+		// }
+		// time.Sleep(10 * time.Second)
 
 		return c, nil
 	}

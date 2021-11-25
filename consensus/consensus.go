@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/libp2p/go-libp2p"
+	discCore "github.com/libp2p/go-libp2p-core/discovery"
+	"github.com/libp2p/go-libp2p-core/host"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/sirupsen/logrus"
@@ -22,8 +24,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	quic "github.com/libp2p/go-libp2p-quic-transport"
-	ws "github.com/libp2p/go-ws-transport"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -240,11 +240,20 @@ func NewPubSubWithTopic(h core.Host, dht *dht.IpfsDHT, mainTopicName string) (*P
 	// Creating pubsub
 	// every peer has its own PubSub
 	disc := discovery.NewRoutingDiscovery(dht)
+
+	rngSrc := mrand.NewSource(mrand.Int63())
+
 	optsPS := []pubsub.Option{
 		// pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
 		pubsub.WithPeerOutboundQueueSize(512),
 		pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
-		pubsub.WithDiscovery(disc),
+
+		pubsub.WithDiscovery(disc,
+			pubsub.WithDiscoveryOpts(discCore.TTL(2*time.Minute)),
+			pubsub.WithDiscoverConnector(func(h host.Host) (*discovery.BackoffConnector, error) {
+				backoff := discovery.NewExponentialBackoff(5*time.Second, 30*time.Second, discovery.FullJitter, time.Second, 5.0, 0, mrand.New(rngSrc))
+				return discovery.NewBackoffConnector(h, 1024, 10*time.Second, backoff)
+			})),
 	}
 
 	if pubSub, err := pubsub.NewGossipSub(context.Background(), h, optsPS...); err != nil {
@@ -349,51 +358,51 @@ func createHostWithIp(nodeId int, ip string, port int) (core.Host, error) {
 }
 
 // createHostQUIC creates a host with QUIC as transport layer implementation
-func createHostQUIC(port int) (core.Host, error) {
-	// Producing private key
-	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
-
-	quicTransport, err := quic.NewTransport(priv, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Starting a peer with QUIC transport
-	opts := []libp2p.Option{
-		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)),
-		libp2p.Transport(quicTransport),
-		libp2p.Identity(priv),
-		libp2p.DefaultMuxers,
-		libp2p.DefaultSecurity,
-	}
-
-	h, err := libp2p.New(context.Background(), opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return h, nil
-}
+// func createHostQUIC(port int) (core.Host, error) {
+// 	// Producing private key
+// 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
+//
+// 	quicTransport, err := quic.NewTransport(priv, nil, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	// Starting a peer with QUIC transport
+// 	opts := []libp2p.Option{
+// 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)),
+// 		libp2p.Transport(quicTransport),
+// 		libp2p.Identity(priv),
+// 		libp2p.DefaultMuxers,
+// 		libp2p.DefaultSecurity,
+// 	}
+//
+// 	h, err := libp2p.New(context.Background(), opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	return h, nil
+// }
 
 // createHostWebSocket creates a host with WebSocket as transport layer implementation
-func createHostWebSocket(port int) (core.Host, error) {
-
-	// Starting a peer with QUIC transport
-	opts := []libp2p.Option{
-		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)),
-		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/ws", port)),
-		libp2p.Transport(ws.New),
-		libp2p.DefaultMuxers,
-		libp2p.DefaultSecurity,
-	}
-
-	h, err := libp2p.New(context.Background(), opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return h, nil
-}
+// func createHostWebSocket(port int) (core.Host, error) {
+//
+// 	// Starting a peer with QUIC transport
+// 	opts := []libp2p.Option{
+// 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)),
+// 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/ws", port)),
+// 		libp2p.Transport(ws.New),
+// 		libp2p.DefaultMuxers,
+// 		libp2p.DefaultSecurity,
+// 	}
+//
+// 	h, err := libp2p.New(context.Background(), opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	return h, nil
+// }
 
 // GetLocalhostAddress is used for getting address of hosts
 func GetLocalhostAddress(h core.Host) string {
@@ -407,51 +416,51 @@ func GetLocalhostAddress(h core.Host) string {
 }
 
 // applyPubSub creates a new GossipSub with message signing
-func applyPubSub(h core.Host) (*pubsub.PubSub, error) {
-	optsPS := []pubsub.Option{
-		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
-	}
-
-	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
-}
+// func applyPubSub(h core.Host) (*pubsub.PubSub, error) {
+// 	optsPS := []pubsub.Option{
+// 		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
+// 	}
+//
+// 	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
+// }
 
 // applyPubSubDetailed creates a new GossipSub with message signing
-func applyPubSubDeatiled(h core.Host, addrInfos []peer.AddrInfo) (*pubsub.PubSub, error) {
-	optsPS := []pubsub.Option{
-		// pubsub.WithMessageSigning(true),
-		pubsub.WithPeerExchange(true),
-		// pubsub.WithMessageIdFn(func(pmsg *pubsubpb.Message) string {
-		//	hash := blake2b.Sum256(pmsg.Data)
-		//	return string(hash[:])
-		// }),
-		pubsub.WithDirectPeers(addrInfos),
-		pubsub.WithFloodPublish(true),
-		pubsub.WithDirectConnectTicks(7),
-	}
-	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
-}
+// func applyPubSubDeatiled(h core.Host, addrInfos []peer.AddrInfo) (*pubsub.PubSub, error) {
+// 	optsPS := []pubsub.Option{
+// 		// pubsub.WithMessageSigning(true),
+// 		pubsub.WithPeerExchange(true),
+// 		// pubsub.WithMessageIdFn(func(pmsg *pubsubpb.Message) string {
+// 		//	hash := blake2b.Sum256(pmsg.Data)
+// 		//	return string(hash[:])
+// 		// }),
+// 		pubsub.WithDirectPeers(addrInfos),
+// 		pubsub.WithFloodPublish(true),
+// 		pubsub.WithDirectConnectTicks(7),
+// 	}
+// 	return pubsub.NewGossipSub(context.Background(), h, optsPS...)
+// }
 
 // connectHostToPeer is used for connecting a host to another peer
-func connectHostToPeer(h core.Host, connectToAddress string) {
-	// Creating multi address
-	multiAddr, err := multiaddr.NewMultiaddr(connectToAddress)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-	pInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-
-	err = h.Connect(context.Background(), *pInfo)
-	if err != nil {
-		fmt.Printf("Error : %v\n", err)
-		return
-	}
-}
+// func connectHostToPeer(h core.Host, connectToAddress string) {
+// 	// Creating multi address
+// 	multiAddr, err := multiaddr.NewMultiaddr(connectToAddress)
+// 	if err != nil {
+// 		fmt.Printf("Error : %v\n", err)
+// 		return
+// 	}
+//
+// 	pInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
+// 	if err != nil {
+// 		fmt.Printf("Error : %v\n", err)
+// 		return
+// 	}
+//
+// 	err = h.Connect(context.Background(), *pInfo)
+// 	if err != nil {
+// 		fmt.Printf("Error : %v\n", err)
+// 		return
+// 	}
+// }
 
 func ConnectHostToPeerWithError(h core.Host, connectToAddress string) (err error) {
 	// Creating multi address

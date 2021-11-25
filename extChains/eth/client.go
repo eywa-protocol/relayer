@@ -129,6 +129,7 @@ func (c *client) subLoop() {
 		defer t.Stop()
 		var reconnectOnTimer bool
 		rMx := new(sync.Mutex)
+	subLoop:
 		for {
 			select {
 			case <-c.reSubWatchers:
@@ -171,7 +172,7 @@ func (c *client) subLoop() {
 				}
 			case <-c.ctx.Done():
 				logrus.Infof("stop subLoop on context canceled %s", c.chainId.String())
-				break
+				break subLoop
 			case <-t.C:
 				rMx.Lock()
 				if reconnectOnTimer {
@@ -185,7 +186,6 @@ func (c *client) subLoop() {
 				} else {
 					rMx.Unlock()
 				}
-			default:
 			}
 		}
 	}()

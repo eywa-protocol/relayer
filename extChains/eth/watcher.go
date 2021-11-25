@@ -108,7 +108,6 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 						case <-quit:
 
 							return nil
-						default:
 						}
 					} else {
 						logrus.Debugf("skip already processed log: %s\n", log.TxHash.Hex())
@@ -127,7 +126,6 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 				case <-quit:
 
 					return nil
-				default:
 				}
 			}
 		}), nil

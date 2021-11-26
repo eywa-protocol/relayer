@@ -668,6 +668,10 @@ func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey
 	}
 }
 
+func (n *Node) HandleNewEpoch(e *wrappers.BridgeNewEpoch, srcChainId *big.Int) {
+	logrus.Infof("New epoch event %v -> %v", e.OldEpochKey, e.NewEpochKey)
+}
+
 func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *big.Int) {
 	logrus.Infof("going to InitializePubSubWithTopicAndPeers on chainId: %s", srcChainId.String())
 	topicName := common2.ToHex(e.Raw.TxHash)

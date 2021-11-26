@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/cmd/utils"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/genesis"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
-	"math/big"
-	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
@@ -294,6 +295,23 @@ func RunNode(name, keysPath, rendezvous string, listen string, port uint) (err e
 		n.PrivKey, err = n.KeysFromFilesByConfigName(name)
 		if err != nil {
 			return err
+		}
+
+		// initialize NewEpoch event watcher
+		regChainId := big.NewInt(int64(config.Bridge.RegChainId))
+		if regBridge, err := n.Bridge.GetBridgeAddress(regChainId); err != nil {
+			logrus.Errorf("StartEpoch %v", err)
+			return err
+		} else if watcher, err := eth.NewEpochWatcher(regBridge, n.HandleNewEpoch); err != nil {
+			err = fmt.Errorf("chain [%d] init epoch watcher error: %w", regChainId, err)
+
+			return err
+		} else if client, err := n.clients.GetEthClient(regChainId); err != nil {
+
+			return err
+		} else {
+			logrus.Info("Adding NewEpoch event watcher for ", regBridge)
+			client.AddWatcher(watcher)
 		}
 
 		err := n.StartEpoch()

@@ -3,12 +3,13 @@ package contracts
 import (
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/sirupsen/logrus"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
-	"math/big"
 )
 
 var (
@@ -41,7 +42,7 @@ func NewBridge(clients *extChains.Clients) (Bridge, error) {
 			return nil, err
 		} else {
 
-			b.addressMap[chain.Id] = chain.ForwarderAddress
+			b.addressMap[chain.Id] = chain.BridgeAddress
 			b.bridgeMap[chain.Id] = chainBridge
 		}
 

@@ -526,16 +526,15 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	membershipKey := bls.ZeroSignature()
 
 	for {
-		rcvdMsg := n.P2PPubSub.Receive(ctx)
-		if rcvdMsg == nil {
-			logrus.Info("receive return nil")
-			break
-		}
-
 		select {
 		case <-ctx.Done():
 			break
 		default:
+			rcvdMsg := n.P2PPubSub.Receive(ctx)
+			if rcvdMsg == nil {
+				logrus.Info("receive return nil")
+				break
+			}
 			wg.Add(1)
 			go func(msgBytes *[]byte) {
 				defer wg.Done()

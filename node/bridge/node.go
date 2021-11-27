@@ -521,7 +521,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest, sourceTx st
 	if err != nil {
 		logrus.WithFields(
 			field.ListFromBridgeOracleRequest(event),
-		).Error(fmt.Errorf("ReceiveRequestV2 error:%w", err))
+		).Error(fmt.Errorf("ReceiveRequestV2 error:%w from SourceTopic tx %v, event.Chainid: %v, event.Selector: %v", err, sourceTx, event.Chainid, event.Selector))
 	}
 	n.nonceMx.Unlock()
 	if tx != nil {

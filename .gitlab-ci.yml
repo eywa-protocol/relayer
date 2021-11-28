@@ -8,9 +8,6 @@ stages:
 
 build:app:
   stage: build:app
-  before_script:
-    - curl --output wrappers.zip --header "${JOB_TOKEN}" "https://gitlab.digiu.ai/api/v4/projects/${PROJECT_ID}/jobs/artifacts/${TAG}/download?job=${JOB_NAME}"
-    - unzip wrappers.zip
   script:
     - docker build -f .ci/Dockerfile -t "registry.digiu.ai/${CI_PROJECT_NAME}/bridge:${CI_COMMIT_SHORT_SHA}" .
   after_script:

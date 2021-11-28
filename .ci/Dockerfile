@@ -1,3 +1,5 @@
+FROM registry.digiu.ai/eywa-contracts/wrappers:latest as wrappers
+
 FROM golang:alpine as build
 
 RUN apk add --no-cache git gcc musl-dev linux-headers build-base
@@ -5,7 +7,7 @@ RUN apk add --no-cache git gcc musl-dev linux-headers build-base
 WORKDIR /p2p-bridge-b
 COPY    ./go.mod .
 COPY    ./go.sum .
-ADD     ./wrappers ./external/eth-contracts/wrappers
+COPY --from=wrappers /wrappers ./external/eth-contracts/wrappers
 
 RUN go mod download
 

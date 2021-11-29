@@ -93,22 +93,6 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 							defer w.client.wg.Done()
 							w.contract.OnEvent(eventPointer, w.client.chainId)
 						}()
-						select {
-						case err := <-sub.Err():
-							logrus.Infof("chain[%s] subscription error: %v", w.client.chainId.String(), err)
-							if err != nil {
-								logrus.Debugf("subscription error: %v", err)
-								w.setSubscribed(false)
-								w.client.SendResubscribeSignal()
-							}
-							// if err != nil {
-							// 	_, _ = w.client.getClient()
-							// }
-							return err
-						case <-quit:
-
-							return nil
-						}
 					} else {
 						logrus.Debugf("skip already processed log: %s\n", log.TxHash.Hex())
 					}
@@ -119,9 +103,6 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 						w.setSubscribed(false)
 						w.client.SendResubscribeSignal()
 					}
-					// if err != nil {
-					// 	_, _ = w.client.getClient()
-					// }
 					return err
 				case <-quit:
 

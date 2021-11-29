@@ -306,6 +306,7 @@ func RunNode(name, keysPath, rendezvous string, listen string, port uint) (err e
 			logrus.Errorf("initLedger %v", err)
 			return err
 		}
+		defer n.Ledger.Close()
 		// initialize watchers
 		for _, chain := range config.Bridge.Chains {
 			chainId := new(big.Int).SetUint64(chain.Id)
@@ -400,6 +401,7 @@ func (n *Node) initLedger() (ldg *ledger.Ledger, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
+	logrus.Infof("EPOCH KEY %v", common.BytesToAddress(n.EpochPublicKey.Marshal()))
 	bookKeepers := []bls.PublicKey{n.EpochPublicKey}
 	genesisBlock, err := genesis.BuildGenesisBlock(bookKeepers)
 	if err != nil {

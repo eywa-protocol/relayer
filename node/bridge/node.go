@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
+	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
 	"math/big"
 	"sync"
 	"time"
@@ -76,28 +77,40 @@ func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, 
 	defer cancel()
 	wg.Add(1)
 	go session.WaitForProtocolMsg(consensusChannel, wg)
+	var block *types2.Block
+	var err error
 	select {
 	case <-consensusChannel:
-		err := n.Ledger.CreateBlockFromEvent(*event)
-		if err != nil {
-			logrus.Error(fmt.Errorf("CreateBlockFromEvent ERROR: %w", err))
-		}
-		blockHash := n.Ledger.GetCurrentBlockHash()
-		hash := blockHash.ToHexString()
-		logrus.Printf("BLOCK HASH: %v Currentheight: %d", hash, n.Ledger.GetCurrentBlockHeight())
-		logrus.Infof("LEADER:%s == MYMNODE:%s", session.Leader.Pretty(), n.Host.ID().Pretty())
+
 		if session.Leader.Pretty() == n.Host.ID().Pretty() {
-			logrus.Info("LEADER going to Call external chain contract method")
-			_, err := n.ReceiveRequestV2(event)
+			block, err = n.Ledger.CreateBlockFromEvent(*event)
 			if err != nil {
-				logrus.Error(fmt.Errorf("%w", err))
+				logrus.Error(fmt.Errorf("CreateBlockFromEvent ERROR: %w", err))
 			}
+			blockHash := n.Ledger.GetCurrentBlockHash()
+			hash := blockHash.ToHexString()
+			logrus.Printf("BLOCK HASH: %v Currentheight: %d", hash, n.Ledger.GetCurrentBlockHeight())
+			logrus.Infof("LEADER:%s == MYMNODE:%s", session.Leader.Pretty(), n.Host.ID().Pretty())
+			logrus.Info("LEADER going to Call external chain contract method")
+			err = n.DistributeBlock(block)
+			if err != nil {
+				logrus.Error(fmt.Errorf("DistributeBlock %w", err))
+			}
+			_, err = n.ReceiveRequestV2(event)
+			if err != nil {
+				logrus.Error(fmt.Errorf("ReceiveRequestV2 %w", err))
+			}
+		} else {
+			wg.Add(1)
+			n.ReceiveAndSaveBlock(wg)
 		}
+
 	case <-ctx.Done():
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			logrus.Warn("WaitGroup timed out..")
 		}
 	}
+
 	logrus.Info("The END of Protocol")
 }
 
@@ -507,6 +520,7 @@ const ChanLen = 500
 const (
 	BlsSetupPhase = iota
 	BlsSetupParts
+	DistributeBlockPhase
 )
 
 type MessageBlsSetup struct {

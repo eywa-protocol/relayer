@@ -81,11 +81,11 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 			for {
 				select {
 				case log := <-logChan:
-					logrus.Debugf("log recived: %s\n", log.TxHash.Hex())
+					logrus.Debugf("chain[%s] %s log recived: %s", w.client.chainId.String(), w.contract.Name(), log.TxHash.Hex())
 					if !w.cache.Exists(log) {
 						eventPointer := w.contract.NewEventPointer()
 						if err := w.unpackLog(eventPointer, log); err != nil {
-							return err
+							return fmt.Errorf("can not unpack chain[%s] %s on error:%w", w.client.chainId.String(), w.contract.Name(), err)
 						}
 						w.contract.SetEventRaw(eventPointer, log)
 						w.client.wg.Add(1)
@@ -94,14 +94,15 @@ func (w *clientWatcher) watchEvents() (event.Subscription, error) {
 							w.contract.OnEvent(eventPointer, w.client.chainId)
 						}()
 					} else {
-						logrus.Debugf("skip already processed log: %s\n", log.TxHash.Hex())
+						logrus.Debugf("chain[%s] %s skip already processed log: %s", w.client.chainId.String(), w.contract.Name(), log.TxHash.Hex())
 					}
 				case err := <-sub.Err():
-					logrus.Infof("chain[%s] subscription error: %v", w.client.chainId.String(), err)
+					w.setSubscribed(false)
 					if err != nil {
-						logrus.Debugf("subscription error: %v", err)
-						w.setSubscribed(false)
+						logrus.Warnf("chain[%s] subscription to %s stoped on error %v", w.client.chainId.String(), w.contract.Name(), err)
 						w.client.SendResubscribeSignal()
+					} else {
+						logrus.Infof("chain[%s] subscription to %s unsubscribed ", w.client.chainId.String(), w.contract.Name())
 					}
 					return err
 				case <-quit:

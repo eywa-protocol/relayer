@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
 	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
 
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"

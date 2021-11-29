@@ -668,7 +668,7 @@ func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey
 }
 
 func (n *Node) HandleNewEpoch(e *wrappers.BridgeNewEpoch, srcChainId *big.Int) {
-	logrus.Infof("New epoch event %v -> %v", e.OldEpochKey, e.NewEpochKey)
+	logrus.Infof("New epoch event in block %d, %x -> %x", e.Raw.BlockNumber, e.OldEpochKey, e.NewEpochKey)
 }
 
 func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *big.Int) {

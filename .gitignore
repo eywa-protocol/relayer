@@ -9,4 +9,4 @@ bsn.yaml
 .env.sentry
 .env.prom
 bsn
-bridge
+/bridge

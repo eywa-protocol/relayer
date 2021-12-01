@@ -71,6 +71,7 @@ type Node struct {
 	BlsNodeId      int
 	Ledger         *ledger.Ledger
 	EpochKeys
+	*QuitHandlers
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Node, wg *sync.WaitGroup) {
@@ -598,6 +599,10 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup, topic *pubSub.Topic) bls.Signature {
 	return membershipKey
 }
 
+func EpochTopicName(key []byte) string {
+	return "Epoch:" + hex.EncodeToString(key)
+}
+
 func (n *Node) StartEpoch() error {
 
 	publicKeys, err := n.NodeRegistryPublicKeys()
@@ -612,7 +617,7 @@ func (n *Node) StartEpoch() error {
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
-	topicName := "Epoch:" + hex.EncodeToString(aggregatedPublicKey.Marshal())
+	topicName := EpochTopicName(aggregatedPublicKey.Marshal())
 	if topic, err := n.P2PPubSub.JoinTopic(topicName); err != nil {
 		logrus.WithFields(logrus.Fields{
 			field.ConsensusRendezvous: topicName,
@@ -656,13 +661,19 @@ func (n *Node) StartEpoch() error {
 
 		logrus.Info("BLS setup done")
 		wg.Wait()
-		go n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0))
+		go n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0), n.AddQuitHandler(topicName))
 	}
 	return nil
 }
 
-func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int) {
-	time.Sleep(time.Duration(n.Id) * time.Second)
+func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int, quit QuitChannel) {
+	defer n.RemoveQuitHandler(quit)
+	select {
+	case <-time.After(time.Duration(n.Id) * 5 * time.Second):
+	case <-quit:
+		return
+	}
+
 	for chainId, client := range *n.clients.All() {
 		go func(chainId uint64, client eth.Client) {
 			instance, err := n.GetBridge(big.NewInt(int64(chainId)))
@@ -694,7 +705,11 @@ func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey
 var noEpochKey = make([]byte, 128)
 
 func (n *Node) HandleNewEpoch(e *wrappers.BridgeNewEpoch, srcChainId *big.Int) {
-	logrus.Infof("New epoch event in block %d, %x -> %x", e.Raw.BlockNumber, e.OldEpochKey, e.NewEpochKey)
+	logrus.Infof("New epoch event in block %d, tx %x, old: %x, new: %x", e.Raw.BlockNumber, e.Raw.TxHash, e.OldEpochKey, e.NewEpochKey)
+	topicName := EpochTopicName(e.NewEpochKey)
+	if n.RemoveTopicHandler(topicName) {
+		logrus.Info("Canceled EpochUpdate() because already done")
+	}
 	if bytes.Equal(e.NewEpochKey, noEpochKey) {
 		n.StartEpoch()
 	}

@@ -363,6 +363,7 @@ func NewNodeWithClients(ctx context.Context, signerKey *ecdsa.PrivateKey) (n *No
 		Node: base.Node{
 			Ctx: ctx,
 		},
+		QuitHandlers:   NewQuitHandlers(),
 		nonceMx:        new(sync.Mutex),
 		signerKey:      signerKey,
 		uptimeRegistry: new(flow.MeterRegistry),

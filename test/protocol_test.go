@@ -132,8 +132,9 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 				PublicKeys:     publicKeys,
 				EpochPublicKey: aggregatedPublicKey,
 			},
-			PrivKey:   privateKeys[i],
-			P2PPubSub: comm,
+			PrivKey:      privateKeys[i],
+			P2PPubSub:    comm,
+			QuitHandlers: bridge.NewQuitHandlers(),
 		}
 
 		nodes[i].InitializeCommonPubSub("TEST")
@@ -224,5 +225,5 @@ func LogOutputBLS(t *testing.T, nodes []*model.Node) {
 
 func runNodeBLSSetup(node *bridge.Node, wg *sync.WaitGroup) {
 	defer wg.Done()
-	node.MembershipKey = node.BlsSetup(wg)
+	node.MembershipKey = node.BlsSetup(wg, node.P2PPubSub.MainTopic())
 }

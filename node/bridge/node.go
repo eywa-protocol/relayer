@@ -686,7 +686,7 @@ func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey
 				logrus.Errorf("Unable to get txOps for %d: %v", chainId, err)
 				return
 			}
-			tx, err := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask)
+			tx, err := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask, 42)
 			if err != nil {
 				logrus.Errorf("Unable to invoke UpdateRequest for %d: %v", chainId, err)
 				return

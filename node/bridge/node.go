@@ -276,7 +276,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 	var txHash *common.Hash
 
 	if n.CanUseGsn(event.Chainid) && n.gsnClient != nil {
-		hash, err := forward.BridgeRequestV2(n.gsnClient, event.Chainid, n.signerKey, event.OppositeBridge, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		hash, err := forward.BridgeRequestV2(n.gsnClient, event.Chainid, n.signerKey, event.OppositeBridge, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge.Hash())
 		if err != nil {
 			err = fmt.Errorf("ReceiveRequestV2 gsn error:%w", err)
 			logrus.WithFields(
@@ -298,7 +298,7 @@ func (n *Node) ReceiveRequestV2(event *wrappers.BridgeOracleRequest) (receipt *t
 			return nil, err
 		}
 		/** Invoke bridge on another side */
-		tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge)
+		tx, err := instance.ReceiveRequestV2(txOpts, event.RequestId, event.Selector, event.ReceiveSide, event.Bridge.Hash())
 		if err != nil {
 			err = fmt.Errorf("ReceiveRequestV2 error:%w", err)
 			logrus.WithFields(

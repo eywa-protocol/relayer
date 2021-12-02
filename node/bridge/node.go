@@ -1,19 +1,24 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
-	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
 	"math/big"
 	"sync"
 	"time"
 
+	types2 "gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/types"
+
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-overhead-chain/core/ledger"
+
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/extChains/eth"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/forward"
 	libp2p2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/contracts"
@@ -66,6 +71,7 @@ type Node struct {
 	BlsNodeId      int
 	Ledger         *ledger.Ledger
 	EpochKeys
+	*QuitHandlers
 }
 
 func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Node, wg *sync.WaitGroup) {
@@ -530,7 +536,7 @@ type MessageBlsSetup struct {
 }
 
 // BlsSetup handles BLS setup phase and returns membership key as a result
-func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
+func (n *Node) BlsSetup(wg *sync.WaitGroup, topic *pubSub.Topic) bls.Signature {
 	ctx, cancel := context.WithCancel(n.Ctx)
 	defer cancel()
 	mutex := &sync.Mutex{}
@@ -540,7 +546,7 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	membershipKey := bls.ZeroSignature()
 
 	for {
-		rcvdMsg := n.P2PPubSub.Receive(ctx)
+		rcvdMsg := n.P2PPubSub.ReceiveFrom(topic.String(), ctx)
 		if rcvdMsg == nil {
 			logrus.Info("receive return nil")
 			break
@@ -571,7 +577,7 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 						MembershipKeyParts: membershipKeyParts,
 					}
 					msgBytes, _ := json.Marshal(outmsg)
-					n.P2PPubSub.Broadcast(msgBytes)
+					n.P2PPubSub.BroadcastTo(topic, msgBytes)
 
 				case BlsSetupParts:
 					logrus.Infof("Membership Key parts of node %d received by node %d", msg.Source, n.Id)
@@ -593,6 +599,10 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup) bls.Signature {
 	return membershipKey
 }
 
+func EpochTopicName(key []byte) string {
+	return "Epoch:" + hex.EncodeToString(key)
+}
+
 func (n *Node) StartEpoch() error {
 
 	publicKeys, err := n.NodeRegistryPublicKeys()
@@ -607,31 +617,102 @@ func (n *Node) StartEpoch() error {
 	n.PublicKeys = publicKeys
 	n.EpochPublicKey = aggregatedPublicKey
 
-	for n.P2PPubSub.MainTopic() == nil || len(n.P2PPubSub.MainTopic().ListPeers()) < len(publicKeys)-1 { // TODO: configure how many peers to wait for
-		if n.P2PPubSub.MainTopic() == nil {
-			logrus.Info("Waiting to join the initial topic")
-		} else {
-			logrus.Info("Waiting for all members to come, topic.ListPeers(): ", n.P2PPubSub.MainTopic().ListPeers())
+	topicName := EpochTopicName(aggregatedPublicKey.Marshal())
+	if topic, err := n.P2PPubSub.JoinTopic(topicName); err != nil {
+		logrus.WithFields(logrus.Fields{
+			field.ConsensusRendezvous: topicName,
+		}).Error(fmt.Errorf("join topic error: %w", err))
+		return err
+	} else {
+		defer func() {
+			if err := n.P2PPubSub.LeaveTopic(topicName); err != nil {
+				logrus.WithFields(logrus.Fields{
+					field.ConsensusRendezvous: topicName,
+				}).Error(fmt.Errorf("close topic error: %w", err))
+			}
+			logrus.Infof("close topic %s", topic.String())
+		}()
+		err := n.P2PPubSub.Subscribe(topicName)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				field.ConsensusRendezvous: topicName,
+			}).Error(fmt.Errorf("subscribe to topic error: %w", err))
+			return err
 		}
-		time.Sleep(3 * time.Second)
+		logrus.Infof("request subscribe to topic: %s", topicName)
+		logrus.Infof("request topic peers: %v", topic.ListPeers())
+
+		for len(topic.ListPeers()) < len(publicKeys)-1 { // TODO: configure how many peers to wait for
+			logrus.Info("Waiting for all members to come, topic.ListPeers(): ", topic.ListPeers())
+			time.Sleep(1000 * time.Millisecond)
+		}
+
+		wg := &sync.WaitGroup{}
+		if n.Id == 0 { // TODO: all nodes must be able to send the first message
+			logrus.Info("Preparing to start BLS setup phase...")
+			// Fire the setup phase
+			msg := MessageBlsSetup{MsgType: BlsSetupPhase}
+			msgBytes, _ := json.Marshal(msg)
+			n.P2PPubSub.BroadcastTo(topic, msgBytes)
+		}
+
+		logrus.Info("Start BLS setup")
+		n.MembershipKey = n.BlsSetup(wg, topic)
+
+		logrus.Info("BLS setup done")
+		wg.Wait()
+		go n.SpreadNewEpoch(aggregatedPublicKey, bls.ZeroPublicKey(), make([]byte, 0), bls.ZeroSignature(), big.NewInt(0), n.AddQuitHandler(topicName))
 	}
-
-	wg := &sync.WaitGroup{}
-	if n.Id == 0 { // TODO: all nodes must be able to send the first message
-		logrus.Info("Preparing to start BLS setup phase...")
-		// Fire the setip phase
-		msg := MessageBlsSetup{MsgType: BlsSetupPhase}
-		msgBytes, _ := json.Marshal(msg)
-		n.P2PPubSub.Broadcast(msgBytes)
-	}
-
-	logrus.Info("Start BLS setup done")
-	n.MembershipKey = n.BlsSetup(wg)
-
-	logrus.Info("BLS setup done")
-	wg.Wait()
-	logrus.Info("start epoch done")
 	return nil
+}
+
+func (n *Node) SpreadNewEpoch(epochKey bls.PublicKey, votersPubKey bls.PublicKey, message []byte, votersSignature bls.Signature, votersMask *big.Int, quit QuitChannel) {
+	defer n.RemoveQuitHandler(quit)
+	select {
+	case <-time.After(time.Duration(n.Id) * 5 * time.Second):
+	case <-quit:
+		return
+	}
+
+	for chainId, client := range *n.clients.All() {
+		go func(chainId uint64, client eth.Client) {
+			instance, err := n.GetBridge(big.NewInt(int64(chainId)))
+			if err != nil {
+				logrus.Errorf("Unable to get Bridge for %d: %v", chainId, err)
+				return
+			}
+			txOpts, err := client.CallOpt(n.signerKey)
+			if err != nil {
+				logrus.Errorf("Unable to get txOps for %d: %v", chainId, err)
+				return
+			}
+			tx, err := instance.UpdateEpoch(txOpts, epochKey.Marshal(), votersPubKey.Marshal(), votersSignature.Marshal(), votersMask, 42)
+			if err != nil {
+				logrus.Errorf("Unable to invoke UpdateRequest for %d: %v", chainId, err)
+				return
+			}
+			logrus.Infof("Sent UpdateEpoch() to %d as %x", chainId, tx.Hash())
+			receipt, err := client.WaitTransaction(tx.Hash())
+			if err != nil {
+				logrus.Errorf("Unable to transact UpdateRequest for %d: %v", chainId, err)
+				return
+			}
+			logrus.Infof("Done UpdateEpoch() to %d with status %d", chainId, receipt.Status)
+		}(chainId, client)
+	}
+}
+
+var noEpochKey = make([]byte, 128)
+
+func (n *Node) HandleNewEpoch(e *wrappers.BridgeNewEpoch, srcChainId *big.Int) {
+	logrus.Infof("New epoch event in block %d, tx %x, old: %x, new: %x", e.Raw.BlockNumber, e.Raw.TxHash, e.OldEpochKey, e.NewEpochKey)
+	topicName := EpochTopicName(e.NewEpochKey)
+	if n.RemoveTopicHandler(topicName) {
+		logrus.Info("Canceled EpochUpdate() because already done")
+	}
+	if bytes.Equal(e.NewEpochKey, noEpochKey) {
+		n.StartEpoch()
+	}
 }
 
 func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *big.Int) {

@@ -7,8 +7,6 @@ enum Msg_type {
     Announce = 0;
     Prepare = 1;
     Prepared = 2;
-    Commit = 3;
-    Commited = 4;
 }
 
 message Message{
@@ -22,8 +20,6 @@ message Message{
 message ConsensusRequest {
     required Msg_type Msg_type = 1;
     required int64 source = 2;
-    required int64 step = 3;
-    repeated ConsensusRequest history = 4;
     optional bytes signature = 5;
     optional bytes mask = 6;
     optional bytes public_key = 7;
@@ -31,8 +27,7 @@ message ConsensusRequest {
 }
 
 message DrandRequest {
-
-}
-    message UptimeRequest {
 }
 
+message UptimeRequest {
+}

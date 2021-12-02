@@ -2,8 +2,9 @@ package message
 
 import (
 	"fmt"
-	"google.golang.org/protobuf/runtime/protoimpl"
 	"math/big"
+
+	"google.golang.org/protobuf/runtime/protoimpl"
 
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/golang/protobuf/proto"
@@ -16,23 +17,13 @@ type Convert struct{}
 // ConvertModelMessage is for converting message defined in model to message used by protobuf
 func convertModelMessage(msg model.MessageWithSig) (message *ConsensusRequest) {
 	source := int64(msg.Source)
-	step := int64(msg.Step)
-
 	msgType := MsgType(msg.MsgType)
-
-	history := make([]*ConsensusRequest, 0)
-
-	for _, hist := range msg.History {
-		history = append(history, convertModelMessage(hist))
-	}
 	message = &ConsensusRequest{
 		state:           protoimpl.MessageState{},
 		sizeCache:       0,
 		unknownFields:   nil,
 		MsgType:         &msgType,
 		Source:          &source,
-		Step:            &step,
-		History:         history,
 		Signature:       msg.Signature.Marshal(),
 		Mask:            msg.Mask.Bytes(),
 		PublicKey:       msg.PublicKey.Marshal(),
@@ -54,10 +45,6 @@ func (c *Convert) MessageToBytes(msg model.MessageWithSig) *[]byte {
 func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWithSig) {
 	history := make([]model.MessageWithSig, 0)
 
-	for _, hist := range msg.History {
-		history = append(history, convertConsensusRequestSig(hist))
-	}
-
 	sig, err := bls.UnmarshalSignature(msg.Signature)
 	if err != nil {
 		logrus.Trace("UnmarshalBlsSignature error: ", err.Error(), msg.Signature)
@@ -70,7 +57,7 @@ func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWit
 
 	message = model.MessageWithSig{
 		Header:    model.Header{Source: int(msg.GetSource()), MsgType: model.MsgType(msg.GetMsgType())},
-		Body:      model.Body{Step: int(msg.GetStep()), BridgeEventHash: msg.GetBridgeEventHash()},
+		Body:      model.Body{msg.GetBridgeEventHash()},
 		History:   history,
 		Signature: sig,
 		Mask:      *new(big.Int).SetBytes(msg.Mask),

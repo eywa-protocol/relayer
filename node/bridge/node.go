@@ -74,10 +74,10 @@ type Node struct {
 	*QuitHandlers
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Node, wg *sync.WaitGroup) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Session, wg *sync.WaitGroup) {
 	defer wg.Done()
 	consensusChannel := make(chan bool)
-	session.AdvanceStep(0)
+	session.StartProtocol()
 	time.Sleep(time.Second)
 	ctx, cancel := context.WithTimeout(session.Ctx, 30*time.Second)
 	defer cancel()
@@ -159,7 +159,7 @@ func (n Node) RegChainId() *big.Int {
 	return new(big.Int).SetUint64(config.Bridge.RegChainId)
 }
 
-func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
+func (n Node) NewSession(topic *pubSub.Topic) (blsNode *model.Session, err error) {
 	publicKeys, err := n.NodeRegistryPublicKeys()
 	if err != nil {
 		return
@@ -177,7 +177,7 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 			return nil, err
 		}
 
-		blsNode = func() *model.Node {
+		blsNode = func() *model.Session {
 			ctx, cancel := context.WithTimeout(n.Ctx, 30*time.Second)
 			defer cancel()
 			for {
@@ -188,17 +188,15 @@ func (n Node) NewBLSNode(topic *pubSub.Topic) (blsNode *model.Node, err error) {
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					leader, _ := libp2p2.RelayerLeaderNode(topic.String(), topicParticipants)
 
-					blsNode = &model.Node{
+					blsNode = &model.Session{
 						Ctx:            n.Ctx,
 						Topic:          topic,
 						Id:             int(node.NodeId.Int64()),
-						TimeStep:       0,
 						ThresholdWit:   len(topicParticipants)/2 + 1,
 						ThresholdAck:   len(topicParticipants)/2 + 1,
 						Acks:           0,
 						ConvertMsg:     &messageSigPb.Convert{},
 						Comm:           n.P2PPubSub,
-						History:        make([]model.MessageWithSig, 0),
 						SigMask:        bls.EmptyMultisigMask(),
 						PublicKeys:     publicKeys,
 						PrivateKey:     n.PrivKey,
@@ -548,7 +546,7 @@ func (n *Node) BlsSetup(wg *sync.WaitGroup, topic *pubSub.Topic) bls.Signature {
 	for {
 		rcvdMsg := n.P2PPubSub.ReceiveFrom(topic.String(), ctx)
 		if rcvdMsg == nil {
-			logrus.Info("receive return nil")
+			logrus.Info("BlsSetup receive return nil")
 			break
 		}
 
@@ -745,7 +743,7 @@ func (n *Node) HandleOracleRequest(e *wrappers.BridgeOracleRequest, srcChainId *
 		logrus.Infof("request chain[%s] subscribe to topic: %s", srcChainId.String(), topicName)
 		logrus.Infof("request chain[%s] topic peers: %v", srcChainId.String(), topic.ListPeers())
 
-		session, err := n.NewBLSNode(topic)
+		session, err := n.NewSession(topic)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				field.CainId:              e.Chainid,

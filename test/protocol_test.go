@@ -143,19 +143,10 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 }
 
 func makeSession(n int, node *bridge.Node) *model.Node {
-	topic, err := node.P2PPubSub.JoinTopic("ProtocolTestTopic")
-	if err != nil {
-		logrus.Error(err)
-	}
-	err = node.P2PPubSub.Subscribe(topic.String())
-	if err != nil {
-		logrus.Error(err)
-	}
-	logrus.Infof("Node %d subscribed to %s.", node.Id, topic.String())
 	return &model.Node{
 		Ctx:            node.Ctx,
 		Id:             node.Id,
-		Topic:          topic,
+		Topic:          node.P2PPubSub.MainTopic(),
 		TimeStep:       0,
 		ThresholdWit:   n/2 + 1,
 		ThresholdAck:   n/2 + 1,

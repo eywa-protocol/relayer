@@ -9,13 +9,13 @@ import (
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/session"
 )
 
 type Convert struct{}
 
 // ConvertModelMessage is for converting message defined in model to message used by protobuf
-func convertModelMessage(msg model.MessageWithSig) (message *ConsensusRequest) {
+func convertModelMessage(msg session.MessageWithSig) (message *ConsensusRequest) {
 	source := int64(msg.Source)
 	msgType := MsgType(msg.MsgType)
 	message = &ConsensusRequest{
@@ -32,7 +32,7 @@ func convertModelMessage(msg model.MessageWithSig) (message *ConsensusRequest) {
 	return
 }
 
-func (c *Convert) MessageToBytes(msg model.MessageWithSig) *[]byte {
+func (c *Convert) MessageToBytes(msg session.MessageWithSig) *[]byte {
 	msgBytes, err := proto.Marshal(convertModelMessage(msg))
 	if err != nil {
 		fmt.Printf("Error : %v\n", err)
@@ -42,8 +42,8 @@ func (c *Convert) MessageToBytes(msg model.MessageWithSig) *[]byte {
 }
 
 // ConvertConsensusRequestSig is for converting protobuf message to message used in model
-func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWithSig) {
-	history := make([]model.MessageWithSig, 0)
+func convertConsensusRequestSig(msg *ConsensusRequest) (message session.MessageWithSig) {
+	history := make([]session.MessageWithSig, 0)
 
 	sig, err := bls.UnmarshalSignature(msg.Signature)
 	if err != nil {
@@ -55,9 +55,9 @@ func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWit
 		logrus.Trace("UnmarshalBlsPublicKey error: ", err.Error(), msg.PublicKey)
 	}
 
-	message = model.MessageWithSig{
-		Header:    model.Header{Source: int(msg.GetSource()), MsgType: model.MsgType(msg.GetMsgType())},
-		Body:      model.Body{msg.GetBridgeEventHash()},
+	message = session.MessageWithSig{
+		Header:    session.Header{Source: int(msg.GetSource()), MsgType: session.MsgType(msg.GetMsgType())},
+		Body:      session.Body{msg.GetBridgeEventHash()},
 		History:   history,
 		Signature: sig,
 		Mask:      *new(big.Int).SetBytes(msg.Mask),
@@ -66,7 +66,7 @@ func convertConsensusRequestSig(msg *ConsensusRequest) (message model.MessageWit
 	return
 }
 
-func (c *Convert) BytesToModelMessage(msgBytes []byte) *model.MessageWithSig {
+func (c *Convert) BytesToModelMessage(msgBytes []byte) *session.MessageWithSig {
 	var ConsensusRequestSig ConsensusRequest
 	err := proto.Unmarshal(msgBytes, &ConsensusRequestSig)
 	if err != nil {

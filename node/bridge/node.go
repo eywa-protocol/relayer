@@ -26,7 +26,6 @@ import (
 	"github.com/eywa-protocol/bls-crypto/bls"
 	"github.com/libp2p/go-flow-metrics"
 	bls_consensus "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/libp2p/rpc/gsn"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/sentry/field"
@@ -41,6 +40,7 @@ import (
 	common2 "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/common"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/config"
 	messageSigPb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/message"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/session"
 	"gitlab.digiu.ai/blockchainlaboratory/wrappers"
 )
 
@@ -74,7 +74,7 @@ type Node struct {
 	*QuitHandlers
 }
 
-func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *model.Session, wg *sync.WaitGroup) {
+func (n Node) StartProtocolByOracleRequest(event *wrappers.BridgeOracleRequest, session *session.Session, wg *sync.WaitGroup) {
 	defer wg.Done()
 	consensusChannel := make(chan bool)
 	session.StartProtocol()
@@ -159,7 +159,7 @@ func (n Node) RegChainId() *big.Int {
 	return new(big.Int).SetUint64(config.Bridge.RegChainId)
 }
 
-func (n Node) NewSession(topic *pubSub.Topic) (blsNode *model.Session, err error) {
+func (n Node) NewSession(topic *pubSub.Topic) (blsNode *session.Session, err error) {
 	publicKeys, err := n.NodeRegistryPublicKeys()
 	if err != nil {
 		return
@@ -177,7 +177,7 @@ func (n Node) NewSession(topic *pubSub.Topic) (blsNode *model.Session, err error
 			return nil, err
 		}
 
-		blsNode = func() *model.Session {
+		blsNode = func() *session.Session {
 			ctx, cancel := context.WithTimeout(n.Ctx, 30*time.Second)
 			defer cancel()
 			for {
@@ -188,7 +188,7 @@ func (n Node) NewSession(topic *pubSub.Topic) (blsNode *model.Session, err error
 				if len(topicParticipants) > minConsensusNodesCount && len(topicParticipants) > len(n.P2PPubSub.ListPeersByTopic(config.Bridge.Rendezvous))/2+1 {
 					leader, _ := libp2p2.RelayerLeaderNode(topic.String(), topicParticipants)
 
-					blsNode = &model.Session{
+					blsNode = &session.Session{
 						Ctx:            n.Ctx,
 						Topic:          topic,
 						Id:             int(node.NodeId.Int64()),

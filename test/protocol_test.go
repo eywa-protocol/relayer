@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/message"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/session"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 )
@@ -66,7 +66,7 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 
 func TestOneStepBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../logs/oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
-	model.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
+	session.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
 	simpleTestOneStepBLS(t, 7, 9900)
 }
 
@@ -142,8 +142,8 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 	return nodes, hosts
 }
 
-func makeSession(n int, node *bridge.Node) *model.Session {
-	return &model.Session{
+func makeSession(n int, node *bridge.Node) *session.Session {
+	return &session.Session{
 		Ctx:            node.Ctx,
 		Id:             node.Id,
 		Topic:          node.P2PPubSub.MainTopic(),
@@ -176,13 +176,13 @@ func StartBlsSetup(nodes []*bridge.Node) {
 }
 
 // StartTest is used for starting tlc nodes
-func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*model.Session) {
+func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*session.Session) {
 	logrus.Info("START")
 	n := len(nodes)
 
 	StartBlsSetup(nodes)
 
-	sessions = make([]*model.Session, n)
+	sessions = make([]*session.Session, n)
 	for i, node := range nodes {
 		sessions[i] = makeSession(n, node)
 	}
@@ -205,7 +205,7 @@ func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*
 	return
 }
 
-func LogOutputBLS(t *testing.T, nodes []*model.Session) {
+func LogOutputBLS(t *testing.T, nodes []*session.Session) {
 	for i := range nodes {
 		t.Logf("LogOut nodes: %d", i)
 	}

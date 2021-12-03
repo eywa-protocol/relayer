@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus"
-	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/model"
 	messageSigpb "gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/protobuf/message"
+	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/consensus/session"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/base"
 	"gitlab.digiu.ai/blockchainlaboratory/eywa-p2p-bridge/node/bridge"
 )
@@ -66,7 +66,7 @@ func setupNetworkTopology(hosts []*core.Host) (err error) {
 
 func TestOneStepBLS(t *testing.T) {
 	logFile, _ := os.OpenFile("../logs/oneStepBLS.log", os.O_RDWR|os.O_CREATE, 0666)
-	model.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
+	session.Logger1 = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
 	simpleTestOneStepBLS(t, 7, 9900)
 }
 
@@ -142,18 +142,16 @@ func setupHostsBLS(n int, initialPort int) ([]*bridge.Node, []*core.Host) {
 	return nodes, hosts
 }
 
-func makeSession(n int, node *bridge.Node) *model.Node {
-	return &model.Node{
+func makeSession(n int, node *bridge.Node) *session.Session {
+	return &session.Session{
 		Ctx:            node.Ctx,
 		Id:             node.Id,
 		Topic:          node.P2PPubSub.MainTopic(),
-		TimeStep:       0,
 		ThresholdWit:   n/2 + 1,
 		ThresholdAck:   n/2 + 1,
 		Acks:           0,
 		ConvertMsg:     &messageSigpb.Convert{},
 		Comm:           node.P2PPubSub,
-		History:        make([]model.MessageWithSig, 0),
 		SigMask:        bls.EmptyMultisigMask(),
 		PublicKeys:     node.PublicKeys,
 		PrivateKey:     node.PrivKey,
@@ -178,18 +176,18 @@ func StartBlsSetup(nodes []*bridge.Node) {
 }
 
 // StartTest is used for starting tlc nodes
-func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*model.Node) {
+func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*session.Session) {
 	logrus.Info("START")
 	n := len(nodes)
 
 	StartBlsSetup(nodes)
 
-	sessions = make([]*model.Node, n)
+	sessions = make([]*session.Session, n)
 	for i, node := range nodes {
 		sessions[i] = makeSession(n, node)
 	}
 	wg := &sync.WaitGroup{}
-	sessions[0].AdvanceStep(0)
+	sessions[0].StartProtocol()
 
 	var consensusesChan []chan bool
 	for _, session := range sessions {
@@ -207,10 +205,9 @@ func StartTestOneStepBLS(nodes []*bridge.Node) (consensuses []bool, sessions []*
 	return
 }
 
-func LogOutputBLS(t *testing.T, nodes []*model.Node) {
+func LogOutputBLS(t *testing.T, nodes []*session.Session) {
 	for i := range nodes {
-		t.Logf("LogOut nodes: %d , TimeStep : %d", i, nodes[i].TimeStep)
-		model.Logger1.Printf("%d,%d\n", i, nodes[i].TimeStep)
+		t.Logf("LogOut nodes: %d", i)
 	}
 }
 

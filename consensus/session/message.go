@@ -1,4 +1,4 @@
-package model
+package session
 
 import (
 	"math/big"
@@ -12,12 +12,9 @@ const (
 	Announce = iota
 	Prepare
 	Prepared
-	Commit
-	Commited
 )
 
 type Body struct {
-	Step            int // Time step of message
 	BridgeEventHash string
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-// Session is the struct used for keeping everything related to a node in TLC.
+// Session is the struct used for keeping everything related to a session in TLC.
 type Session struct {
 	Ctx            context.Context
 	Topic          *pubsub.Topic

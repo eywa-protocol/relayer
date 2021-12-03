@@ -26,54 +26,54 @@ func Popcount(z *big.Int) int {
 	return count
 }
 
-// verifyThresholdWitnesses verifies that it's really witnessed by majority of nodes by checking the signature and number of them
-func (node *Session) verifyThresholdWitnesses(msg MessageWithSig) (err error) {
-	if pop := Popcount(&msg.Mask); pop < node.ThresholdAck {
-		err = fmt.Errorf("not enough sigantures: %d(%s) < %d", pop, msg.Mask.Text(16), node.ThresholdAck)
+// verifyThresholdWitnesses verifies that it's really witnessed by majority of sessions by checking the signature and number of them
+func (session *Session) verifyThresholdWitnesses(msg MessageWithSig) (err error) {
+	if pop := Popcount(&msg.Mask); pop < session.ThresholdAck {
+		err = fmt.Errorf("not enough sigantures: %d(%s) < %d", pop, msg.Mask.Text(16), session.ThresholdAck)
 		return
 	}
 
 	// Verify message signature
 	body, _ := json.Marshal(msg.Body)
-	if !msg.Signature.VerifyMultisig(node.EpochPublicKey, msg.PublicKey, body, &msg.Mask) {
+	if !msg.Signature.VerifyMultisig(session.EpochPublicKey, msg.PublicKey, body, &msg.Mask) {
 		return fmt.Errorf("threshold signature mismatch for '%s'", body)
 	}
 	logrus.Tracef("Aggregated Signature VERIFIED ! ! !")
 	return
 }
 
-func (node *Session) verifyAckSignature(msg MessageWithSig) (err error) {
+func (session *Session) verifyAckSignature(msg MessageWithSig) (err error) {
 	body, _ := json.Marshal(msg.Body)
 	mask := big.NewInt(0)
 	mask.SetBit(mask, msg.Source, 1)
-	if !msg.Signature.VerifyMultisig(node.EpochPublicKey, node.PublicKeys[msg.Source], body, mask) {
+	if !msg.Signature.VerifyMultisig(session.EpochPublicKey, session.PublicKeys[msg.Source], body, mask) {
 		err = fmt.Errorf("ACK signature mismatch for '%s'", body)
 		return
 	}
 	return
 }
 
-// StartProtocol  will change the step of the node to a new one and then broadcast a message to the network.
-func (node *Session) StartProtocol() {
+// StartProtocol  will change the step of the session to a new one and then broadcast a message to the network.
+func (session *Session) StartProtocol() {
 	msg := MessageWithSig{
-		Header:  Header{node.Id, Announce},
-		Body:    Body{node.Topic.String()},
+		Header:  Header{session.Id, Announce},
+		Body:    Body{session.Topic.String()},
 		History: make([]MessageWithSig, 0),
 	}
 
-	msgBytes := node.ConvertMsg.MessageToBytes(msg)
-	node.Comm.BroadcastTo(node.Topic, *msgBytes)
+	msgBytes := session.ConvertMsg.MessageToBytes(msg)
+	session.Comm.BroadcastTo(session.Topic, *msgBytes)
 }
 
 // WaitForProtocolMsg waits for upcoming messages and then decides the next action with respect to msg's contents.
-func (node *Session) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGroup) {
+func (session *Session) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ctx, cancel := context.WithCancel(node.Ctx)
+	ctx, cancel := context.WithCancel(session.Ctx)
 	defer cancel()
 	mutex := &sync.Mutex{}
 	for ctx.Err() == nil {
 		// For now we assume that the underlying receive function is blocking
-		rcvdMsg := node.Comm.ReceiveFrom(node.Topic.String(), ctx)
+		rcvdMsg := session.Comm.ReceiveFrom(session.Topic.String(), ctx)
 		if rcvdMsg == nil {
 			logrus.Warn("protocol received empty message")
 			break
@@ -82,22 +82,22 @@ func (node *Session) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.Wait
 		wg.Add(1)
 		go func(msgBytes *[]byte) {
 			defer wg.Done()
-			msg := node.ConvertMsg.BytesToModelMessage(*msgBytes)
-			if msg.BridgeEventHash != node.Topic.String() {
-				logrus.Warnf("NOT MY MESSAGE %s != %s", msg.BridgeEventHash, node.Topic.String())
+			msg := session.ConvertMsg.BytesToModelMessage(*msgBytes)
+			if msg.BridgeEventHash != session.Topic.String() {
+				logrus.Warnf("NOT MY MESSAGE %s != %s", msg.BridgeEventHash, session.Topic.String())
 				return
 			}
 
 			switch msg.MsgType {
 			case Prepared:
-				err := node.verifyThresholdWitnesses(*msg)
+				err := session.verifyThresholdWitnesses(*msg)
 				if err != nil {
-					logrus.Error("Prepared threshold failed: ", err, " at node ", node.Id)
+					logrus.Error("Prepared threshold failed: ", err, " at session ", session.Id)
 					return
 				}
-				logrus.Debugf("Verified 'Prepared' Signature at node %d from node %d", node.Id, msg.Source)
+				logrus.Debugf("Verified 'Prepared' Signature at session %d from session %d", session.Id, msg.Source)
 
-				logrus.Tracef("Consensus achieved by node %v", node.Id)
+				logrus.Tracef("Consensus achieved by session %v", session.Id)
 				mutex.Lock()
 				if ctx.Err() == nil {
 					consensusAgreed <- true
@@ -108,61 +108,61 @@ func (node *Session) WaitForProtocolMsg(consensusAgreed chan bool, wg *sync.Wait
 			case Prepare:
 				// Checking that the ack is for message of this step
 				mutex.Lock()
-				if (node.Acks >= node.ThresholdAck) || (node.SigMask.Bit(msg.Source) != 0) {
+				if (session.Acks >= session.ThresholdAck) || (session.SigMask.Bit(msg.Source) != 0) {
 					mutex.Unlock()
 					return
 				}
 
-				err := node.verifyAckSignature(*msg)
+				err := session.verifyAckSignature(*msg)
 				if err != nil {
-					logrus.Error(err, " at node ", node.Id, msg.Source, msg.Signature.Marshal())
+					logrus.Error(err, " at session ", session.Id, msg.Source, msg.Signature.Marshal())
 					return
 				}
-				logrus.Debugf("Verified Prepare Signature at node %d from node %d", node.Id, msg.Source)
+				logrus.Debugf("Verified Prepare Signature at session %d from session %d", session.Id, msg.Source)
 
-				node.SigMask.SetBit(&node.SigMask, msg.Source, 1)
-				logrus.Debugf("Node SigMask Merged: %x", node.SigMask.Int64())
+				session.SigMask.SetBit(&session.SigMask, msg.Source, 1)
+				logrus.Debugf("Session SigMask Merged: %x", session.SigMask.Int64())
 
 				// Count acks toward the threshold
-				node.Acks += 1
-				node.PartSignature = node.PartSignature.Aggregate(msg.Signature)
-				node.PartPublicKey = node.PartPublicKey.Aggregate(node.PublicKeys[msg.Source])
+				session.Acks += 1
+				session.PartSignature = session.PartSignature.Aggregate(msg.Signature)
+				session.PartPublicKey = session.PartPublicKey.Aggregate(session.PublicKeys[msg.Source])
 
-				if node.Acks >= node.ThresholdAck {
+				if session.Acks >= session.ThresholdAck {
 					// Send witnessed message if the acks are more than threshold
 					outmsg := MessageWithSig{
-						Header:    Header{node.Id, Prepared},
+						Header:    Header{session.Id, Prepared},
 						Body:      msg.Body,
-						Mask:      node.SigMask,
-						Signature: node.PartSignature,
-						PublicKey: node.PartPublicKey,
+						Mask:      session.SigMask,
+						Signature: session.PartSignature,
+						PublicKey: session.PartPublicKey,
 					}
 
 					// Verify before sending message to others
-					if err := node.verifyThresholdWitnesses(outmsg); err != nil {
-						logrus.Error("verifyThresholdWitnesses1 ", err, ", node: ", node.Id, ", mask: ", msg.Mask.Text(16))
+					if err := session.verifyThresholdWitnesses(outmsg); err != nil {
+						logrus.Error("verifyThresholdWitnesses1 ", err, ", session: ", session.Id, ", mask: ", msg.Mask.Text(16))
 						return
 					}
 
-					msgBytes := node.ConvertMsg.MessageToBytes(outmsg)
-					node.Comm.BroadcastTo(node.Topic, *msgBytes)
+					msgBytes := session.ConvertMsg.MessageToBytes(outmsg)
+					session.Comm.BroadcastTo(session.Topic, *msgBytes)
 				}
 
 				mutex.Unlock()
 
 			case Announce:
 				body, _ := json.Marshal(msg.Body)
-				signature := node.PrivateKey.Multisign(body, node.EpochPublicKey, node.MembershipKey)
-				logrus.Debugf("Sign message '%s' at node %d", body, node.Id)
+				signature := session.PrivateKey.Multisign(body, session.EpochPublicKey, session.MembershipKey)
+				logrus.Debugf("Sign message '%s' at session %d", body, session.Id)
 
 				// Adding signature and ack to message. These fields were empty when message got signed
 				outmsg := MessageWithSig{
-					Header:    Header{node.Id, Prepare},
+					Header:    Header{session.Id, Prepare},
 					Body:      msg.Body,
 					Signature: signature,
 				}
-				msgBytes = node.ConvertMsg.MessageToBytes(outmsg)
-				node.Comm.BroadcastTo(node.Topic, *msgBytes)
+				msgBytes = session.ConvertMsg.MessageToBytes(outmsg)
+				session.Comm.BroadcastTo(session.Topic, *msgBytes)
 			}
 		}(rcvdMsg)
 	}

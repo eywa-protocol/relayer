@@ -24,20 +24,20 @@ do
     set +o allexport
     if [ "$NETWORK_ID" == "1111" ];then
       NET="network1"
-        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run ./scripts/bridge/mint.js --network ${NET}; cd -
+        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run --no-compile ./scripts/bridge/mint.js --network ${NET}; cd -
     elif [ "$NETWORK_ID" == "1112" ];then
       NET="network2"
-        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run ./scripts/bridge/mint.js --network ${NET}; cd -
+        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run --no-compile ./scripts/bridge/mint.js --network ${NET}; cd -
     elif [ "$NETWORK_ID" == "1113" ];then
       NET="network3"
-        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run ./scripts/bridge/mint.js --network ${NET}; cd -
+        cd ../external/eth-contracts/hardhat/; ADDR=$FORWARDER_ADDRESS npx hardhat run --no-compile ./scripts/bridge/mint.js --network ${NET}; cd -
     fi
 done
 
 for i in 1 2 3 4 5 6 7; do
     ADDR=$(docker-compose -f $DC run --rm --no-deps node$i ./bridge -init -cnf bridge.yaml -verbosity 0)
     for net in ${NETS}; do
-        cd ../external/eth-contracts/hardhat/; ADDR=$ADDR npx hardhat run ./scripts/bridge/mint.js --network ${net}; cd -
+        cd ../external/eth-contracts/hardhat/; ADDR=$ADDR npx hardhat run --no-compile ./scripts/bridge/mint.js --network ${net}; cd -
     done
     docker-compose -f $DC run --rm --no-deps node$i ./bridge -register -cnf bridge.yaml
 done
